@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-11T08:59:50.480565+00:00",
+  "generated_at": "2026-03-11T13:37:42.273842+00:00",
   "source_count": 4,
   "article_count": 40,
   "sources": [
@@ -23,14 +23,47 @@
   "errors": [],
   "clusters": [
     {
-      "slug": "live-1-prosecutor-says-rihanna-family-were-home-when-woman-charged-",
-      "topic_label": "Attempted / Rihanna / Murder",
-      "title": "Prosecutor says Rihanna, family were home when woman charged with attempted murder fired",
-      "dek": "Rihanna, her partner A$AP Rocky, their three children and her mother were all at home when a woman now charged with attempted murder is alleged to have fired at the property, a prosecutor said.",
-      "latest_at": "2026-03-11T05:50:41+00:00",
+      "slug": "live-1-georgia-race-to-replace-marjorie-taylor-greene-heads-to-a-ru",
+      "topic_label": "Taylor / Georgia / Marjorie",
+      "title": "Georgia race to replace Marjorie Taylor Greene heads to a runoff",
+      "dek": "Republican Clay Fuller is projected to face Democrat Shawn Harris in the 7 April runoff election.",
+      "latest_at": "2026-03-11T12:06:42+00:00",
       "article_count": 2,
       "sources": [
         "BBC",
+        "PBS NewsHour"
+      ],
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/cd05/live/a5b8f0a0-1ce7-11f1-801d-ed3cff6bf876.jpg",
+      "hero_credit": "Publisher preview image",
+      "articles": [
+        {
+          "source": "BBC",
+          "title": "Georgia race to replace Marjorie Taylor Greene heads to a runoff",
+          "url": "https://www.bbc.com/news/articles/cy4wknrz3exo?at_medium=RSS&at_campaign=rss",
+          "published_at": "2026-03-11T12:06:42+00:00",
+          "summary": "Republican Clay Fuller is projected to face Democrat Shawn Harris in the 7 April runoff election.",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/cd05/live/a5b8f0a0-1ce7-11f1-801d-ed3cff6bf876.jpg",
+          "domain": "www.bbc.com"
+        },
+        {
+          "source": "PBS NewsHour",
+          "title": "News Wrap: Georgia holds special election to replace Marjorie Taylor Greene",
+          "url": "https://www.pbs.org/newshour/show/news-wrap-georgia-holds-special-election-to-replace-marjorie-taylor-greene",
+          "published_at": "2026-03-10T22:40:10+00:00",
+          "summary": "In our news wrap Tuesday, Rep. Bennie Thompson of Mississippi is fighting off a primary challenge from newcomer Evan Turnage, there's a crowded field in a Georgia special election to replace former Rep. Marjorie Taylor G",
+          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/NewsWrap-7-1024x683.jpg",
+          "domain": "www.pbs.org"
+        }
+      ]
+    },
+    {
+      "slug": "live-2-americans-skeptical-of-the-iran-war-poll-says-and-doj-gives-",
+      "topic_label": "Gun / Doj / Back",
+      "title": "Americans skeptical of the Iran war, poll says. And, DOJ gives guns back to felons",
+      "dek": "A majority of Americans oppose the U.S.' involvement in the war with Iran, according to a new NPR/PBS News/Marist poll. And, the Department of Justice is quietly restoring gun rights to felons.",
+      "latest_at": "2026-03-11T11:12:58+00:00",
+      "article_count": 2,
+      "sources": [
         "NPR"
       ],
       "hero_image": null,
@@ -38,27 +71,61 @@
       "articles": [
         {
           "source": "NPR",
-          "title": "Prosecutor says Rihanna, family were home when woman charged with attempted murder fired",
-          "url": "https://www.npr.org/2026/03/11/g-s1-113252/prosecutor-says-rihanna-family-were-home-when-woman-charged-with-attempted-murder-fired",
-          "published_at": "2026-03-11T05:50:41+00:00",
-          "summary": "Rihanna, her partner A$AP Rocky, their three children and her mother were all at home when a woman now charged with attempted murder is alleged to have fired at the property, a prosecutor said.",
+          "title": "Americans skeptical of the Iran war, poll says. And, DOJ gives guns back to felons",
+          "url": "https://www.npr.org/2026/03/11/g-s1-113261/up-first-newsletter-iran-israel-us-georgia-clay-fuller-shawn-harris-second-amendment-rights-national-guard",
+          "published_at": "2026-03-11T11:12:58+00:00",
+          "summary": "A majority of Americans oppose the U.S.' involvement in the war with Iran, according to a new NPR/PBS News/Marist poll. And, the Department of Justice is quietly restoring gun rights to felons.",
           "image": null,
           "domain": "www.npr.org"
         },
         {
-          "source": "BBC",
-          "title": "Woman charged with attempted murder after shooting at Rihanna's home",
-          "url": "https://www.bbc.com/news/articles/cgjze644wjvo?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T03:10:09+00:00",
-          "summary": "The woman posted about the singer online prior to the attack, the BBC's US news partner CBS reports.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/de26/live/e8673110-1d1d-11f1-801d-ed3cff6bf876.jpg",
-          "domain": "www.bbc.com"
+          "source": "NPR",
+          "title": "The Trump DOJ is giving guns back to felons, including one alleged fake elector",
+          "url": "https://www.npr.org/2026/03/11/g-s1-113204/gun-rights-restore-felons-trump-justice-department",
+          "published_at": "2026-03-11T09:00:00+00:00",
+          "summary": "The Department of Justice is quietly restarting a decades-dormant program to restore gun rights to felons. One of them was an alleged fake elector in 2020.",
+          "image": null,
+          "domain": "www.npr.org"
         }
       ]
     },
     {
-      "slug": "live-2-member-of-iranian-football-delegation-granted-australian-asy",
-      "topic_label": "Member / Iranian / Asylum",
+      "slug": "live-3-americans-are-split-on-wanting-the-national-guard-to-monitor",
+      "topic_label": "Voting / Poll / American",
+      "title": "Americans are split on wanting the National Guard to monitor voting, a new poll finds",
+      "dek": "Nearly half of Americans support the National Guard monitoring November's elections, potentially signaling an openness to the sort of nationalizing of elections that President Trump says he wants.",
+      "latest_at": "2026-03-11T09:00:00+00:00",
+      "article_count": 2,
+      "sources": [
+        "NPR",
+        "PBS NewsHour"
+      ],
+      "hero_image": null,
+      "hero_credit": "No image available",
+      "articles": [
+        {
+          "source": "NPR",
+          "title": "Americans are split on wanting the National Guard to monitor voting, a new poll finds",
+          "url": "https://www.npr.org/2026/03/11/nx-s1-5743823/voting-poll-national-guard-election-security",
+          "published_at": "2026-03-11T09:00:00+00:00",
+          "summary": "Nearly half of Americans support the National Guard monitoring November's elections, potentially signaling an openness to the sort of nationalizing of elections that President Trump says he wants.",
+          "image": null,
+          "domain": "www.npr.org"
+        },
+        {
+          "source": "PBS NewsHour",
+          "title": "Americans are increasingly worried about voting, new poll shows",
+          "url": "https://www.pbs.org/newshour/politics/americans-are-increasingly-worried-about-voting-new-poll-shows",
+          "published_at": "2026-03-11T09:00:00+00:00",
+          "summary": "Americans' confidence that their elections will be run fairly has dropped to its lowest point in years, according to a new PBS News/NPR/Marist poll.",
+          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2024/11/Vote2024-1024x683.jpg",
+          "domain": "www.pbs.org"
+        }
+      ]
+    },
+    {
+      "slug": "live-4-member-of-iranian-football-delegation-granted-australian-asy",
+      "topic_label": "Asylum / Member / Iranian",
       "title": "Member of Iranian football delegation granted Australian asylum changes her mind",
       "dek": "One of the seven women who received visas has reversed her decision after speaking to teammates, minister says",
       "latest_at": "2026-03-11T04:14:40+00:00",
@@ -91,103 +158,59 @@
       ]
     },
     {
-      "slug": "live-3-news-wrap-georgia-holds-special-election-to-replace-marjorie",
-      "topic_label": "Election / Special / Marjorie",
-      "title": "News Wrap: Georgia holds special election to replace Marjorie Taylor Greene",
-      "dek": "In our news wrap Tuesday, Rep. Bennie Thompson of Mississippi is fighting off a primary challenge from newcomer Evan Turnage, there's a crowded field in a Georgia special election to replace former Rep. Marjorie Taylor Greene, Democrats sued the Trump administration over whether ",
-      "latest_at": "2026-03-10T22:40:10+00:00",
-      "article_count": 2,
+      "slug": "live-5-canadian-pm-mark-carney-inches-closer-to-majority-as-fourth-",
+      "topic_label": "Carney / Majority / Mark",
+      "title": "Canadian PM Mark Carney inches closer to majority, as fourth MP defects to Liberals",
+      "dek": "Lori Idlout, formerly of the NDP, has become the latest lawmaker in the current parliament to cross the floor.",
+      "latest_at": "2026-03-11T13:26:57+00:00",
+      "article_count": 1,
       "sources": [
-        "BBC",
-        "PBS NewsHour"
+        "BBC"
       ],
-      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/NewsWrap-7-1024x683.jpg",
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/8323/live/9ee99e90-1cf2-11f1-bb35-653e5995a61a.jpg",
       "hero_credit": "Publisher preview image",
       "articles": [
         {
-          "source": "PBS NewsHour",
-          "title": "News Wrap: Georgia holds special election to replace Marjorie Taylor Greene",
-          "url": "https://www.pbs.org/newshour/show/news-wrap-georgia-holds-special-election-to-replace-marjorie-taylor-greene",
-          "published_at": "2026-03-10T22:40:10+00:00",
-          "summary": "In our news wrap Tuesday, Rep. Bennie Thompson of Mississippi is fighting off a primary challenge from newcomer Evan Turnage, there's a crowded field in a Georgia special election to replace former Rep. Marjorie Taylor G",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/NewsWrap-7-1024x683.jpg",
-          "domain": "www.pbs.org"
-        },
-        {
           "source": "BBC",
-          "title": "Georgia voters to pick replacement for Marjorie Taylor Greene in special election",
-          "url": "https://www.bbc.com/news/articles/c77ey1v7jrzo?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-10T10:47:08+00:00",
-          "summary": "The shadow of Greene, who resigned from Congress after a rift with the president, looms large over a crowded contest.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/abb5/live/d44a7660-1c05-11f1-801d-ed3cff6bf876.jpg",
+          "title": "Canadian PM Mark Carney inches closer to majority, as fourth MP defects to Liberals",
+          "url": "https://www.bbc.com/news/articles/c0e5jwz0703o?at_medium=RSS&at_campaign=rss",
+          "published_at": "2026-03-11T13:26:57+00:00",
+          "summary": "Lori Idlout, formerly of the NDP, has become the latest lawmaker in the current parliament to cross the floor.",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/8323/live/9ee99e90-1cf2-11f1-bb35-653e5995a61a.jpg",
           "domain": "www.bbc.com"
         }
       ]
     },
     {
-      "slug": "live-4-watch-white-house-says-trump-will-accept-outcome-of-investig",
-      "topic_label": "Will / Accept / Trump",
-      "title": "WATCH: White House says Trump will accept outcome of investigation into bombing of school in Iran",
-      "dek": "White House press secretary Karoline Leavitt didn't answer why President Donald Trump falsely asserted on Monday that Iran has access to the U.S.-made Tomahawk cruise missile, the weapon likely used to strike a girls school in Iran, killing 165 people.",
-      "latest_at": "2026-03-10T22:31:01+00:00",
-      "article_count": 2,
+      "slug": "live-6-g7-welcomes-potential-record-release-of-oil-reserves-as-pric",
+      "topic_label": "Record / Oil / Reserve",
+      "title": "G7 welcomes potential record release of oil reserves as prices surge",
+      "dek": "The group of nations welcomes the idea of releasing oil in response to the surge in prices since the US-Israel war with Iran began",
+      "latest_at": "2026-03-11T12:07:11+00:00",
+      "article_count": 1,
       "sources": [
-        "PBS NewsHour",
-        "WSJ World"
+        "BBC"
       ],
-      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-10T184009Z_936098620_RC2T1KAN1NA8_RTRMADP_3_USA-TRUMP-1024x683.jpg",
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/e9ac/live/9c070350-1d3a-11f1-8a7a-4725a6287ab3.jpg",
       "hero_credit": "Publisher preview image",
       "articles": [
         {
-          "source": "PBS NewsHour",
-          "title": "WATCH: White House says Trump will accept outcome of investigation into bombing of school in Iran",
-          "url": "https://www.pbs.org/newshour/politics/watch-white-house-says-trump-will-accept-outcome-of-investigation-into-bombing-of-school-in-iran",
-          "published_at": "2026-03-10T22:31:01+00:00",
-          "summary": "White House press secretary Karoline Leavitt didn't answer why President Donald Trump falsely asserted on Monday that Iran has access to the U.S.-made Tomahawk cruise missile, the weapon likely used to strike a girls sch",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-10T184009Z_936098620_RC2T1KAN1NA8_RTRMADP_3_USA-TRUMP-1024x683.jpg",
-          "domain": "www.pbs.org"
-        },
-        {
-          "source": "WSJ World",
-          "title": "Trump Says Colombia Will Accept Deportees, Ending Tariff Standoff",
-          "url": "https://www.wsj.com/articles/trump-says-colombia-will-face-25-tariffs-amid-fight-over-deportation-flights-e32dc497",
-          "published_at": "2025-01-27T03:59:00+00:00",
-          "summary": "The president has made immigration an early priority to start second term, with ICE making more than 900 arrests Sunday.",
-          "image": null,
-          "domain": "www.wsj.com"
+          "source": "BBC",
+          "title": "G7 welcomes potential record release of oil reserves as prices surge",
+          "url": "https://www.bbc.com/news/articles/cly093xxlzzo?at_medium=RSS&at_campaign=rss",
+          "published_at": "2026-03-11T12:07:11+00:00",
+          "summary": "The group of nations welcomes the idea of releasing oil in response to the surge in prices since the US-Israel war with Iran began",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/e9ac/live/9c070350-1d3a-11f1-8a7a-4725a6287ab3.jpg",
+          "domain": "www.bbc.com"
         }
       ]
     },
     {
-      "slug": "live-5-bam-heat-s-adebayo-scores-83-points-2nd-only-to-wilt-chamber",
-      "topic_label": "Point / Only / Heat",
-      "title": "Bam! Heat's Adebayo scores 83 points, 2nd only to Wilt Chamberlain in NBA history",
-      "dek": "Bam Adebayo had a night for all time on Tuesday, with a point total second to only Wilt Chamberlain in the NBA record books.",
-      "latest_at": "2026-03-11T06:15:01+00:00",
-      "article_count": 1,
-      "sources": [
-        "NPR"
-      ],
-      "hero_image": null,
-      "hero_credit": "No image available",
-      "articles": [
-        {
-          "source": "NPR",
-          "title": "Bam! Heat's Adebayo scores 83 points, 2nd only to Wilt Chamberlain in NBA history",
-          "url": "https://www.npr.org/2026/03/11/g-s1-113255/bam-heats-adebayo-scores-83-points-2nd-only-to-wilt-chamberlain-in-nba-history",
-          "published_at": "2026-03-11T06:15:01+00:00",
-          "summary": "Bam Adebayo had a night for all time on Tuesday, with a point total second to only Wilt Chamberlain in the NBA record books.",
-          "image": null,
-          "domain": "www.npr.org"
-        }
-      ]
-    },
-    {
-      "slug": "live-6-at-least-six-dead-in-switzerland-bus-fire",
-      "topic_label": "Bu / Least / Fire",
+      "slug": "live-7-at-least-six-dead-in-switzerland-bus-fire",
+      "topic_label": "Fire / Switzerland / Bu",
       "title": "At least six dead in Switzerland bus fire",
       "dek": "Police do not yet know the cause of the fire in the western Fribourg canton, which also injured a number of people.",
-      "latest_at": "2026-03-11T06:13:12+00:00",
+      "latest_at": "2026-03-11T11:37:23+00:00",
       "article_count": 1,
       "sources": [
         "BBC"
@@ -199,7 +222,7 @@
           "source": "BBC",
           "title": "At least six dead in Switzerland bus fire",
           "url": "https://www.bbc.com/news/articles/c5y4wdlyy9xo?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T06:13:12+00:00",
+          "published_at": "2026-03-11T11:37:23+00:00",
           "summary": "Police do not yet know the cause of the fire in the western Fribourg canton, which also injured a number of people.",
           "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/15d1/live/8627cf80-1ccf-11f1-b048-c9424b2cf5fd.jpg",
           "domain": "www.bbc.com"
@@ -207,98 +230,74 @@
       ]
     },
     {
-      "slug": "live-7-arrests-accusations-and-arguments-the-mugabe-family-after-lo",
-      "topic_label": "Accusation / Family / Argument",
-      "title": "Arrests, accusations and arguments - the Mugabe family after losing power",
-      "dek": "With Bellarmine Mugabe due in court we look at what has happened to Zimbabwe's ex-first family.",
-      "latest_at": "2026-03-11T05:54:23+00:00",
+      "slug": "live-8-ukraine-says-it-has-hit-russian-missile-component-plant",
+      "topic_label": "Missile / Russian / Component",
+      "title": "Ukraine says it has hit Russian 'missile component' plant",
+      "dek": "Russia says the attack hit civilians and could not have been carried out without British help.",
+      "latest_at": "2026-03-11T11:16:02+00:00",
       "article_count": 1,
       "sources": [
         "BBC"
       ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/b307/live/040774f0-1cb2-11f1-801d-ed3cff6bf876.jpg",
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/1e77/live/9d9a8680-1d38-11f1-9120-a910fc22c6ac.jpg",
       "hero_credit": "Publisher preview image",
       "articles": [
         {
           "source": "BBC",
-          "title": "Arrests, accusations and arguments - the Mugabe family after losing power",
+          "title": "Ukraine says it has hit Russian 'missile component' plant",
+          "url": "https://www.bbc.com/news/articles/ckg1eqw30l9o?at_medium=RSS&at_campaign=rss",
+          "published_at": "2026-03-11T11:16:02+00:00",
+          "summary": "Russia says the attack hit civilians and could not have been carried out without British help.",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/1e77/live/9d9a8680-1d38-11f1-9120-a910fc22c6ac.jpg",
+          "domain": "www.bbc.com"
+        }
+      ]
+    },
+    {
+      "slug": "live-9-mugabe-s-son-drops-bail-request-what-has-happened-to-the-fam",
+      "topic_label": "Power / Son / Request",
+      "title": "Mugabe's son drops bail request - what has happened to the family after losing power",
+      "dek": "Bellarmine Mugabe will negotiate a plea deal after being accused of attempted murder and other charges in South Africa.",
+      "latest_at": "2026-03-11T10:31:57+00:00",
+      "article_count": 1,
+      "sources": [
+        "BBC"
+      ],
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/2658/live/8803f1d0-1d38-11f1-9120-a910fc22c6ac.jpg",
+      "hero_credit": "Publisher preview image",
+      "articles": [
+        {
+          "source": "BBC",
+          "title": "Mugabe's son drops bail request - what has happened to the family after losing power",
           "url": "https://www.bbc.com/news/articles/cp32xx35lwwo?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T05:54:23+00:00",
-          "summary": "With Bellarmine Mugabe due in court we look at what has happened to Zimbabwe's ex-first family.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/b307/live/040774f0-1cb2-11f1-801d-ed3cff6bf876.jpg",
+          "published_at": "2026-03-11T10:31:57+00:00",
+          "summary": "Bellarmine Mugabe will negotiate a plea deal after being accused of attempted murder and other charges in South Africa.",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/2658/live/8803f1d0-1d38-11f1-9120-a910fc22c6ac.jpg",
           "domain": "www.bbc.com"
         }
       ]
     },
     {
-      "slug": "live-8-australian-designer-katie-perry-wins-trademark-appeal-vs-kat",
-      "topic_label": "Katy / Appeal / Trademark",
-      "title": "Australian designer Katie Perry wins trademark appeal vs Katy Perry",
-      "dek": "The US singer lost the case in 2023 and later won on appeal, but now judges have ruled against her.",
-      "latest_at": "2026-03-11T05:36:25+00:00",
+      "slug": "live-10-u-s-attacks-iranian-mine-laying-vessels-near-hormuz-on-day-1",
+      "topic_label": "Mine / Laying / Day",
+      "title": "U.S. attacks Iranian mine-laying vessels near Hormuz on Day 12 of war",
+      "dek": "Attacks and counterattacks continued throughout the Middle East Wednesday. Two cargo ships were struck in the Gulf, as some lawmakers in Washington pressed for answers on the war's rationale.",
+      "latest_at": "2026-03-11T09:45:36+00:00",
       "article_count": 1,
       "sources": [
-        "BBC"
+        "NPR"
       ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/2eb1/live/ca8fc480-1d1e-11f1-9120-a910fc22c6ac.jpg",
-      "hero_credit": "Publisher preview image",
+      "hero_image": null,
+      "hero_credit": "No image available",
       "articles": [
         {
-          "source": "BBC",
-          "title": "Australian designer Katie Perry wins trademark appeal vs Katy Perry",
-          "url": "https://www.bbc.com/news/articles/c9dn8l021l2o?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T05:36:25+00:00",
-          "summary": "The US singer lost the case in 2023 and later won on appeal, but now judges have ruled against her.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/2eb1/live/ca8fc480-1d1e-11f1-9120-a910fc22c6ac.jpg",
-          "domain": "www.bbc.com"
-        }
-      ]
-    },
-    {
-      "slug": "live-9-jeffrey-epstein-had-two-key-aides-why-do-they-still-control-",
-      "topic_label": "Secret / Jeffrey / Key",
-      "title": "Jeffrey Epstein had two key aides - why do they still control his money and secrets?",
-      "dek": "Richard Kahn and Darren Indyke administer Epstein\u2019s estate - court filings allege complicity in his crimes.",
-      "latest_at": "2026-03-11T00:10:20+00:00",
-      "article_count": 1,
-      "sources": [
-        "BBC"
-      ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/9366/live/60c8fb60-1ca2-11f1-9120-a910fc22c6ac.jpg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "BBC",
-          "title": "Jeffrey Epstein had two key aides - why do they still control his money and secrets?",
-          "url": "https://www.bbc.com/news/articles/cdjm7rxjxneo?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T00:10:20+00:00",
-          "summary": "Richard Kahn and Darren Indyke administer Epstein\u2019s estate - court filings allege complicity in his crimes.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/9366/live/60c8fb60-1ca2-11f1-9120-a910fc22c6ac.jpg",
-          "domain": "www.bbc.com"
-        }
-      ]
-    },
-    {
-      "slug": "live-10-fact-checking-trump-s-claim-that-iran-has-tomahawk-missiles",
-      "topic_label": "Missile / Claim / Fact",
-      "title": "Fact-checking Trump's claim that Iran has Tomahawk missiles",
-      "dek": "Although a few countries other than the U.S. have Tomahawks, none of them is engaged in fighting Iran. Tomahawk cruise missiles are manufactured by Raytheon, a U.S. company, for use by the U.S. military and international partners.",
-      "latest_at": "2026-03-10T23:48:52+00:00",
-      "article_count": 1,
-      "sources": [
-        "PBS NewsHour"
-      ],
-      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-01T154717Z_2025560289_RC2LVJAU5DC5_RTRMADP_3_IRAN-CRISIS-1024x683.jpg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "PBS NewsHour",
-          "title": "Fact-checking Trump's claim that Iran has Tomahawk missiles",
-          "url": "https://www.pbs.org/newshour/politics/fact-checking-trumps-claim-that-iran-has-tomahawk-missiles",
-          "published_at": "2026-03-10T23:48:52+00:00",
-          "summary": "Although a few countries other than the U.S. have Tomahawks, none of them is engaged in fighting Iran. Tomahawk cruise missiles are manufactured by Raytheon, a U.S. company, for use by the U.S. military and international",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-01T154717Z_2025560289_RC2LVJAU5DC5_RTRMADP_3_IRAN-CRISIS-1024x683.jpg",
-          "domain": "www.pbs.org"
+          "source": "NPR",
+          "title": "U.S. attacks Iranian mine-laying vessels near Hormuz on Day 12 of war",
+          "url": "https://www.npr.org/2026/03/11/nx-s1-5744029/us-iran-war",
+          "published_at": "2026-03-11T09:45:36+00:00",
+          "summary": "Attacks and counterattacks continued throughout the Middle East Wednesday. Two cargo ships were struck in the Gulf, as some lawmakers in Washington pressed for answers on the war's rationale.",
+          "image": null,
+          "domain": "www.npr.org"
         }
       ]
     }
