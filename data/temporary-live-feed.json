@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-11T05:16:56.030768+00:00",
+  "generated_at": "2026-03-11T08:59:50.480565+00:00",
   "source_count": 4,
   "article_count": 40,
   "sources": [
@@ -23,8 +23,42 @@
   "errors": [],
   "clusters": [
     {
-      "slug": "live-1-member-of-iranian-football-delegation-granted-australian-asy",
-      "topic_label": "Member / Asylum / Iranian",
+      "slug": "live-1-prosecutor-says-rihanna-family-were-home-when-woman-charged-",
+      "topic_label": "Attempted / Rihanna / Murder",
+      "title": "Prosecutor says Rihanna, family were home when woman charged with attempted murder fired",
+      "dek": "Rihanna, her partner A$AP Rocky, their three children and her mother were all at home when a woman now charged with attempted murder is alleged to have fired at the property, a prosecutor said.",
+      "latest_at": "2026-03-11T05:50:41+00:00",
+      "article_count": 2,
+      "sources": [
+        "BBC",
+        "NPR"
+      ],
+      "hero_image": null,
+      "hero_credit": "No image available",
+      "articles": [
+        {
+          "source": "NPR",
+          "title": "Prosecutor says Rihanna, family were home when woman charged with attempted murder fired",
+          "url": "https://www.npr.org/2026/03/11/g-s1-113252/prosecutor-says-rihanna-family-were-home-when-woman-charged-with-attempted-murder-fired",
+          "published_at": "2026-03-11T05:50:41+00:00",
+          "summary": "Rihanna, her partner A$AP Rocky, their three children and her mother were all at home when a woman now charged with attempted murder is alleged to have fired at the property, a prosecutor said.",
+          "image": null,
+          "domain": "www.npr.org"
+        },
+        {
+          "source": "BBC",
+          "title": "Woman charged with attempted murder after shooting at Rihanna's home",
+          "url": "https://www.bbc.com/news/articles/cgjze644wjvo?at_medium=RSS&at_campaign=rss",
+          "published_at": "2026-03-11T03:10:09+00:00",
+          "summary": "The woman posted about the singer online prior to the attack, the BBC's US news partner CBS reports.",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/de26/live/e8673110-1d1d-11f1-801d-ed3cff6bf876.jpg",
+          "domain": "www.bbc.com"
+        }
+      ]
+    },
+    {
+      "slug": "live-2-member-of-iranian-football-delegation-granted-australian-asy",
+      "topic_label": "Member / Iranian / Asylum",
       "title": "Member of Iranian football delegation granted Australian asylum changes her mind",
       "dek": "One of the seven women who received visas has reversed her decision after speaking to teammates, minister says",
       "latest_at": "2026-03-11T04:14:40+00:00",
@@ -57,42 +91,8 @@
       ]
     },
     {
-      "slug": "live-2-as-iran-shows-no-signs-of-surrender-u-s-launches-most-intens",
-      "topic_label": "Intense / Most / Day",
-      "title": "As Iran shows no signs of surrender, U.S. launches 'most intense' day of strikes",
-      "dek": "The U.S.-Israeli war with Iran showed no sign of slowing on Tuesday, with both sides trading strikes and vowing to keep up the attacks. U.S. officials said the campaign has destroyed most of Iran's ability to produce nuclear fuel, and President Trump said forces also struck sea m",
-      "latest_at": "2026-03-10T22:55:32+00:00",
-      "article_count": 2,
-      "sources": [
-        "NPR",
-        "PBS NewsHour"
-      ],
-      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/IranWar-1024x678.jpeg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "PBS NewsHour",
-          "title": "As Iran shows no signs of surrender, U.S. launches 'most intense' day of strikes",
-          "url": "https://www.pbs.org/newshour/show/as-iran-shows-no-signs-of-surrender-u-s-launches-most-intense-day-of-strikes",
-          "published_at": "2026-03-10T22:55:32+00:00",
-          "summary": "The U.S.-Israeli war with Iran showed no sign of slowing on Tuesday, with both sides trading strikes and vowing to keep up the attacks. U.S. officials said the campaign has destroyed most of Iran's ability to produce nuc",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/IranWar-1024x678.jpeg",
-          "domain": "www.pbs.org"
-        },
-        {
-          "source": "NPR",
-          "title": "The U.S. vowed its 'most intense day of strikes inside Iran'",
-          "url": "https://www.npr.org/2026/03/10/nx-s1-5742828/iran-war-us-trump",
-          "published_at": "2026-03-10T09:35:21+00:00",
-          "summary": "Defense Secretary Pete Hegseth said the Pentagon was giving President Trump \"maximum options\" and that the war will not be \"endless,\" a day after the president gave mixed signals about progress.",
-          "image": null,
-          "domain": "www.npr.org"
-        }
-      ]
-    },
-    {
       "slug": "live-3-news-wrap-georgia-holds-special-election-to-replace-marjorie",
-      "topic_label": "Greene / Election / Special",
+      "topic_label": "Election / Special / Marjorie",
       "title": "News Wrap: Georgia holds special election to replace Marjorie Taylor Greene",
       "dek": "In our news wrap Tuesday, Rep. Bennie Thompson of Mississippi is fighting off a primary challenge from newcomer Evan Turnage, there's a crowded field in a Georgia special election to replace former Rep. Marjorie Taylor Greene, Democrats sued the Trump administration over whether ",
       "latest_at": "2026-03-10T22:40:10+00:00",
@@ -126,7 +126,7 @@
     },
     {
       "slug": "live-4-watch-white-house-says-trump-will-accept-outcome-of-investig",
-      "topic_label": "Accept / Will / Trump",
+      "topic_label": "Will / Accept / Trump",
       "title": "WATCH: White House says Trump will accept outcome of investigation into bombing of school in Iran",
       "dek": "White House press secretary Karoline Leavitt didn't answer why President Donald Trump falsely asserted on Monday that Iran has access to the U.S.-made Tomahawk cruise missile, the weapon likely used to strike a girls school in Iran, killing 165 people.",
       "latest_at": "2026-03-10T22:31:01+00:00",
@@ -159,80 +159,104 @@
       ]
     },
     {
-      "slug": "live-5-katy-perry-loses-trademark-case-against-australian-designer-",
-      "topic_label": "Against / Lose / Designer",
-      "title": "Katy Perry loses trademark case against Australian designer Katie Perry",
+      "slug": "live-5-bam-heat-s-adebayo-scores-83-points-2nd-only-to-wilt-chamber",
+      "topic_label": "Point / Only / Heat",
+      "title": "Bam! Heat's Adebayo scores 83 points, 2nd only to Wilt Chamberlain in NBA history",
+      "dek": "Bam Adebayo had a night for all time on Tuesday, with a point total second to only Wilt Chamberlain in the NBA record books.",
+      "latest_at": "2026-03-11T06:15:01+00:00",
+      "article_count": 1,
+      "sources": [
+        "NPR"
+      ],
+      "hero_image": null,
+      "hero_credit": "No image available",
+      "articles": [
+        {
+          "source": "NPR",
+          "title": "Bam! Heat's Adebayo scores 83 points, 2nd only to Wilt Chamberlain in NBA history",
+          "url": "https://www.npr.org/2026/03/11/g-s1-113255/bam-heats-adebayo-scores-83-points-2nd-only-to-wilt-chamberlain-in-nba-history",
+          "published_at": "2026-03-11T06:15:01+00:00",
+          "summary": "Bam Adebayo had a night for all time on Tuesday, with a point total second to only Wilt Chamberlain in the NBA record books.",
+          "image": null,
+          "domain": "www.npr.org"
+        }
+      ]
+    },
+    {
+      "slug": "live-6-at-least-six-dead-in-switzerland-bus-fire",
+      "topic_label": "Bu / Least / Fire",
+      "title": "At least six dead in Switzerland bus fire",
+      "dek": "Police do not yet know the cause of the fire in the western Fribourg canton, which also injured a number of people.",
+      "latest_at": "2026-03-11T06:13:12+00:00",
+      "article_count": 1,
+      "sources": [
+        "BBC"
+      ],
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/15d1/live/8627cf80-1ccf-11f1-b048-c9424b2cf5fd.jpg",
+      "hero_credit": "Publisher preview image",
+      "articles": [
+        {
+          "source": "BBC",
+          "title": "At least six dead in Switzerland bus fire",
+          "url": "https://www.bbc.com/news/articles/c5y4wdlyy9xo?at_medium=RSS&at_campaign=rss",
+          "published_at": "2026-03-11T06:13:12+00:00",
+          "summary": "Police do not yet know the cause of the fire in the western Fribourg canton, which also injured a number of people.",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/15d1/live/8627cf80-1ccf-11f1-b048-c9424b2cf5fd.jpg",
+          "domain": "www.bbc.com"
+        }
+      ]
+    },
+    {
+      "slug": "live-7-arrests-accusations-and-arguments-the-mugabe-family-after-lo",
+      "topic_label": "Accusation / Family / Argument",
+      "title": "Arrests, accusations and arguments - the Mugabe family after losing power",
+      "dek": "With Bellarmine Mugabe due in court we look at what has happened to Zimbabwe's ex-first family.",
+      "latest_at": "2026-03-11T05:54:23+00:00",
+      "article_count": 1,
+      "sources": [
+        "BBC"
+      ],
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/b307/live/040774f0-1cb2-11f1-801d-ed3cff6bf876.jpg",
+      "hero_credit": "Publisher preview image",
+      "articles": [
+        {
+          "source": "BBC",
+          "title": "Arrests, accusations and arguments - the Mugabe family after losing power",
+          "url": "https://www.bbc.com/news/articles/cp32xx35lwwo?at_medium=RSS&at_campaign=rss",
+          "published_at": "2026-03-11T05:54:23+00:00",
+          "summary": "With Bellarmine Mugabe due in court we look at what has happened to Zimbabwe's ex-first family.",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/b307/live/040774f0-1cb2-11f1-801d-ed3cff6bf876.jpg",
+          "domain": "www.bbc.com"
+        }
+      ]
+    },
+    {
+      "slug": "live-8-australian-designer-katie-perry-wins-trademark-appeal-vs-kat",
+      "topic_label": "Katy / Appeal / Trademark",
+      "title": "Australian designer Katie Perry wins trademark appeal vs Katy Perry",
       "dek": "The US singer lost the case in 2023 and later won on appeal, but now judges have ruled against her.",
-      "latest_at": "2026-03-11T04:13:40+00:00",
+      "latest_at": "2026-03-11T05:36:25+00:00",
       "article_count": 1,
       "sources": [
         "BBC"
       ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/915c/live/4dd116b0-1d00-11f1-845b-217496a1f0c5.jpg",
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/2eb1/live/ca8fc480-1d1e-11f1-9120-a910fc22c6ac.jpg",
       "hero_credit": "Publisher preview image",
       "articles": [
         {
           "source": "BBC",
-          "title": "Katy Perry loses trademark case against Australian designer Katie Perry",
+          "title": "Australian designer Katie Perry wins trademark appeal vs Katy Perry",
           "url": "https://www.bbc.com/news/articles/c9dn8l021l2o?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T04:13:40+00:00",
+          "published_at": "2026-03-11T05:36:25+00:00",
           "summary": "The US singer lost the case in 2023 and later won on appeal, but now judges have ruled against her.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/915c/live/4dd116b0-1d00-11f1-845b-217496a1f0c5.jpg",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/2eb1/live/ca8fc480-1d1e-11f1-9120-a910fc22c6ac.jpg",
           "domain": "www.bbc.com"
         }
       ]
     },
     {
-      "slug": "live-6-woman-charged-with-attempted-murder-after-shooting-at-rihann",
-      "topic_label": "Rihanna / Murder / Charged",
-      "title": "Woman charged with attempted murder after shooting at Rihanna's home",
-      "dek": "The woman posted about the singer online prior to the attack, the BBC's US news partner CBS reports.",
-      "latest_at": "2026-03-11T03:10:09+00:00",
-      "article_count": 1,
-      "sources": [
-        "BBC"
-      ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/2bbd/live/477c5960-1ceb-11f1-b3be-0fab6819344b.jpg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "BBC",
-          "title": "Woman charged with attempted murder after shooting at Rihanna's home",
-          "url": "https://www.bbc.com/news/articles/cgjze644wjvo?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T03:10:09+00:00",
-          "summary": "The woman posted about the singer online prior to the attack, the BBC's US news partner CBS reports.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/2bbd/live/477c5960-1ceb-11f1-b3be-0fab6819344b.jpg",
-          "domain": "www.bbc.com"
-        }
-      ]
-    },
-    {
-      "slug": "live-7-meghan-to-headline-1-400-girls-weekend-in-australia",
-      "topic_label": "Girl / Weekend / Meghan",
-      "title": "Meghan to headline \u00a31,400 'girls' weekend' in Australia",
-      "dek": "The Duke and Duchess of Sussex are returning to Australia in April, their first visit since 2018.",
-      "latest_at": "2026-03-11T01:04:53+00:00",
-      "article_count": 1,
-      "sources": [
-        "BBC"
-      ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/fb82/live/0cb3b500-1d02-11f1-9f49-7d864bc66628.jpg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "BBC",
-          "title": "Meghan to headline \u00a31,400 'girls' weekend' in Australia",
-          "url": "https://www.bbc.com/news/articles/cwykl5d02rno?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T01:04:53+00:00",
-          "summary": "The Duke and Duchess of Sussex are returning to Australia in April, their first visit since 2018.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/fb82/live/0cb3b500-1d02-11f1-9f49-7d864bc66628.jpg",
-          "domain": "www.bbc.com"
-        }
-      ]
-    },
-    {
-      "slug": "live-8-jeffrey-epstein-had-two-key-aides-why-do-they-still-control-",
-      "topic_label": "Epstein / Hi / Jeffrey",
+      "slug": "live-9-jeffrey-epstein-had-two-key-aides-why-do-they-still-control-",
+      "topic_label": "Secret / Jeffrey / Key",
       "title": "Jeffrey Epstein had two key aides - why do they still control his money and secrets?",
       "dek": "Richard Kahn and Darren Indyke administer Epstein\u2019s estate - court filings allege complicity in his crimes.",
       "latest_at": "2026-03-11T00:10:20+00:00",
@@ -255,8 +279,8 @@
       ]
     },
     {
-      "slug": "live-9-fact-checking-trump-s-claim-that-iran-has-tomahawk-missiles",
-      "topic_label": "Fact / Ha / Trump",
+      "slug": "live-10-fact-checking-trump-s-claim-that-iran-has-tomahawk-missiles",
+      "topic_label": "Missile / Claim / Fact",
       "title": "Fact-checking Trump's claim that Iran has Tomahawk missiles",
       "dek": "Although a few countries other than the U.S. have Tomahawks, none of them is engaged in fighting Iran. Tomahawk cruise missiles are manufactured by Raytheon, a U.S. company, for use by the U.S. military and international partners.",
       "latest_at": "2026-03-10T23:48:52+00:00",
@@ -274,30 +298,6 @@
           "published_at": "2026-03-10T23:48:52+00:00",
           "summary": "Although a few countries other than the U.S. have Tomahawks, none of them is engaged in fighting Iran. Tomahawk cruise missiles are manufactured by Raytheon, a U.S. company, for use by the U.S. military and international",
           "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-01T154717Z_2025560289_RC2LVJAU5DC5_RTRMADP_3_IRAN-CRISIS-1024x683.jpg",
-          "domain": "www.pbs.org"
-        }
-      ]
-    },
-    {
-      "slug": "live-10-ukraine-and-russia-both-claim-progress-on-front-lines-while-",
-      "topic_label": "Progre / Russia / Hold",
-      "title": "Ukraine and Russia both claim progress on front lines while U.S.-brokered talks are on hold",
-      "dek": "The Iran war, which erupted on Feb. 28 following U.S.-Israeli strikes on Iran and spread across the region, has drawn the international spotlight from Ukraine's plight as it strives to hold back Russia's bigger army.",
-      "latest_at": "2026-03-10T23:26:41+00:00",
-      "article_count": 1,
-      "sources": [
-        "PBS NewsHour"
-      ],
-      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-06T183223Z_1292013447_RC26ZJAWFHA2_RTRMADP_3_UKRAINE-CRISIS-ZELENSKIY-EAST-1024x683.jpg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "PBS NewsHour",
-          "title": "Ukraine and Russia both claim progress on front lines while U.S.-brokered talks are on hold",
-          "url": "https://www.pbs.org/newshour/world/ukraine-and-russia-both-claim-progress-on-front-lines-while-u-s-brokered-talks-are-on-hold",
-          "published_at": "2026-03-10T23:26:41+00:00",
-          "summary": "The Iran war, which erupted on Feb. 28 following U.S.-Israeli strikes on Iran and spread across the region, has drawn the international spotlight from Ukraine's plight as it strives to hold back Russia's bigger army.",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-06T183223Z_1292013447_RC26ZJAWFHA2_RTRMADP_3_UKRAINE-CRISIS-ZELENSKIY-EAST-1024x683.jpg",
           "domain": "www.pbs.org"
         }
       ]
