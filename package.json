@@ -1,0 +1,21 @@
+{
+  "name": "prism-wire",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "src/api",
+    "src/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev:web",
+    "dev:api": "npm run dev --workspace=src/api",
+    "dev:web": "npm run dev --workspace=src/web",
+    "refresh:live-feed": "python3 tooling/generate_temporary_live_feed.py",
+    "build:api": "npm run build --workspace=src/api",
+    "build:web": "npm run build --workspace=src/web",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

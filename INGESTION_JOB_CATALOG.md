@@ -1,0 +1,214 @@
+# Prism Ingestion Job Catalog
+### Version 0.1
+
+---
+
+## Purpose
+
+This is the execution companion to the ingestion/content plan. It defines the jobs Prism should actually run, what each job owns, how often it runs, and what counts as failure.
+
+The system goal is maximum automation with narrow human-review points.
+
+---
+
+## Job Groups
+
+### 1. Source Discovery
+
+#### `poll_feeds`
+
+- cadence: every 2 to 5 minutes for priority sources
+- input: `source_registry`, `source_feeds`
+- output: `raw_discovered_urls`
+- failure rule: source marked degraded after 3 consecutive failures
+
+#### `poll_news_sitemaps`
+
+- cadence: every 5 to 10 minutes
+- input: `source_registry`, sitemap URLs
+- output: `raw_discovered_urls`
+- failure rule: retry with backoff, then source-health alert
+
+#### `backfill_metadata_api`
+
+- cadence: hourly
+- input: external metadata provider + recent topic windows
+- output: `raw_discovered_urls`
+- failure rule: no pipeline halt; mark as degraded secondary source
+
+---
+
+### 2. Fetch and Normalize
+
+#### `normalize_discovered_url`
+
+- cadence: queue-driven
+- input: `raw_discovered_urls`
+- output: canonical URL, outlet domain, source priority
+- failure rule: send malformed URLs to dead-letter queue
+
+#### `fetch_article_metadata`
+
+- cadence: queue-driven
+- input: canonical URL
+- output: `article_metadata`
+- extracted fields: title, description, published time, author, site name, Open Graph data
+- failure rule: retry 3 times, then mark fetch failed
+
+#### `classify_media_rights`
+
+- cadence: immediately after metadata fetch
+- input: article metadata + source policy
+- output: rights class on the article record
+- failure rule: default to stricter rights class
+
+---
+
+### 3. Content Quality
+
+#### `dedupe_articles`
+
+- cadence: queue-driven + scheduled sweep
+- input: new or updated article metadata
+- output: duplicate links, canonical article mapping
+- failure rule: duplicates remain visible only inside internal queue until processed
+
+#### `detect_syndication_variants`
+
+- cadence: every 15 minutes
+- input: recent article corpus
+- output: relation records between source variants
+- failure rule: non-blocking
+
+#### `score_article_quality`
+
+- cadence: queue-driven
+- input: metadata + parsed content
+- output: extraction confidence, structural quality flags
+- failure rule: article remains usable, but with lower enrichment confidence
+
+---
+
+### 4. Clustering
+
+#### `cluster_recent_articles`
+
+- cadence: continuous batches every 1 to 3 minutes
+- input: recent article pool
+- output: cluster membership assignments
+- failure rule: retry batch; recent articles remain in unclustered queue
+
+#### `recluster_recent_windows`
+
+- cadence: every 15 minutes
+- input: last 24 to 72 hours of article/cluster data
+- output: improved merges, splits, and confidence updates
+- failure rule: no user-facing interruption; defer to next window
+
+#### `queue_low_confidence_clusters`
+
+- cadence: after clustering pass
+- input: cluster confidence thresholds
+- output: review queue entries
+- failure rule: no pipeline halt
+
+---
+
+### 5. Perspective and Evidence
+
+#### `map_outlets`
+
+- cadence: queue-driven after metadata fetch
+- input: article domain
+- output: outlet ID or unmapped-outlet queue item
+- failure rule: article stays live with source-domain fallback
+
+#### `refresh_rater_data`
+
+- cadence: daily
+- input: official rater sources and outlet registry
+- output: refreshed outlet attribution and version record
+- failure rule: preserve last good dataset and open alert
+
+#### `extract_evidence_items`
+
+- cadence: queue-driven after article parse
+- input: article content
+- output: evidence items, quoted entities, source references
+- failure rule: cluster remains live without evidence enrichment
+
+#### `generate_context_pack_candidates`
+
+- cadence: every cluster update
+- input: cluster membership + outlet mapping + lens rules
+- output: candidate sets for each launch lens
+- failure rule: cluster stays live; pack falls back to minimal set
+
+---
+
+### 6. Publishing and Monitoring
+
+#### `publish_cluster_updates`
+
+- cadence: queue-driven after cluster change
+- input: cluster version diff
+- output: live cluster cache refresh
+- failure rule: serve previous good cluster version until publish succeeds
+
+#### `emit_correction_events`
+
+- cadence: on every material cluster or mapping change
+- input: before/after state diff
+- output: `correction_events`
+- failure rule: publish blocked if correction logging fails
+
+#### `compute_source_health`
+
+- cadence: every 30 minutes
+- input: fetch success rates, freshness lag, parse rates
+- output: source-health score
+- failure rule: alert only
+
+---
+
+## Review Queues
+
+Prism should keep human review narrow and explicit.
+
+Queues:
+
+- unmapped outlets
+- low-confidence cluster merges
+- rights-policy exceptions
+- high-consequence story reviews
+- source-health degradations
+
+---
+
+## Success Rules
+
+The pipeline is healthy when:
+
+- fresh URLs are discovered continuously
+- metadata extraction succeeds at high rates
+- clusters form quickly enough to feel live
+- outlet mapping backlog remains small
+- correction events are always logged
+
+---
+
+## Implementation Order
+
+Build these jobs in order:
+
+1. `poll_feeds`
+2. `poll_news_sitemaps`
+3. `normalize_discovered_url`
+4. `fetch_article_metadata`
+5. `dedupe_articles`
+6. `cluster_recent_articles`
+7. `map_outlets`
+8. `generate_context_pack_candidates`
+9. `emit_correction_events`
+
+That sequence gets Prism from a static mockup to a living cluster product with the fewest moving parts.

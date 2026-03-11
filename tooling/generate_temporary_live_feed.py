@@ -1,0 +1,306 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import html
+import json
+import re
+import sys
+import time
+from collections import Counter
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
+from pathlib import Path
+from typing import Iterable
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
+from xml.etree import ElementTree as ET
+
+
+ROOT = Path(__file__).resolve().parents[1]
+OUTPUT_PATHS = [
+    ROOT / "data" / "temporary-live-feed.json",
+    ROOT / "src" / "web" / "public" / "data" / "temporary-live-feed.json",
+]
+USER_AGENT = "PrismWirePrototype/0.1 (+local preview)"
+
+FEEDS = [
+    {"source": "NPR", "feed_url": "https://feeds.npr.org/1001/rss.xml"},
+    {"source": "BBC", "feed_url": "https://feeds.bbci.co.uk/news/world/rss.xml"},
+    {"source": "PBS NewsHour", "feed_url": "https://www.pbs.org/newshour/feeds/rss/headlines"},
+    {"source": "WSJ World", "feed_url": "https://feeds.a.dj.com/rss/RSSWorldNews.xml"},
+]
+
+STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "in",
+    "into",
+    "is",
+    "it",
+    "its",
+    "of",
+    "on",
+    "or",
+    "that",
+    "the",
+    "their",
+    "to",
+    "with",
+    "after",
+    "amid",
+    "before",
+    "over",
+    "under",
+    "new",
+    "says",
+    "say",
+    "how",
+    "why",
+    "what",
+    "who",
+}
+
+
+@dataclass
+class FeedItem:
+    source: str
+    feed_url: str
+    title: str
+    url: str
+    published_at: str
+    summary: str
+    image: str | None
+    tokens: set[str]
+
+
+def fetch_text(url: str) -> str:
+    request = Request(
+        url,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "application/rss+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.8",
+        },
+    )
+    with urlopen(request, timeout=20) as response:
+        return response.read().decode("utf-8", errors="replace")
+
+
+def strip_html(raw: str | None) -> str:
+    if not raw:
+        return ""
+    text = re.sub(r"<[^>]+>", " ", raw)
+    text = html.unescape(text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def parse_datetime(value: str | None) -> datetime:
+    if not value:
+        return datetime.now(UTC)
+    try:
+        parsed = parsedate_to_datetime(value)
+        return parsed.astimezone(UTC)
+    except (TypeError, ValueError):
+        return datetime.now(UTC)
+
+
+def tokenize(title: str) -> set[str]:
+    words = re.findall(r"[A-Za-z]{3,}", title.lower())
+    return {word.rstrip("s") for word in words if word not in STOPWORDS}
+
+
+def image_from_description(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    match = re.search(r'<img[^>]+src="([^"]+)"', raw, re.IGNORECASE)
+    return html.unescape(match.group(1)) if match else None
+
+
+def image_from_article(url: str) -> str | None:
+    try:
+        markup = fetch_text(url)
+    except (HTTPError, URLError, TimeoutError):
+        return None
+
+    match = re.search(
+        r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+        markup,
+        re.IGNORECASE,
+    )
+    return html.unescape(match.group(1)) if match else None
+
+
+def parse_feed(feed: dict[str, str]) -> list[FeedItem]:
+    xml = fetch_text(feed["feed_url"])
+    root = ET.fromstring(xml)
+    namespace_map = {"media": "http://search.yahoo.com/mrss/"}
+
+    items: list[FeedItem] = []
+    for item in root.findall(".//item")[:10]:
+        title = strip_html(item.findtext("title"))
+        url = strip_html(item.findtext("link"))
+        if not title or not url:
+            continue
+
+        description_raw = item.findtext("description") or item.findtext(
+            "{http://purl.org/rss/1.0/modules/content/}encoded"
+        )
+        summary = strip_html(description_raw)
+
+        media_image = None
+        media_content = item.find("media:content", namespace_map)
+        media_thumbnail = item.find("media:thumbnail", namespace_map)
+        enclosure = item.find("enclosure")
+        if media_content is not None:
+          media_image = media_content.attrib.get("url")
+        elif media_thumbnail is not None:
+          media_image = media_thumbnail.attrib.get("url")
+        elif enclosure is not None and enclosure.attrib.get("type", "").startswith("image/"):
+          media_image = enclosure.attrib.get("url")
+
+        items.append(
+            FeedItem(
+                source=feed["source"],
+                feed_url=feed["feed_url"],
+                title=title,
+                url=url,
+                published_at=parse_datetime(
+                    item.findtext("pubDate") or item.findtext("published")
+                ).isoformat(),
+                summary=summary,
+                image=media_image or image_from_description(description_raw),
+                tokens=tokenize(title),
+            )
+        )
+
+    return items
+
+
+def should_join_cluster(item: FeedItem, cluster: list[FeedItem]) -> bool:
+    cluster_tokens = set().union(*(entry.tokens for entry in cluster))
+    if not item.tokens or not cluster_tokens:
+        return False
+    overlap = len(item.tokens & cluster_tokens)
+    if overlap >= 3:
+        return True
+    smaller = min(len(item.tokens), len(cluster_tokens))
+    return smaller > 0 and overlap / smaller >= 0.55
+
+
+def cluster_items(items: Iterable[FeedItem]) -> list[list[FeedItem]]:
+    clusters: list[list[FeedItem]] = []
+    for item in sorted(items, key=lambda entry: entry.published_at, reverse=True):
+        target = None
+        for cluster in clusters:
+            if should_join_cluster(item, cluster):
+                target = cluster
+                break
+        if target is None:
+            clusters.append([item])
+        else:
+            target.append(item)
+    return clusters
+
+
+def pick_cluster_label(items: list[FeedItem]) -> str:
+    tokens = Counter(token for item in items for token in item.tokens)
+    common = [token for token, _count in tokens.most_common(3)]
+    return " / ".join(token.title() for token in common) if common else "Live story"
+
+
+def slugify(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return slug[:60] or "story"
+
+
+def build_cluster_payload(index: int, items: list[FeedItem]) -> dict[str, object]:
+    ordered = sorted(items, key=lambda item: item.published_at, reverse=True)
+    lead = ordered[0]
+    hero_image = lead.image or image_from_article(lead.url)
+    sources = sorted({item.source for item in ordered})
+    dek = lead.summary or f"Live prototype cluster built from {', '.join(sources)} coverage."
+
+    return {
+        "slug": f"live-{index}-{slugify(lead.title)}",
+        "topic_label": pick_cluster_label(ordered),
+        "title": lead.title,
+        "dek": dek[:280],
+        "latest_at": lead.published_at,
+        "article_count": len(ordered),
+        "sources": sources,
+        "hero_image": hero_image,
+        "hero_credit": "Publisher preview image" if hero_image else "No image available",
+        "articles": [
+            {
+                "source": item.source,
+                "title": item.title,
+                "url": item.url,
+                "published_at": item.published_at,
+                "summary": item.summary[:220],
+                "image": item.image,
+                "domain": urlparse(item.url).netloc,
+            }
+            for item in ordered[:5]
+        ],
+    }
+
+
+def main() -> int:
+    all_items: list[FeedItem] = []
+    source_errors: list[dict[str, str]] = []
+
+    for feed in FEEDS:
+        try:
+            all_items.extend(parse_feed(feed))
+            time.sleep(0.25)
+        except Exception as exc:  # noqa: BLE001
+            source_errors.append(
+                {
+                    "source": feed["source"],
+                    "feed_url": feed["feed_url"],
+                    "error": str(exc),
+                }
+            )
+
+    deduped = {item.url: item for item in all_items}
+    clustered = cluster_items(deduped.values())
+    ordered_clusters = sorted(
+        clustered,
+        key=lambda group: (len(group), max(item.published_at for item in group)),
+        reverse=True,
+    )[:10]
+
+    payload = {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "source_count": len(FEEDS),
+        "article_count": len(deduped),
+        "sources": FEEDS,
+        "errors": source_errors,
+        "clusters": [
+            build_cluster_payload(index, cluster)
+            for index, cluster in enumerate(ordered_clusters, start=1)
+        ],
+    }
+
+    for output_path in OUTPUT_PATHS:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        print(f"Wrote {output_path}")
+
+    print(f"Clusters: {len(payload['clusters'])}, articles: {payload['article_count']}")
+    if source_errors:
+        print(f"Feed errors: {len(source_errors)}", file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
