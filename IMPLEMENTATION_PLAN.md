@@ -1,5 +1,5 @@
 # Prism Implementation Plan
-### Version 0.1
+### Version 0.2 — Updated 2026-03-11: Harbor-style phase roadmap with checkbox tracking
 
 ---
 
@@ -146,103 +146,128 @@ Institutional plans and saved clusters matter early because they align with the 
 
 ---
 
-## 6. Phases
+## 6. Phase Roadmap
 
-### Phase 1A: Preview Baseline
+### Phase 1: Preview Foundation (Months 1–2)
+**Goal: A Vercel-ready Prism preview with the core reader surfaces, live snapshot loop, and low-cost staging discipline in place.**
 
-Goal:
-Stand up a Vercel-ready preview product with strong local parity.
+#### Deliverables:
+- [x] Doctrine set and repo scaffold
+- [x] Local Next.js reader shell
+- [x] Homepage, cluster detail page, and live prototype surface
+- [x] Web-native preview APIs under `src/web/src/app/api`
+- [x] Temporary live feed generator with heuristic clustering
+- [x] Live snapshot output written into `src/web/public/data` for Vercel-safe deploys
+- [x] `.env.example`, Node version pinning, and GitHub workflow baseline
+- [x] Doppler / Vercel / Supabase / Upstash assumptions documented
+- [x] Low-cost staging plan and Vercel bootstrap docs
+- [ ] First hosted Vercel preview deployment
+- [ ] Doppler `staging` config wired into hosted preview
+- [ ] Supabase preview project created and connected
 
-Deliverables:
+#### Success metrics:
+- Homepage, cluster detail, and `/live` all render locally without the Fastify API
+- `npm run build:web` passes cleanly
+- `/api/health` and `/api/live` return healthy preview responses
+- First hosted preview URL is online
 
-- root doctrine docs and repo scaffold
-- local Next.js reader shell
-- homepage, cluster detail page, and live prototype surface
-- web-native read APIs under `src/web/src/app/api`
-- `.env.example`, Node version pinning, and GitHub workflow baseline
-- Doppler / Vercel / Supabase / Upstash assumptions documented
+#### Team: 1 engineer, 1 design/product lead
 
-### Phase 1B: Live Preview Loop
+---
 
-Goal:
-Make the preview environment feel alive without paying for always-on infrastructure.
+### Phase 2: Reader MVP (Months 3–5)
+**Goal: Turn the preview into a credible newsroom-grade cluster reader, not just a static mockup.**
 
-Deliverables:
+#### Deliverables:
+- [x] Cluster detail prototype with evidence, corrections, and context modules
+- [x] Real-media cluster cards with fallback handling in the live prototype
+- [ ] Source registry admin seed tooling
+- [ ] Data-backed homepage and cluster list
+- [ ] Perspective panel v1 backed by real outlet data
+- [ ] Methodology page shell
+- [ ] Saved clusters
+- [ ] Reader account scaffolding
+- [ ] Subscriber pricing and subscription shell
 
-- temporary live feed generator
-- snapshot output committed inside the web workspace for Vercel deployability
-- scheduled GitHub Actions refresh job
-- basic live feed health endpoint
-- initial preview data policy and operational cadence
+#### Success metrics:
+- New users can explain the purpose of a Story Cluster within 2 minutes of landing
+- Cluster detail page is the clear hero surface in product feedback
+- Live prototype consistently surfaces enough fresh linked coverage to feel active
+- Reader testing confirms the interface feels inspectable rather than overwhelming
 
-### Phase 2: Reader MVP
+#### Team: 1–2 engineers, 1 designer
 
-Goal:
-Ship a usable hosted reader for Story Clusters.
+---
 
-Deliverables:
+### Phase 3: Content Pipeline and Persistence (Months 6–8)
+**Goal: Replace temporary feeds and mock records with a durable, automated content substrate that still fits cheap staging.**
 
-- source registry admin seed tooling
-- richer cluster list and cluster detail pages
-- Perspective panel v1
-- evidence ledger and corrections flow
-- saved clusters shell
-- pricing and subscription shell
-- real-media card support with rights-aware fallback handling
+#### Deliverables:
+- [x] Scheduled GitHub Actions live snapshot refresh
+- [x] Temporary URL deduplication and heuristic clustering pass
+- [ ] Feed ingestion adapters beyond the temporary snapshot script
+- [ ] News sitemap ingestion
+- [ ] Canonical URL normalization pipeline
+- [ ] Outlet registry seed import
+- [ ] Supabase-backed article, outlet, cluster, evidence, and version tables
+- [ ] Correction and version event persistence
+- [ ] Media-rights policy enforcement in the ingestion pipeline
+- [ ] Scheduled enrichment jobs beyond the temporary live snapshot
 
-### Phase 3: Content Pipeline Preview
+#### Success metrics:
+- Most surfaced stories arrive through automated ingestion rather than manual seeding
+- Duplicate story handling is acceptable under manual QA
+- Preview/staging content refreshes on a predictable cadence
+- Corrections and outlet mappings are stored, not just rendered
 
-Goal:
-Replace mostly mocked content with a durable ingestion path that still fits cheap staging.
+#### Team: 2 engineers, 1 designer
 
-Deliverables:
+---
 
-- feed and sitemap ingestion adapters
-- URL normalization and deduplication
-- initial clustering pass
-- outlet registry seed import
-- Supabase-backed article and cluster tables
-- scheduled enrichment jobs
+### Phase 4: Perspective Engine and Paid Proof (Months 9–12)
+**Goal: Make Prism's differentiator operational: inspectable coverage structure, auditable methodology, and a first paid reader value loop.**
 
-### Phase 4: Integrated Staging
+#### Deliverables:
+- [ ] Framing presence group generation
+- [ ] Context Pack generation for all four launch lenses
+- [ ] Methodology pages and version registry
+- [ ] Perspective firewall tests
+- [ ] Morning and evening briefing generation
+- [ ] Follow alerts and topic following
+- [ ] Subscriber-only monitoring and briefing features
+- [ ] Payment and account workflows
+- [ ] Fly.io migration for always-on API or worker workloads
 
-Goal:
-Add a real backend service only after the product loop is proven.
+#### Success metrics:
+- Readers use alternate lenses and Context Packs repeatedly
+- Methodology and correction surfaces are visible enough to build trust
+- Early subscribers demonstrate willingness to pay for clarity and monitoring value
+- No Perspective data leaks into ranking or recommendation logic
 
-Deliverables:
+#### Team: 2–4 engineers, 1 data/ML engineer, 1 designer
 
-- Fly.io app host for long-lived API or worker workloads
-- Fastify APIs promoted from prototype to staged service
-- Upstash-backed queueing where needed
-- saved clusters and follow alerts backed by real persistence
-- basic operational dashboards and migration discipline
+---
 
-### Phase 5: Perspective Engine and Paid Proof
+### Phase 5: Institutional and Harbor Integration (Months 13–18)
+**Goal: Turn Prism into durable infrastructure that funds itself and can safely power Harbor's Perspective layer later.**
 
-Goal:
-Make coverage structure operational and test willingness to pay.
+#### Deliverables:
+- [ ] Institutional account management
+- [ ] Team, school, library, and workplace provisioning
+- [ ] Admin reporting and usage controls
+- [ ] Public transparency reporting
+- [ ] Correction and outlet-dispute workflows
+- [ ] Shared Perspective service contracts for Harbor
+- [ ] Export and audit interfaces for institutional users
+- [ ] Production hosting convergence beyond the early Supabase preview posture
 
-Deliverables:
+#### Success metrics:
+- First institutional pilots are live
+- Correction turnaround is operationally reliable
+- Harbor can consume shared Perspective services without ranking contamination
+- Prism has a credible path from paid reader product to public-trust infrastructure
 
-- framing presence group generation
-- Context Pack generation for all four launch lenses
-- methodology pages and version registry
-- Perspective firewall tests
-- subscriber briefing and monitoring features
-- payment and account workflows
-
-### Phase 6: Institutional and Harbor Integration
-
-Goal:
-Turn Prism into durable infrastructure and validate the engine for Harbor reuse.
-
-Deliverables:
-
-- institutional account management
-- shared Perspective service contracts for Harbor
-- public transparency reporting
-- correction and mapping dispute workflows
-- admin controls for institution provisioning and usage reporting
+#### Team: 3–5 engineers, 1 designer, 1 PM
 
 ---
 
