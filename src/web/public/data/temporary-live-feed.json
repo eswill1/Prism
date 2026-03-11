@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-11T17:10:07.380341+00:00",
+  "generated_at": "2026-03-11T20:49:17.812838+00:00",
   "source_count": 4,
   "article_count": 40,
   "sources": [
@@ -23,29 +23,86 @@
   "errors": [],
   "clusters": [
     {
-      "slug": "live-1-iea-agrees-to-release-record-volume-of-emergency-oil-reserve",
-      "topic_label": "Agree / Release / Oil",
-      "title": "IEA agrees to release record volume of emergency oil reserves in effort to calm prices",
-      "dek": "The Paris-based organization said it will make 400 million barrels of oil available from its members' emergency reserves.",
-      "latest_at": "2026-03-11T16:23:09+00:00",
-      "article_count": 3,
+      "slug": "live-1-iran-s-soccer-team-cannot-participate-in-the-fifa-world-cup-",
+      "topic_label": "Cup / Iran / World",
+      "title": "Iran's soccer team cannot participate in the FIFA World Cup, Iranian minister says",
+      "dek": "Iran is set to play three games in the U.S. this June. But amid the U.S.-Israel military campaign that has killed Iran's supreme leader, Iran's sports minister said the team would pull out.",
+      "latest_at": "2026-03-11T19:57:48+00:00",
+      "article_count": 2,
       "sources": [
-        "BBC",
         "NPR",
         "PBS NewsHour"
       ],
-      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-06T102310Z_1099493989_RC2XYJA83EJ8_RTRMADP_3_IRAN-CRISIS-IEA-PRESSER-1024x684.jpg",
-      "hero_credit": "Publisher preview image",
+      "hero_image": null,
+      "hero_credit": "No image available",
       "articles": [
         {
-          "source": "PBS NewsHour",
-          "title": "IEA agrees to release record volume of emergency oil reserves in effort to calm prices",
-          "url": "https://www.pbs.org/newshour/economy/iea-agrees-to-release-record-volume-of-emergency-oil-reserves-in-effort-to-calm-prices",
-          "published_at": "2026-03-11T16:23:09+00:00",
-          "summary": "The Paris-based organization said it will make 400 million barrels of oil available from its members' emergency reserves.",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-06T102310Z_1099493989_RC2XYJA83EJ8_RTRMADP_3_IRAN-CRISIS-IEA-PRESSER-1024x684.jpg",
-          "domain": "www.pbs.org"
+          "source": "NPR",
+          "title": "Iran's soccer team cannot participate in the FIFA World Cup, Iranian minister says",
+          "url": "https://www.npr.org/2026/03/11/nx-s1-5744855/fifa-world-cup-iran-team",
+          "published_at": "2026-03-11T19:57:48+00:00",
+          "summary": "Iran is set to play three games in the U.S. this June. But amid the U.S.-Israel military campaign that has killed Iran's supreme leader, Iran's sports minister said the team would pull out.",
+          "image": null,
+          "domain": "www.npr.org"
         },
+        {
+          "source": "PBS NewsHour",
+          "title": "Iran's sports minister says country can't take part in World Cup because of U.S. attacks",
+          "url": "https://www.pbs.org/newshour/world/irans-sports-minister-says-country-cant-take-part-in-world-cup-because-of-u-s-attacks",
+          "published_at": "2026-03-11T18:50:30+00:00",
+          "summary": "Iran was expected to take part in the World Cup that will be held across North America in June, but Iranian Sports and Youth Minister Ahmad Donyamali told state television that his country's soccer team players are not s",
+          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-11T151202Z_1874940062_RC2HWEA71K0G_RTRMADP_3_SOCCER-WORLDCUP-IRAN-e1773254952864-1024x709.jpg",
+          "domain": "www.pbs.org"
+        }
+      ]
+    },
+    {
+      "slug": "live-2-pentagon-probe-points-to-u-s-missile-hitting-iranian-school",
+      "topic_label": "School / Point / Probe",
+      "title": "Pentagon probe points to U.S. missile hitting Iranian school",
+      "dek": "A military assessment suggests a U.S. Tomahawk cruise missile was responsible for at least 165 deaths at an Iranian girls' school, according to a U.S. official who was not authorized to speak publicly.",
+      "latest_at": "2026-03-11T19:38:37+00:00",
+      "article_count": 2,
+      "sources": [
+        "NPR"
+      ],
+      "hero_image": null,
+      "hero_credit": "No image available",
+      "articles": [
+        {
+          "source": "NPR",
+          "title": "Pentagon probe points to U.S. missile hitting Iranian school",
+          "url": "https://www.npr.org/2026/03/11/nx-s1-5744981/pentagon-iran-missile-school-hegseth",
+          "published_at": "2026-03-11T19:38:37+00:00",
+          "summary": "A military assessment suggests a U.S. Tomahawk cruise missile was responsible for at least 165 deaths at an Iranian girls' school, according to a U.S. official who was not authorized to speak publicly.",
+          "image": null,
+          "domain": "www.npr.org"
+        },
+        {
+          "source": "NPR",
+          "title": "Iran war: More ships are hit and a probe points to the U.S. striking a girls school",
+          "url": "https://www.npr.org/2026/03/11/nx-s1-5744029/us-iran-war",
+          "published_at": "2026-03-11T09:45:36+00:00",
+          "summary": "Attacks and counterattacks continued throughout the Middle East Wednesday. Two cargo ships were struck in the Gulf, as some lawmakers in Washington pressed for answers on the war's rationale.",
+          "image": null,
+          "domain": "www.npr.org"
+        }
+      ]
+    },
+    {
+      "slug": "live-3-countries-agree-to-record-release-of-emergency-oil-reserves-",
+      "topic_label": "Agree / Release / Oil",
+      "title": "Countries agree to record release of emergency oil reserves as prices surge",
+      "dek": "The G7 group of nations welcomes the idea of releasing oil in response to the surge in prices since the US-Israel war with Iran began",
+      "latest_at": "2026-03-11T15:51:11+00:00",
+      "article_count": 2,
+      "sources": [
+        "BBC",
+        "NPR"
+      ],
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/e9ac/live/9c070350-1d3a-11f1-8a7a-4725a6287ab3.jpg",
+      "hero_credit": "Publisher preview image",
+      "articles": [
         {
           "source": "BBC",
           "title": "Countries agree to record release of emergency oil reserves as prices surge",
@@ -67,8 +124,8 @@
       ]
     },
     {
-      "slug": "live-2-french-aid-worker-among-three-killed-in-drone-strikes-in-reb",
-      "topic_label": "City / Rebel / Congo",
+      "slug": "live-4-french-aid-worker-among-three-killed-in-drone-strikes-in-reb",
+      "topic_label": "Congo / Rebel / City",
       "title": "French aid worker among three killed in drone strikes in rebel-held DR Congo city",
       "dek": "Witnesses say drone strikes hit a residential building frequently occupied by expatriates and aid workers in Goma.",
       "latest_at": "2026-03-11T15:24:57+00:00",
@@ -101,222 +158,145 @@
       ]
     },
     {
-      "slug": "live-3-americans-skeptical-of-the-iran-war-poll-says-and-doj-gives-",
-      "topic_label": "Felon / Doj / Gun",
-      "title": "Americans skeptical of the Iran war, poll says. And, DOJ gives guns back to felons",
-      "dek": "A majority of Americans oppose the U.S.' involvement in the war with Iran, according to a new NPR/PBS News/Marist poll. And, the Department of Justice is quietly restoring gun rights to felons.",
-      "latest_at": "2026-03-11T11:12:58+00:00",
-      "article_count": 2,
+      "slug": "live-5-north-korean-leader-kim-watches-cruise-missile-tests-with-hi",
+      "topic_label": "Daughter / Missile / Leader",
+      "title": "North Korean leader Kim watches cruise missile tests with his daughter",
+      "dek": "Images sent by state media Wednesday showed the two in a conference room watching the firing on a screen, but the report did not mention Kim's daughter.",
+      "latest_at": "2026-03-11T20:37:43+00:00",
+      "article_count": 1,
       "sources": [
-        "NPR"
-      ],
-      "hero_image": null,
-      "hero_credit": "No image available",
-      "articles": [
-        {
-          "source": "NPR",
-          "title": "Americans skeptical of the Iran war, poll says. And, DOJ gives guns back to felons",
-          "url": "https://www.npr.org/2026/03/11/g-s1-113261/up-first-newsletter-iran-israel-us-georgia-clay-fuller-shawn-harris-second-amendment-rights-national-guard",
-          "published_at": "2026-03-11T11:12:58+00:00",
-          "summary": "A majority of Americans oppose the U.S.' involvement in the war with Iran, according to a new NPR/PBS News/Marist poll. And, the Department of Justice is quietly restoring gun rights to felons.",
-          "image": null,
-          "domain": "www.npr.org"
-        },
-        {
-          "source": "NPR",
-          "title": "The Trump DOJ is giving guns back to felons, including one alleged fake elector",
-          "url": "https://www.npr.org/2026/03/11/g-s1-113204/gun-rights-restore-felons-trump-justice-department",
-          "published_at": "2026-03-11T09:00:00+00:00",
-          "summary": "The Department of Justice is quietly restarting a decades-dormant program to restore gun rights to felons. One of them was an alleged fake elector in 2020.",
-          "image": null,
-          "domain": "www.npr.org"
-        }
-      ]
-    },
-    {
-      "slug": "live-4-americans-are-split-on-wanting-the-national-guard-to-monitor",
-      "topic_label": "Poll / American / Voting",
-      "title": "Americans are split on wanting the National Guard to monitor voting, a new poll finds",
-      "dek": "Nearly half of Americans support the National Guard monitoring November's elections, potentially signaling an openness to the sort of nationalizing of elections that President Trump says he wants.",
-      "latest_at": "2026-03-11T09:00:00+00:00",
-      "article_count": 2,
-      "sources": [
-        "NPR",
         "PBS NewsHour"
       ],
-      "hero_image": null,
-      "hero_credit": "No image available",
+      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/AP26069848409710-1024x679.jpg",
+      "hero_credit": "Publisher preview image",
       "articles": [
         {
-          "source": "NPR",
-          "title": "Americans are split on wanting the National Guard to monitor voting, a new poll finds",
-          "url": "https://www.npr.org/2026/03/11/nx-s1-5743823/voting-poll-national-guard-election-security",
-          "published_at": "2026-03-11T09:00:00+00:00",
-          "summary": "Nearly half of Americans support the National Guard monitoring November's elections, potentially signaling an openness to the sort of nationalizing of elections that President Trump says he wants.",
-          "image": null,
-          "domain": "www.npr.org"
-        },
-        {
           "source": "PBS NewsHour",
-          "title": "Americans are increasingly worried about voting, new poll shows",
-          "url": "https://www.pbs.org/newshour/politics/americans-are-increasingly-worried-about-voting-new-poll-shows",
-          "published_at": "2026-03-11T09:00:00+00:00",
-          "summary": "Americans' confidence that their elections will be run fairly has dropped to its lowest point in years, according to a new PBS News/NPR/Marist poll.",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2024/11/Vote2024-1024x683.jpg",
+          "title": "North Korean leader Kim watches cruise missile tests with his daughter",
+          "url": "https://www.pbs.org/newshour/world/north-korean-leader-kim-watches-cruise-missile-tests-with-his-daughter",
+          "published_at": "2026-03-11T20:37:43+00:00",
+          "summary": "Images sent by state media Wednesday showed the two in a conference room watching the firing on a screen, but the report did not mention Kim's daughter.",
+          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/AP26069848409710-1024x679.jpg",
           "domain": "www.pbs.org"
         }
       ]
     },
     {
-      "slug": "live-5-member-of-iranian-football-delegation-granted-australian-asy",
-      "topic_label": "Iranian / Asylum / Member",
-      "title": "Member of Iranian football delegation granted Australian asylum changes her mind",
-      "dek": "One of the seven women who received visas has reversed her decision after speaking to teammates, minister says",
-      "latest_at": "2026-03-11T04:14:40+00:00",
-      "article_count": 2,
+      "slug": "live-6-prosecutor-says-rihanna-a-ap-rocky-3-kids-were-home-when-wom",
+      "topic_label": "Attempted / Rihanna / Charged",
+      "title": "Prosecutor says Rihanna, A$AP Rocky, 3 kids were home when woman charged with attempted murder fired",
+      "dek": "Authorities say a Florida woman has been charged with attempted murder and other felonies over gunshots fired at Rihanna's Los Angeles home last weekend.",
+      "latest_at": "2026-03-11T20:31:15+00:00",
+      "article_count": 1,
       "sources": [
-        "BBC",
         "PBS NewsHour"
       ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/e80d/live/273a2e60-1cec-11f1-9b34-c51430981061.jpg",
+      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2025-11-04T025036Z_1088161056_RC2DPHAD9NCH_RTRMADP_3_AWARDS-CFDA-1024x683.jpg",
       "hero_credit": "Publisher preview image",
       "articles": [
         {
-          "source": "BBC",
-          "title": "Member of Iranian football delegation granted Australian asylum changes her mind",
-          "url": "https://www.bbc.com/news/articles/c93j2492d0do?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T04:14:40+00:00",
-          "summary": "One of the seven women who received visas has reversed her decision after speaking to teammates, minister says",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/e80d/live/273a2e60-1cec-11f1-9b34-c51430981061.jpg",
-          "domain": "www.bbc.com"
-        },
-        {
           "source": "PBS NewsHour",
-          "title": "Australia grants asylum to 2 more members of Iranian women's soccer team",
-          "url": "https://www.pbs.org/newshour/world/australia-grants-asylum-to-2-more-members-of-iranian-womens-soccer-team",
-          "published_at": "2026-03-10T23:58:51+00:00",
-          "summary": "Two more members of the Iranian women's soccer team were granted asylum in Australia before their teammates departed, the country's Home Affairs Minister Tony Burke said Wednesday.",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-10T111829Z_205315868_RC2F1KAO0H0O_RTRMADP_3_IRAN-CRISIS-AUSTRALIA-SOCCER-1024x696.jpg",
+          "title": "Prosecutor says Rihanna, A$AP Rocky, 3 kids were home when woman charged with attempted murder fired",
+          "url": "https://www.pbs.org/newshour/nation/prosecutor-says-rihanna-aap-rocky-3-kids-were-home-when-woman-charged-with-attempted-murder-fired",
+          "published_at": "2026-03-11T20:31:15+00:00",
+          "summary": "Authorities say a Florida woman has been charged with attempted murder and other felonies over gunshots fired at Rihanna's Los Angeles home last weekend.",
+          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2025-11-04T025036Z_1088161056_RC2DPHAD9NCH_RTRMADP_3_AWARDS-CFDA-1024x683.jpg",
           "domain": "www.pbs.org"
         }
       ]
     },
     {
-      "slug": "live-6-man-taken-into-custody-after-driving-van-into-white-house-se",
-      "topic_label": "White / Gate / Van",
-      "title": "Man taken into custody after driving van into White House security gate",
-      "dek": "The Secret Service said the man crashed into the temporary security barrier just before 6:30 a.m. He was immediately arrested by officers from the Secret Service's uniformed division, the agency said.",
-      "latest_at": "2026-03-11T16:57:25+00:00",
+      "slug": "live-7-smartmatic-says-trump-s-campaign-of-retribution-is-driving-c",
+      "topic_label": "Retribution / Driving / Campaign",
+      "title": "Smartmatic says Trump's 'campaign of retribution' is driving criminal prosecution",
+      "dek": "Voting technology firm Smartmatic asked a federal judge to dismiss a criminal money laundering indictment saying the case is political retaliation tied to President Donald Trump's baseless claims about the 2020 election.",
+      "latest_at": "2026-03-11T20:21:34+00:00",
       "article_count": 1,
       "sources": [
         "PBS NewsHour"
       ],
-      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-11T142752Z_983601800_RC2D2KAKD5KQ_RTRMADP_3_USA-TRUMP-1024x683.jpg",
+      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-09T213853Z_475891865_RC281KADEOKB_RTRMADP_3_USA-TRUMP-1024x683.jpg",
       "hero_credit": "Publisher preview image",
       "articles": [
         {
           "source": "PBS NewsHour",
-          "title": "Man taken into custody after driving van into White House security gate",
-          "url": "https://www.pbs.org/newshour/politics/man-taken-into-custody-after-driving-van-into-white-house-security-gate",
-          "published_at": "2026-03-11T16:57:25+00:00",
-          "summary": "The Secret Service said the man crashed into the temporary security barrier just before 6:30 a.m. He was immediately arrested by officers from the Secret Service's uniformed division, the agency said.",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-11T142752Z_983601800_RC2D2KAKD5KQ_RTRMADP_3_USA-TRUMP-1024x683.jpg",
+          "title": "Smartmatic says Trump's 'campaign of retribution' is driving criminal prosecution",
+          "url": "https://www.pbs.org/newshour/politics/smartmatic-says-trumps-campaign-of-retribution-is-driving-criminal-prosecution",
+          "published_at": "2026-03-11T20:21:34+00:00",
+          "summary": "Voting technology firm Smartmatic asked a federal judge to dismiss a criminal money laundering indictment saying the case is political retaliation tied to President Donald Trump's baseless claims about the 2020 election.",
+          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-09T213853Z_475891865_RC281KADEOKB_RTRMADP_3_USA-TRUMP-1024x683.jpg",
           "domain": "www.pbs.org"
         }
       ]
     },
     {
-      "slug": "live-7-no-nobles-day-britain-s-parliament-boots-its-last-hereditary",
-      "topic_label": "Hereditary / Last / Britain",
-      "title": "No Nobles Day: Britain's Parliament boots its last hereditary Lords after 700 years",
-      "dek": "Government minister Nick Thomas-Symonds said the change put an end to \"an archaic and undemocratic principle.\" The removed aristocrats are 92 of the House of Lords' 800 members.",
-      "latest_at": "2026-03-11T16:56:39+00:00",
-      "article_count": 1,
-      "sources": [
-        "NPR"
-      ],
-      "hero_image": null,
-      "hero_credit": "No image available",
-      "articles": [
-        {
-          "source": "NPR",
-          "title": "No Nobles Day: Britain's Parliament boots its last hereditary Lords after 700 years",
-          "url": "https://www.npr.org/2026/03/11/g-s1-113300/britain-parliament-hereditary-house-of-lords-aristocrats-duke-earl-viscount",
-          "published_at": "2026-03-11T16:56:39+00:00",
-          "summary": "Government minister Nick Thomas-Symonds said the change put an end to \"an archaic and undemocratic principle.\" The removed aristocrats are 92 of the House of Lords' 800 members.",
-          "image": null,
-          "domain": "www.npr.org"
-        }
-      ]
-    },
-    {
-      "slug": "live-8-the-iran-war-and-surging-oil-prices-are-affecting-consumers-",
-      "topic_label": "Price / Consumer / Surging",
-      "title": "The Iran war and surging oil prices are affecting consumers. Here's how",
-      "dek": "You don't have to drive a car to be affected.",
-      "latest_at": "2026-03-11T16:50:26+00:00",
+      "slug": "live-8-epstein-s-longtime-accountant-testifies-on-his-wealth-and-bu",
+      "topic_label": "Accountant / Longtime / Busine",
+      "title": "Epstein's longtime accountant testifies on his wealth and business ties",
+      "dek": "House lawmakers were digging into Jeffrey Epstein's sprawling financial portfolio Wednesday as a committee deposed his former accountant.",
+      "latest_at": "2026-03-11T20:11:59+00:00",
       "article_count": 1,
       "sources": [
         "PBS NewsHour"
       ],
-      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-07T044533Z_104144065_RC2IYJA1F699_RTRMADP_3_IRAN-CRISIS-ENERGY-1024x684.jpg",
+      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/AP26070540892257-1024x683.jpg",
       "hero_credit": "Publisher preview image",
       "articles": [
         {
           "source": "PBS NewsHour",
-          "title": "The Iran war and surging oil prices are affecting consumers. Here's how",
-          "url": "https://www.pbs.org/newshour/economy/the-iran-war-and-surging-oil-prices-are-affecting-consumers-heres-how",
-          "published_at": "2026-03-11T16:50:26+00:00",
-          "summary": "You don't have to drive a car to be affected.",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-07T044533Z_104144065_RC2IYJA1F699_RTRMADP_3_IRAN-CRISIS-ENERGY-1024x684.jpg",
+          "title": "Epstein's longtime accountant testifies on his wealth and business ties",
+          "url": "https://www.pbs.org/newshour/politics/epsteins-longtime-accountant-testifies-on-his-wealth-and-business-ties",
+          "published_at": "2026-03-11T20:11:59+00:00",
+          "summary": "House lawmakers were digging into Jeffrey Epstein's sprawling financial portfolio Wednesday as a committee deposed his former accountant.",
+          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/AP26070540892257-1024x683.jpg",
           "domain": "www.pbs.org"
         }
       ]
     },
     {
-      "slug": "live-9-bowen-trump-has-called-for-an-iran-uprising-but-the-lessons-",
-      "topic_label": "Iraq / Loom / Large",
-      "title": "Bowen: Trump has called for an Iran uprising but the lessons from Iraq in 1991 loom large",
-      "dek": "The US president might learn that starting wars is much easier than ending them, writes the BBC's international editor.",
-      "latest_at": "2026-03-11T16:45:28+00:00",
-      "article_count": 1,
-      "sources": [
-        "BBC"
-      ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/3cd7/live/59400920-1d64-11f1-8078-f393eb24ebf7.jpg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "BBC",
-          "title": "Bowen: Trump has called for an Iran uprising but the lessons from Iraq in 1991 loom large",
-          "url": "https://www.bbc.com/news/articles/cn0znx4xrl9o?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T16:45:28+00:00",
-          "summary": "The US president might learn that starting wars is much easier than ending them, writes the BBC's international editor.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/3cd7/live/59400920-1d64-11f1-8078-f393eb24ebf7.jpg",
-          "domain": "www.bbc.com"
-        }
-      ]
-    },
-    {
-      "slug": "live-10-british-prime-minister-was-warned-of-reputational-risk-in-ap",
-      "topic_label": "British / File / Show",
-      "title": "British prime minister was warned of 'reputational risk' in appointing Mandelson, files show",
-      "dek": "Concerns were raised in a document sent to Prime Minister Keir Starmer in December 2024 when he was considering appointing Peter Mandelson as U.S. ambassador because of his relationship with convicted sex offender Jeffrey Epstein.",
-      "latest_at": "2026-03-11T16:13:45+00:00",
+      "slug": "live-9-how-some-states-are-reviving-a-push-to-tax-the-rich",
+      "topic_label": "State / Reviving / Push",
+      "title": "How some states are reviving a push to tax the rich",
+      "dek": "Advocates across the U.S. are hoping a growing unhappiness of wage and wealth inequalities that have increased coming out of the COVID-19 pandemic will help more states adopt policies involve the rich paying more in taxes.",
+      "latest_at": "2026-03-11T20:02:54+00:00",
       "article_count": 1,
       "sources": [
         "PBS NewsHour"
       ],
-      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-02-26T131626Z_934066868_RC2PTJAV5A4K_RTRMADP_3_USA-EPSTEIN-BRITAIN-MANDELSON-1024x685.jpg",
+      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/AP26069818409270-1024x683.jpg",
       "hero_credit": "Publisher preview image",
       "articles": [
         {
           "source": "PBS NewsHour",
-          "title": "British prime minister was warned of 'reputational risk' in appointing Mandelson, files show",
-          "url": "https://www.pbs.org/newshour/world/british-prime-minister-was-warned-of-reputational-risk-in-appointing-mandelson-files-show",
-          "published_at": "2026-03-11T16:13:45+00:00",
-          "summary": "Concerns were raised in a document sent to Prime Minister Keir Starmer in December 2024 when he was considering appointing Peter Mandelson as U.S. ambassador because of his relationship with convicted sex offender Jeffre",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-02-26T131626Z_934066868_RC2PTJAV5A4K_RTRMADP_3_USA-EPSTEIN-BRITAIN-MANDELSON-1024x685.jpg",
+          "title": "How some states are reviving a push to tax the rich",
+          "url": "https://www.pbs.org/newshour/nation/how-some-states-are-reviving-a-push-to-tax-the-rich",
+          "published_at": "2026-03-11T20:02:54+00:00",
+          "summary": "Advocates across the U.S. are hoping a growing unhappiness of wage and wealth inequalities that have increased coming out of the COVID-19 pandemic will help more states adopt policies involve the rich paying more in taxe",
+          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/AP26069818409270-1024x683.jpg",
+          "domain": "www.pbs.org"
+        }
+      ]
+    },
+    {
+      "slug": "live-10-most-u-s-stocks-fall-as-oil-prices-get-back-to-rising",
+      "topic_label": "Fall / Back / Price",
+      "title": "Most U.S. stocks fall as oil prices get back to rising",
+      "dek": "Since the start of the Iran war, sharp moves for oil prices have triggered swings up and down for financial markets worldwide, sometimes by the hour.",
+      "latest_at": "2026-03-11T19:49:13+00:00",
+      "article_count": 1,
+      "sources": [
+        "PBS NewsHour"
+      ],
+      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/AP26069503341859-1024x683.jpg",
+      "hero_credit": "Publisher preview image",
+      "articles": [
+        {
+          "source": "PBS NewsHour",
+          "title": "Most U.S. stocks fall as oil prices get back to rising",
+          "url": "https://www.pbs.org/newshour/world/most-u-s-stocks-fall-as-oil-prices-get-back-to-rising",
+          "published_at": "2026-03-11T19:49:13+00:00",
+          "summary": "Since the start of the Iran war, sharp moves for oil prices have triggered swings up and down for financial markets worldwide, sometimes by the hour.",
+          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/AP26069503341859-1024x683.jpg",
           "domain": "www.pbs.org"
         }
       ]
