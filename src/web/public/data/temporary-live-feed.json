@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-11T13:37:42.273842+00:00",
+  "generated_at": "2026-03-11T17:10:07.380341+00:00",
   "source_count": 4,
   "article_count": 40,
   "sources": [
@@ -23,42 +23,86 @@
   "errors": [],
   "clusters": [
     {
-      "slug": "live-1-georgia-race-to-replace-marjorie-taylor-greene-heads-to-a-ru",
-      "topic_label": "Taylor / Georgia / Marjorie",
-      "title": "Georgia race to replace Marjorie Taylor Greene heads to a runoff",
-      "dek": "Republican Clay Fuller is projected to face Democrat Shawn Harris in the 7 April runoff election.",
-      "latest_at": "2026-03-11T12:06:42+00:00",
-      "article_count": 2,
+      "slug": "live-1-iea-agrees-to-release-record-volume-of-emergency-oil-reserve",
+      "topic_label": "Agree / Release / Oil",
+      "title": "IEA agrees to release record volume of emergency oil reserves in effort to calm prices",
+      "dek": "The Paris-based organization said it will make 400 million barrels of oil available from its members' emergency reserves.",
+      "latest_at": "2026-03-11T16:23:09+00:00",
+      "article_count": 3,
       "sources": [
         "BBC",
+        "NPR",
         "PBS NewsHour"
       ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/cd05/live/a5b8f0a0-1ce7-11f1-801d-ed3cff6bf876.jpg",
+      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-06T102310Z_1099493989_RC2XYJA83EJ8_RTRMADP_3_IRAN-CRISIS-IEA-PRESSER-1024x684.jpg",
       "hero_credit": "Publisher preview image",
       "articles": [
         {
+          "source": "PBS NewsHour",
+          "title": "IEA agrees to release record volume of emergency oil reserves in effort to calm prices",
+          "url": "https://www.pbs.org/newshour/economy/iea-agrees-to-release-record-volume-of-emergency-oil-reserves-in-effort-to-calm-prices",
+          "published_at": "2026-03-11T16:23:09+00:00",
+          "summary": "The Paris-based organization said it will make 400 million barrels of oil available from its members' emergency reserves.",
+          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-06T102310Z_1099493989_RC2XYJA83EJ8_RTRMADP_3_IRAN-CRISIS-IEA-PRESSER-1024x684.jpg",
+          "domain": "www.pbs.org"
+        },
+        {
           "source": "BBC",
-          "title": "Georgia race to replace Marjorie Taylor Greene heads to a runoff",
-          "url": "https://www.bbc.com/news/articles/cy4wknrz3exo?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T12:06:42+00:00",
-          "summary": "Republican Clay Fuller is projected to face Democrat Shawn Harris in the 7 April runoff election.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/cd05/live/a5b8f0a0-1ce7-11f1-801d-ed3cff6bf876.jpg",
+          "title": "Countries agree to record release of emergency oil reserves as prices surge",
+          "url": "https://www.bbc.com/news/articles/cly093xxlzzo?at_medium=RSS&at_campaign=rss",
+          "published_at": "2026-03-11T15:51:11+00:00",
+          "summary": "The G7 group of nations welcomes the idea of releasing oil in response to the surge in prices since the US-Israel war with Iran began",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/e9ac/live/9c070350-1d3a-11f1-8a7a-4725a6287ab3.jpg",
           "domain": "www.bbc.com"
         },
         {
-          "source": "PBS NewsHour",
-          "title": "News Wrap: Georgia holds special election to replace Marjorie Taylor Greene",
-          "url": "https://www.pbs.org/newshour/show/news-wrap-georgia-holds-special-election-to-replace-marjorie-taylor-greene",
-          "published_at": "2026-03-10T22:40:10+00:00",
-          "summary": "In our news wrap Tuesday, Rep. Bennie Thompson of Mississippi is fighting off a primary challenge from newcomer Evan Turnage, there's a crowded field in a Georgia special election to replace former Rep. Marjorie Taylor G",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/NewsWrap-7-1024x683.jpg",
-          "domain": "www.pbs.org"
+          "source": "NPR",
+          "title": "Countries agree to a historic release of stockpiled oil to ease global disruption",
+          "url": "https://www.npr.org/2026/03/11/nx-s1-5743816/iran-war-oil-reserves-iea",
+          "published_at": "2026-03-11T14:24:18+00:00",
+          "summary": "Members of the International Energy Agency have announced a coordinated release of 400 million barrels of stockpiled oil in an attempt to counter the disruption in oil trade triggered by the Iran war.",
+          "image": null,
+          "domain": "www.npr.org"
         }
       ]
     },
     {
-      "slug": "live-2-americans-skeptical-of-the-iran-war-poll-says-and-doj-gives-",
-      "topic_label": "Gun / Doj / Back",
+      "slug": "live-2-french-aid-worker-among-three-killed-in-drone-strikes-in-reb",
+      "topic_label": "City / Rebel / Congo",
+      "title": "French aid worker among three killed in drone strikes in rebel-held DR Congo city",
+      "dek": "Witnesses say drone strikes hit a residential building frequently occupied by expatriates and aid workers in Goma.",
+      "latest_at": "2026-03-11T15:24:57+00:00",
+      "article_count": 2,
+      "sources": [
+        "BBC",
+        "WSJ World"
+      ],
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/c0c6/live/607ec730-1d4b-11f1-b048-c9424b2cf5fd.jpg",
+      "hero_credit": "Publisher preview image",
+      "articles": [
+        {
+          "source": "BBC",
+          "title": "French aid worker among three killed in drone strikes in rebel-held DR Congo city",
+          "url": "https://www.bbc.com/news/articles/cvgj8veg0gno?at_medium=RSS&at_campaign=rss",
+          "published_at": "2026-03-11T15:24:57+00:00",
+          "summary": "Witnesses say drone strikes hit a residential building frequently occupied by expatriates and aid workers in Goma.",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/c0c6/live/607ec730-1d4b-11f1-b048-c9424b2cf5fd.jpg",
+          "domain": "www.bbc.com"
+        },
+        {
+          "source": "WSJ World",
+          "title": "Rwanda-Backed Rebels Enter Congo's Safe-Haven City",
+          "url": "https://www.wsj.com/articles/rwanda-backed-rebels-enter-congo-safe-haven-city-aid-hub-09fdccb8",
+          "published_at": "2025-01-27T15:07:00+00:00",
+          "summary": "Residents of Goma reported gunfire and shelling after rebels overran Congolese troops. U.N. officials estimated that more than one million displaced people were now inside the city.",
+          "image": null,
+          "domain": "www.wsj.com"
+        }
+      ]
+    },
+    {
+      "slug": "live-3-americans-skeptical-of-the-iran-war-poll-says-and-doj-gives-",
+      "topic_label": "Felon / Doj / Gun",
       "title": "Americans skeptical of the Iran war, poll says. And, DOJ gives guns back to felons",
       "dek": "A majority of Americans oppose the U.S.' involvement in the war with Iran, according to a new NPR/PBS News/Marist poll. And, the Department of Justice is quietly restoring gun rights to felons.",
       "latest_at": "2026-03-11T11:12:58+00:00",
@@ -90,8 +134,8 @@
       ]
     },
     {
-      "slug": "live-3-americans-are-split-on-wanting-the-national-guard-to-monitor",
-      "topic_label": "Voting / Poll / American",
+      "slug": "live-4-americans-are-split-on-wanting-the-national-guard-to-monitor",
+      "topic_label": "Poll / American / Voting",
       "title": "Americans are split on wanting the National Guard to monitor voting, a new poll finds",
       "dek": "Nearly half of Americans support the National Guard monitoring November's elections, potentially signaling an openness to the sort of nationalizing of elections that President Trump says he wants.",
       "latest_at": "2026-03-11T09:00:00+00:00",
@@ -124,8 +168,8 @@
       ]
     },
     {
-      "slug": "live-4-member-of-iranian-football-delegation-granted-australian-asy",
-      "topic_label": "Asylum / Member / Iranian",
+      "slug": "live-5-member-of-iranian-football-delegation-granted-australian-asy",
+      "topic_label": "Iranian / Asylum / Member",
       "title": "Member of Iranian football delegation granted Australian asylum changes her mind",
       "dek": "One of the seven women who received visas has reversed her decision after speaking to teammates, minister says",
       "latest_at": "2026-03-11T04:14:40+00:00",
@@ -158,131 +202,35 @@
       ]
     },
     {
-      "slug": "live-5-canadian-pm-mark-carney-inches-closer-to-majority-as-fourth-",
-      "topic_label": "Carney / Majority / Mark",
-      "title": "Canadian PM Mark Carney inches closer to majority, as fourth MP defects to Liberals",
-      "dek": "Lori Idlout, formerly of the NDP, has become the latest lawmaker in the current parliament to cross the floor.",
-      "latest_at": "2026-03-11T13:26:57+00:00",
+      "slug": "live-6-man-taken-into-custody-after-driving-van-into-white-house-se",
+      "topic_label": "White / Gate / Van",
+      "title": "Man taken into custody after driving van into White House security gate",
+      "dek": "The Secret Service said the man crashed into the temporary security barrier just before 6:30 a.m. He was immediately arrested by officers from the Secret Service's uniformed division, the agency said.",
+      "latest_at": "2026-03-11T16:57:25+00:00",
       "article_count": 1,
       "sources": [
-        "BBC"
+        "PBS NewsHour"
       ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/8323/live/9ee99e90-1cf2-11f1-bb35-653e5995a61a.jpg",
+      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-11T142752Z_983601800_RC2D2KAKD5KQ_RTRMADP_3_USA-TRUMP-1024x683.jpg",
       "hero_credit": "Publisher preview image",
       "articles": [
         {
-          "source": "BBC",
-          "title": "Canadian PM Mark Carney inches closer to majority, as fourth MP defects to Liberals",
-          "url": "https://www.bbc.com/news/articles/c0e5jwz0703o?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T13:26:57+00:00",
-          "summary": "Lori Idlout, formerly of the NDP, has become the latest lawmaker in the current parliament to cross the floor.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/8323/live/9ee99e90-1cf2-11f1-bb35-653e5995a61a.jpg",
-          "domain": "www.bbc.com"
+          "source": "PBS NewsHour",
+          "title": "Man taken into custody after driving van into White House security gate",
+          "url": "https://www.pbs.org/newshour/politics/man-taken-into-custody-after-driving-van-into-white-house-security-gate",
+          "published_at": "2026-03-11T16:57:25+00:00",
+          "summary": "The Secret Service said the man crashed into the temporary security barrier just before 6:30 a.m. He was immediately arrested by officers from the Secret Service's uniformed division, the agency said.",
+          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-11T142752Z_983601800_RC2D2KAKD5KQ_RTRMADP_3_USA-TRUMP-1024x683.jpg",
+          "domain": "www.pbs.org"
         }
       ]
     },
     {
-      "slug": "live-6-g7-welcomes-potential-record-release-of-oil-reserves-as-pric",
-      "topic_label": "Record / Oil / Reserve",
-      "title": "G7 welcomes potential record release of oil reserves as prices surge",
-      "dek": "The group of nations welcomes the idea of releasing oil in response to the surge in prices since the US-Israel war with Iran began",
-      "latest_at": "2026-03-11T12:07:11+00:00",
-      "article_count": 1,
-      "sources": [
-        "BBC"
-      ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/e9ac/live/9c070350-1d3a-11f1-8a7a-4725a6287ab3.jpg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "BBC",
-          "title": "G7 welcomes potential record release of oil reserves as prices surge",
-          "url": "https://www.bbc.com/news/articles/cly093xxlzzo?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T12:07:11+00:00",
-          "summary": "The group of nations welcomes the idea of releasing oil in response to the surge in prices since the US-Israel war with Iran began",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/e9ac/live/9c070350-1d3a-11f1-8a7a-4725a6287ab3.jpg",
-          "domain": "www.bbc.com"
-        }
-      ]
-    },
-    {
-      "slug": "live-7-at-least-six-dead-in-switzerland-bus-fire",
-      "topic_label": "Fire / Switzerland / Bu",
-      "title": "At least six dead in Switzerland bus fire",
-      "dek": "Police do not yet know the cause of the fire in the western Fribourg canton, which also injured a number of people.",
-      "latest_at": "2026-03-11T11:37:23+00:00",
-      "article_count": 1,
-      "sources": [
-        "BBC"
-      ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/15d1/live/8627cf80-1ccf-11f1-b048-c9424b2cf5fd.jpg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "BBC",
-          "title": "At least six dead in Switzerland bus fire",
-          "url": "https://www.bbc.com/news/articles/c5y4wdlyy9xo?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T11:37:23+00:00",
-          "summary": "Police do not yet know the cause of the fire in the western Fribourg canton, which also injured a number of people.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/15d1/live/8627cf80-1ccf-11f1-b048-c9424b2cf5fd.jpg",
-          "domain": "www.bbc.com"
-        }
-      ]
-    },
-    {
-      "slug": "live-8-ukraine-says-it-has-hit-russian-missile-component-plant",
-      "topic_label": "Missile / Russian / Component",
-      "title": "Ukraine says it has hit Russian 'missile component' plant",
-      "dek": "Russia says the attack hit civilians and could not have been carried out without British help.",
-      "latest_at": "2026-03-11T11:16:02+00:00",
-      "article_count": 1,
-      "sources": [
-        "BBC"
-      ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/1e77/live/9d9a8680-1d38-11f1-9120-a910fc22c6ac.jpg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "BBC",
-          "title": "Ukraine says it has hit Russian 'missile component' plant",
-          "url": "https://www.bbc.com/news/articles/ckg1eqw30l9o?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T11:16:02+00:00",
-          "summary": "Russia says the attack hit civilians and could not have been carried out without British help.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/1e77/live/9d9a8680-1d38-11f1-9120-a910fc22c6ac.jpg",
-          "domain": "www.bbc.com"
-        }
-      ]
-    },
-    {
-      "slug": "live-9-mugabe-s-son-drops-bail-request-what-has-happened-to-the-fam",
-      "topic_label": "Power / Son / Request",
-      "title": "Mugabe's son drops bail request - what has happened to the family after losing power",
-      "dek": "Bellarmine Mugabe will negotiate a plea deal after being accused of attempted murder and other charges in South Africa.",
-      "latest_at": "2026-03-11T10:31:57+00:00",
-      "article_count": 1,
-      "sources": [
-        "BBC"
-      ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/2658/live/8803f1d0-1d38-11f1-9120-a910fc22c6ac.jpg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "BBC",
-          "title": "Mugabe's son drops bail request - what has happened to the family after losing power",
-          "url": "https://www.bbc.com/news/articles/cp32xx35lwwo?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T10:31:57+00:00",
-          "summary": "Bellarmine Mugabe will negotiate a plea deal after being accused of attempted murder and other charges in South Africa.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/2658/live/8803f1d0-1d38-11f1-9120-a910fc22c6ac.jpg",
-          "domain": "www.bbc.com"
-        }
-      ]
-    },
-    {
-      "slug": "live-10-u-s-attacks-iranian-mine-laying-vessels-near-hormuz-on-day-1",
-      "topic_label": "Mine / Laying / Day",
-      "title": "U.S. attacks Iranian mine-laying vessels near Hormuz on Day 12 of war",
-      "dek": "Attacks and counterattacks continued throughout the Middle East Wednesday. Two cargo ships were struck in the Gulf, as some lawmakers in Washington pressed for answers on the war's rationale.",
-      "latest_at": "2026-03-11T09:45:36+00:00",
+      "slug": "live-7-no-nobles-day-britain-s-parliament-boots-its-last-hereditary",
+      "topic_label": "Hereditary / Last / Britain",
+      "title": "No Nobles Day: Britain's Parliament boots its last hereditary Lords after 700 years",
+      "dek": "Government minister Nick Thomas-Symonds said the change put an end to \"an archaic and undemocratic principle.\" The removed aristocrats are 92 of the House of Lords' 800 members.",
+      "latest_at": "2026-03-11T16:56:39+00:00",
       "article_count": 1,
       "sources": [
         "NPR"
@@ -292,12 +240,84 @@
       "articles": [
         {
           "source": "NPR",
-          "title": "U.S. attacks Iranian mine-laying vessels near Hormuz on Day 12 of war",
-          "url": "https://www.npr.org/2026/03/11/nx-s1-5744029/us-iran-war",
-          "published_at": "2026-03-11T09:45:36+00:00",
-          "summary": "Attacks and counterattacks continued throughout the Middle East Wednesday. Two cargo ships were struck in the Gulf, as some lawmakers in Washington pressed for answers on the war's rationale.",
+          "title": "No Nobles Day: Britain's Parliament boots its last hereditary Lords after 700 years",
+          "url": "https://www.npr.org/2026/03/11/g-s1-113300/britain-parliament-hereditary-house-of-lords-aristocrats-duke-earl-viscount",
+          "published_at": "2026-03-11T16:56:39+00:00",
+          "summary": "Government minister Nick Thomas-Symonds said the change put an end to \"an archaic and undemocratic principle.\" The removed aristocrats are 92 of the House of Lords' 800 members.",
           "image": null,
           "domain": "www.npr.org"
+        }
+      ]
+    },
+    {
+      "slug": "live-8-the-iran-war-and-surging-oil-prices-are-affecting-consumers-",
+      "topic_label": "Price / Consumer / Surging",
+      "title": "The Iran war and surging oil prices are affecting consumers. Here's how",
+      "dek": "You don't have to drive a car to be affected.",
+      "latest_at": "2026-03-11T16:50:26+00:00",
+      "article_count": 1,
+      "sources": [
+        "PBS NewsHour"
+      ],
+      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-07T044533Z_104144065_RC2IYJA1F699_RTRMADP_3_IRAN-CRISIS-ENERGY-1024x684.jpg",
+      "hero_credit": "Publisher preview image",
+      "articles": [
+        {
+          "source": "PBS NewsHour",
+          "title": "The Iran war and surging oil prices are affecting consumers. Here's how",
+          "url": "https://www.pbs.org/newshour/economy/the-iran-war-and-surging-oil-prices-are-affecting-consumers-heres-how",
+          "published_at": "2026-03-11T16:50:26+00:00",
+          "summary": "You don't have to drive a car to be affected.",
+          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-07T044533Z_104144065_RC2IYJA1F699_RTRMADP_3_IRAN-CRISIS-ENERGY-1024x684.jpg",
+          "domain": "www.pbs.org"
+        }
+      ]
+    },
+    {
+      "slug": "live-9-bowen-trump-has-called-for-an-iran-uprising-but-the-lessons-",
+      "topic_label": "Iraq / Loom / Large",
+      "title": "Bowen: Trump has called for an Iran uprising but the lessons from Iraq in 1991 loom large",
+      "dek": "The US president might learn that starting wars is much easier than ending them, writes the BBC's international editor.",
+      "latest_at": "2026-03-11T16:45:28+00:00",
+      "article_count": 1,
+      "sources": [
+        "BBC"
+      ],
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/3cd7/live/59400920-1d64-11f1-8078-f393eb24ebf7.jpg",
+      "hero_credit": "Publisher preview image",
+      "articles": [
+        {
+          "source": "BBC",
+          "title": "Bowen: Trump has called for an Iran uprising but the lessons from Iraq in 1991 loom large",
+          "url": "https://www.bbc.com/news/articles/cn0znx4xrl9o?at_medium=RSS&at_campaign=rss",
+          "published_at": "2026-03-11T16:45:28+00:00",
+          "summary": "The US president might learn that starting wars is much easier than ending them, writes the BBC's international editor.",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/3cd7/live/59400920-1d64-11f1-8078-f393eb24ebf7.jpg",
+          "domain": "www.bbc.com"
+        }
+      ]
+    },
+    {
+      "slug": "live-10-british-prime-minister-was-warned-of-reputational-risk-in-ap",
+      "topic_label": "British / File / Show",
+      "title": "British prime minister was warned of 'reputational risk' in appointing Mandelson, files show",
+      "dek": "Concerns were raised in a document sent to Prime Minister Keir Starmer in December 2024 when he was considering appointing Peter Mandelson as U.S. ambassador because of his relationship with convicted sex offender Jeffrey Epstein.",
+      "latest_at": "2026-03-11T16:13:45+00:00",
+      "article_count": 1,
+      "sources": [
+        "PBS NewsHour"
+      ],
+      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-02-26T131626Z_934066868_RC2PTJAV5A4K_RTRMADP_3_USA-EPSTEIN-BRITAIN-MANDELSON-1024x685.jpg",
+      "hero_credit": "Publisher preview image",
+      "articles": [
+        {
+          "source": "PBS NewsHour",
+          "title": "British prime minister was warned of 'reputational risk' in appointing Mandelson, files show",
+          "url": "https://www.pbs.org/newshour/world/british-prime-minister-was-warned-of-reputational-risk-in-appointing-mandelson-files-show",
+          "published_at": "2026-03-11T16:13:45+00:00",
+          "summary": "Concerns were raised in a document sent to Prime Minister Keir Starmer in December 2024 when he was considering appointing Peter Mandelson as U.S. ambassador because of his relationship with convicted sex offender Jeffre",
+          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-02-26T131626Z_934066868_RC2PTJAV5A4K_RTRMADP_3_USA-EPSTEIN-BRITAIN-MANDELSON-1024x685.jpg",
+          "domain": "www.pbs.org"
         }
       ]
     }
