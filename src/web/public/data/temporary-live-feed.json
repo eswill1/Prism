@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-11T01:40:35.642522+00:00",
+  "generated_at": "2026-03-11T05:16:56.030768+00:00",
   "source_count": 4,
   "article_count": 40,
   "sources": [
@@ -23,26 +23,26 @@
   "errors": [],
   "clusters": [
     {
-      "slug": "live-1-two-more-people-connected-to-iranian-football-team-choose-to",
-      "topic_label": "More / Iranian / Australia",
-      "title": "Two more people connected to Iranian football team choose to stay in Australia",
-      "dek": "It is understood most of the team left Australia on Tuesday night, but that a player and a member of support staff have joined five players who chose to remain.",
-      "latest_at": "2026-03-11T00:09:51+00:00",
+      "slug": "live-1-member-of-iranian-football-delegation-granted-australian-asy",
+      "topic_label": "Member / Asylum / Iranian",
+      "title": "Member of Iranian football delegation granted Australian asylum changes her mind",
+      "dek": "One of the seven women who received visas has reversed her decision after speaking to teammates, minister says",
+      "latest_at": "2026-03-11T04:14:40+00:00",
       "article_count": 2,
       "sources": [
         "BBC",
         "PBS NewsHour"
       ],
-      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/45e0/live/1bfc9510-1c9c-11f1-b048-c9424b2cf5fd.jpg",
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/e80d/live/273a2e60-1cec-11f1-9b34-c51430981061.jpg",
       "hero_credit": "Publisher preview image",
       "articles": [
         {
           "source": "BBC",
-          "title": "Two more people connected to Iranian football team choose to stay in Australia",
+          "title": "Member of Iranian football delegation granted Australian asylum changes her mind",
           "url": "https://www.bbc.com/news/articles/c93j2492d0do?at_medium=RSS&at_campaign=rss",
-          "published_at": "2026-03-11T00:09:51+00:00",
-          "summary": "It is understood most of the team left Australia on Tuesday night, but that a player and a member of support staff have joined five players who chose to remain.",
-          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/45e0/live/1bfc9510-1c9c-11f1-b048-c9424b2cf5fd.jpg",
+          "published_at": "2026-03-11T04:14:40+00:00",
+          "summary": "One of the seven women who received visas has reversed her decision after speaking to teammates, minister says",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/e80d/live/273a2e60-1cec-11f1-9b34-c51430981061.jpg",
           "domain": "www.bbc.com"
         },
         {
@@ -58,7 +58,7 @@
     },
     {
       "slug": "live-2-as-iran-shows-no-signs-of-surrender-u-s-launches-most-intens",
-      "topic_label": "Most / Iran / Day",
+      "topic_label": "Intense / Most / Day",
       "title": "As Iran shows no signs of surrender, U.S. launches 'most intense' day of strikes",
       "dek": "The U.S.-Israeli war with Iran showed no sign of slowing on Tuesday, with both sides trading strikes and vowing to keep up the attacks. U.S. officials said the campaign has destroyed most of Iran's ability to produce nuclear fuel, and President Trump said forces also struck sea m",
       "latest_at": "2026-03-10T22:55:32+00:00",
@@ -92,7 +92,7 @@
     },
     {
       "slug": "live-3-news-wrap-georgia-holds-special-election-to-replace-marjorie",
-      "topic_label": "Election / Georgia / Marjorie",
+      "topic_label": "Greene / Election / Special",
       "title": "News Wrap: Georgia holds special election to replace Marjorie Taylor Greene",
       "dek": "In our news wrap Tuesday, Rep. Bennie Thompson of Mississippi is fighting off a primary challenge from newcomer Evan Turnage, there's a crowded field in a Georgia special election to replace former Rep. Marjorie Taylor Greene, Democrats sued the Trump administration over whether ",
       "latest_at": "2026-03-10T22:40:10+00:00",
@@ -126,7 +126,7 @@
     },
     {
       "slug": "live-4-watch-white-house-says-trump-will-accept-outcome-of-investig",
-      "topic_label": "Will / Trump / Accept",
+      "topic_label": "Accept / Will / Trump",
       "title": "WATCH: White House says Trump will accept outcome of investigation into bombing of school in Iran",
       "dek": "White House press secretary Karoline Leavitt didn't answer why President Donald Trump falsely asserted on Monday that Iran has access to the U.S.-made Tomahawk cruise missile, the weapon likely used to strike a girls school in Iran, killing 165 people.",
       "latest_at": "2026-03-10T22:31:01+00:00",
@@ -159,8 +159,80 @@
       ]
     },
     {
-      "slug": "live-5-jeffrey-epstein-had-two-key-aides-why-do-they-still-control-",
-      "topic_label": "Secret / Epstein / Still",
+      "slug": "live-5-katy-perry-loses-trademark-case-against-australian-designer-",
+      "topic_label": "Against / Lose / Designer",
+      "title": "Katy Perry loses trademark case against Australian designer Katie Perry",
+      "dek": "The US singer lost the case in 2023 and later won on appeal, but now judges have ruled against her.",
+      "latest_at": "2026-03-11T04:13:40+00:00",
+      "article_count": 1,
+      "sources": [
+        "BBC"
+      ],
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/915c/live/4dd116b0-1d00-11f1-845b-217496a1f0c5.jpg",
+      "hero_credit": "Publisher preview image",
+      "articles": [
+        {
+          "source": "BBC",
+          "title": "Katy Perry loses trademark case against Australian designer Katie Perry",
+          "url": "https://www.bbc.com/news/articles/c9dn8l021l2o?at_medium=RSS&at_campaign=rss",
+          "published_at": "2026-03-11T04:13:40+00:00",
+          "summary": "The US singer lost the case in 2023 and later won on appeal, but now judges have ruled against her.",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/915c/live/4dd116b0-1d00-11f1-845b-217496a1f0c5.jpg",
+          "domain": "www.bbc.com"
+        }
+      ]
+    },
+    {
+      "slug": "live-6-woman-charged-with-attempted-murder-after-shooting-at-rihann",
+      "topic_label": "Rihanna / Murder / Charged",
+      "title": "Woman charged with attempted murder after shooting at Rihanna's home",
+      "dek": "The woman posted about the singer online prior to the attack, the BBC's US news partner CBS reports.",
+      "latest_at": "2026-03-11T03:10:09+00:00",
+      "article_count": 1,
+      "sources": [
+        "BBC"
+      ],
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/2bbd/live/477c5960-1ceb-11f1-b3be-0fab6819344b.jpg",
+      "hero_credit": "Publisher preview image",
+      "articles": [
+        {
+          "source": "BBC",
+          "title": "Woman charged with attempted murder after shooting at Rihanna's home",
+          "url": "https://www.bbc.com/news/articles/cgjze644wjvo?at_medium=RSS&at_campaign=rss",
+          "published_at": "2026-03-11T03:10:09+00:00",
+          "summary": "The woman posted about the singer online prior to the attack, the BBC's US news partner CBS reports.",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/2bbd/live/477c5960-1ceb-11f1-b3be-0fab6819344b.jpg",
+          "domain": "www.bbc.com"
+        }
+      ]
+    },
+    {
+      "slug": "live-7-meghan-to-headline-1-400-girls-weekend-in-australia",
+      "topic_label": "Girl / Weekend / Meghan",
+      "title": "Meghan to headline \u00a31,400 'girls' weekend' in Australia",
+      "dek": "The Duke and Duchess of Sussex are returning to Australia in April, their first visit since 2018.",
+      "latest_at": "2026-03-11T01:04:53+00:00",
+      "article_count": 1,
+      "sources": [
+        "BBC"
+      ],
+      "hero_image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/fb82/live/0cb3b500-1d02-11f1-9f49-7d864bc66628.jpg",
+      "hero_credit": "Publisher preview image",
+      "articles": [
+        {
+          "source": "BBC",
+          "title": "Meghan to headline \u00a31,400 'girls' weekend' in Australia",
+          "url": "https://www.bbc.com/news/articles/cwykl5d02rno?at_medium=RSS&at_campaign=rss",
+          "published_at": "2026-03-11T01:04:53+00:00",
+          "summary": "The Duke and Duchess of Sussex are returning to Australia in April, their first visit since 2018.",
+          "image": "https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/fb82/live/0cb3b500-1d02-11f1-9f49-7d864bc66628.jpg",
+          "domain": "www.bbc.com"
+        }
+      ]
+    },
+    {
+      "slug": "live-8-jeffrey-epstein-had-two-key-aides-why-do-they-still-control-",
+      "topic_label": "Epstein / Hi / Jeffrey",
       "title": "Jeffrey Epstein had two key aides - why do they still control his money and secrets?",
       "dek": "Richard Kahn and Darren Indyke administer Epstein\u2019s estate - court filings allege complicity in his crimes.",
       "latest_at": "2026-03-11T00:10:20+00:00",
@@ -183,8 +255,8 @@
       ]
     },
     {
-      "slug": "live-6-fact-checking-trump-s-claim-that-iran-has-tomahawk-missiles",
-      "topic_label": "Fact / Tomahawk / Trump",
+      "slug": "live-9-fact-checking-trump-s-claim-that-iran-has-tomahawk-missiles",
+      "topic_label": "Fact / Ha / Trump",
       "title": "Fact-checking Trump's claim that Iran has Tomahawk missiles",
       "dek": "Although a few countries other than the U.S. have Tomahawks, none of them is engaged in fighting Iran. Tomahawk cruise missiles are manufactured by Raytheon, a U.S. company, for use by the U.S. military and international partners.",
       "latest_at": "2026-03-10T23:48:52+00:00",
@@ -207,8 +279,8 @@
       ]
     },
     {
-      "slug": "live-7-ukraine-and-russia-both-claim-progress-on-front-lines-while-",
-      "topic_label": "Ukraine / Progre / Talk",
+      "slug": "live-10-ukraine-and-russia-both-claim-progress-on-front-lines-while-",
+      "topic_label": "Progre / Russia / Hold",
       "title": "Ukraine and Russia both claim progress on front lines while U.S.-brokered talks are on hold",
       "dek": "The Iran war, which erupted on Feb. 28 following U.S.-Israeli strikes on Iran and spread across the region, has drawn the international spotlight from Ukraine's plight as it strives to hold back Russia's bigger army.",
       "latest_at": "2026-03-10T23:26:41+00:00",
@@ -226,78 +298,6 @@
           "published_at": "2026-03-10T23:26:41+00:00",
           "summary": "The Iran war, which erupted on Feb. 28 following U.S.-Israeli strikes on Iran and spread across the region, has drawn the international spotlight from Ukraine's plight as it strives to hold back Russia's bigger army.",
           "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-06T183223Z_1292013447_RC26ZJAWFHA2_RTRMADP_3_UKRAINE-CRISIS-ZELENSKIY-EAST-1024x683.jpg",
-          "domain": "www.pbs.org"
-        }
-      ]
-    },
-    {
-      "slug": "live-8-a-look-at-evidence-linking-u-s-to-iranian-school-strike",
-      "topic_label": "Look / Iranian / Strike",
-      "title": "A look at evidence linking U.S. to Iranian school strike",
-      "dek": "The U.S. is investigating an explosion at a school next to an Iranian navy base in the city of Minab. Iran says the strike killed more than 150 people, mostly schoolgirls. A U.S. official briefed on the initial review tells PBS News that the strike was likely American. Nick Schif",
-      "latest_at": "2026-03-10T22:50:49+00:00",
-      "article_count": 1,
-      "sources": [
-        "PBS NewsHour"
-      ],
-      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/Girls_School-1024x576.jpeg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "PBS NewsHour",
-          "title": "A look at evidence linking U.S. to Iranian school strike",
-          "url": "https://www.pbs.org/newshour/show/a-look-at-evidence-linking-u-s-to-iranian-school-strike",
-          "published_at": "2026-03-10T22:50:49+00:00",
-          "summary": "The U.S. is investigating an explosion at a school next to an Iranian navy base in the city of Minab. Iran says the strike killed more than 150 people, mostly schoolgirls. A U.S. official briefed on the initial review te",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/Girls_School-1024x576.jpeg",
-          "domain": "www.pbs.org"
-        }
-      ]
-    },
-    {
-      "slug": "live-9-afghans-stranded-for-a-year-by-trump-s-refugee-freeze-now-ca",
-      "topic_label": "Trump / Caught / War",
-      "title": "Afghans stranded for a year by Trump's refugee freeze now caught in new war",
-      "dek": "President Trump's decision to freeze refugee processing left thousands in limbo. For more than a year, 1,100 Afghan refugees who thought they were bound for the United States have been stranded on a disused military base in Qatar. Now, having fled one war, they're trapped in anot",
-      "latest_at": "2026-03-10T22:45:33+00:00",
-      "article_count": 1,
-      "sources": [
-        "PBS NewsHour"
-      ],
-      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/Qatar-1-1024x683.jpeg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "PBS NewsHour",
-          "title": "Afghans stranded for a year by Trump's refugee freeze now caught in new war",
-          "url": "https://www.pbs.org/newshour/show/afghans-stranded-for-a-year-by-trumps-refugee-freeze-now-caught-in-new-war",
-          "published_at": "2026-03-10T22:45:33+00:00",
-          "summary": "President Trump's decision to freeze refugee processing left thousands in limbo. For more than a year, 1,100 Afghan refugees who thought they were bound for the United States have been stranded on a disused military base",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/Qatar-1-1024x683.jpeg",
-          "domain": "www.pbs.org"
-        }
-      ]
-    },
-    {
-      "slug": "live-10-watch-u-s-seems-on-a-path-to-deploying-ground-troops-in-iran",
-      "topic_label": "Blumenthal / Classified / Troop",
-      "title": "WATCH: U.S. seems 'on a path' to deploying ground troops in Iran, Blumenthal says after classified briefing",
-      "dek": "\"I am left with more questions than answers, especially about the cost of the war,\" Blumenthal told reporters after the briefing before the Senate Armed Services Committee.",
-      "latest_at": "2026-03-10T22:43:41+00:00",
-      "article_count": 1,
-      "sources": [
-        "PBS NewsHour"
-      ],
-      "hero_image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-10T161742Z_1413593574_RC2P1KA6KY2U_RTRMADP_3_IRAN-CRISIS-USA-1024x683.jpg",
-      "hero_credit": "Publisher preview image",
-      "articles": [
-        {
-          "source": "PBS NewsHour",
-          "title": "WATCH: U.S. seems 'on a path' to deploying ground troops in Iran, Blumenthal says after classified briefing",
-          "url": "https://www.pbs.org/newshour/politics/watch-u-s-seems-on-a-path-to-deploying-ground-troops-in-iran-blumenthal-says-after-classified-briefing",
-          "published_at": "2026-03-10T22:43:41+00:00",
-          "summary": "\"I am left with more questions than answers, especially about the cost of the war,\" Blumenthal told reporters after the briefing before the Senate Armed Services Committee.",
-          "image": "https://d3i6fh83elv35t.cloudfront.net/static/2026/03/2026-03-10T161742Z_1413593574_RC2P1KA6KY2U_RTRMADP_3_IRAN-CRISIS-USA-1024x683.jpg",
           "domain": "www.pbs.org"
         }
       ]
