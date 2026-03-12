@@ -137,6 +137,7 @@ Environment baseline:
 - `npm run sources:health` now also shows open vs likely-paywalled article volume and highlights thin paywalled sources that still need better fallback handling
 - enrichment now persists article-level access signals so the reader layer and the brief generator can distinguish open reads from likely paywalled ones using article evidence, not outlet lists alone
 - active story metadata now only advertises lead-source confidence and open alternates when those reads clear a minimum quality floor; Prism does not surface weak alternates just because they are open
+- automated live stories with a single weak source and no substantive extracted reporting are now pruned from the active live set instead of shipping one-sentence placeholder briefs
 - Perspective now uses stored revisions and generated Context Packs in connected mode, with quality gating so only lenses justified by the current source mix populate reads while the UI still shows the full launch lens set
 - `npm run cluster:candidates` reports how well semantic candidate retrieval covers the current heuristic clusters and validates the offline regression fixtures
 - clustering now shares canonical URL normalization across ingest, sync, and evaluation so tracking parameters and alias domains do not fragment stories

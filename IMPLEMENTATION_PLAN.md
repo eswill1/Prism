@@ -258,6 +258,7 @@ Institutional plans and saved stories matter early because they align with the b
 - Semantic candidate retrieval meaningfully narrows cluster choices before deterministic merge rules fire
 - Canonical URL cleanup reduces story fragmentation caused by tracking parameters and alias domains
 - Sitemap-derived story shells do not surface reader-facing one-line summaries just because a title was discoverable
+- Single-source live stories with no substantive extracted reporting do not remain in the active reader-facing set as placeholder briefs
 - Discovery sources can be ranked by recent substantive yield instead of only by anecdotal inspection
 - Preview/staging content refreshes on a predictable cadence
 - Corrections and outlet mappings are stored, not just rendered
