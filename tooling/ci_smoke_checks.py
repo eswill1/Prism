@@ -6,11 +6,16 @@ import json
 from pathlib import Path
 
 try:
-    from tooling.generate_temporary_live_feed import FeedItem, cluster_items
+    from tooling.generate_temporary_live_feed import (
+        FeedItem,
+        choose_story_summary,
+        cluster_items,
+        summary_quality_score,
+    )
     from tooling.semantic_story_candidates import build_similarity_lookup
     from tooling.url_normalization import normalize_canonical_url
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
-    from generate_temporary_live_feed import FeedItem, cluster_items
+    from generate_temporary_live_feed import FeedItem, choose_story_summary, cluster_items, summary_quality_score
     from semantic_story_candidates import build_similarity_lookup
     from url_normalization import normalize_canonical_url
 
@@ -86,6 +91,53 @@ def main() -> int:
     normalized = normalize_canonical_url("https://example.com/story?utm_source=test&id=42#top")
     if normalized != "https://example.com/story?id=42":
         raise SystemExit(f"unexpected canonical URL normalization result: {normalized}")
+
+    thin_quality = summary_quality_score(
+        "Markets brace for tariff shock",
+        "Markets brace for tariff shock",
+        extraction_quality="rss_only",
+    )
+    rich_quality = summary_quality_score(
+        "Markets brace for tariff shock",
+        "Officials said the emergency move could slow the price spike, though analysts warned the disruption might outlast the first intervention.",
+        extraction_quality="article_body",
+        body_text="Officials said the emergency move could slow the price spike, though analysts warned the disruption might outlast the first intervention. Traders were watching shipping routes and reserve policy for the next signal.",
+    )
+    if thin_quality >= 6:
+        raise SystemExit(f"expected thin summary to score poorly, got {thin_quality}")
+    if rich_quality <= thin_quality:
+        raise SystemExit(f"expected rich summary to outscore thin summary: {rich_quality} <= {thin_quality}")
+
+    selected_summary, selected_score, substantive_sources = choose_story_summary(
+        [
+            {
+                "source": "Bloomberg",
+                "title": "Markets brace for tariff shock",
+                "summary": "Markets brace for tariff shock",
+                "feed_summary": "Markets brace for tariff shock",
+                "lede": "Markets brace for tariff shock",
+                "body_preview": "",
+                "extraction_quality": "rss_only",
+            },
+            {
+                "source": "Reuters",
+                "title": "Emergency reserve release aims to steady oil prices",
+                "summary": "Officials said the emergency move could slow the price spike, though analysts warned the disruption might outlast the first intervention.",
+                "feed_summary": "Emergency reserve release aims to steady oil prices.",
+                "lede": "Officials said the emergency move could slow the price spike, though analysts warned the disruption might outlast the first intervention.",
+                "body_preview": "Officials said the emergency move could slow the price spike, though analysts warned the disruption might outlast the first intervention. Traders were watching shipping routes and reserve policy for the next signal.",
+                "extraction_quality": "article_body",
+            },
+        ],
+        "Markets brace for tariff shock",
+        ["Bloomberg", "Reuters"],
+    )
+    if "Officials said the emergency move could slow the price spike" not in selected_summary:
+        raise SystemExit(f"unexpected selected story summary: {selected_summary}")
+    if selected_score < 6 or substantive_sources != 1:
+        raise SystemExit(
+            f"unexpected story summary quality metrics: score={selected_score}, substantive_sources={substantive_sources}"
+        )
 
     fixture_cases = json.loads(FIXTURES_PATH.read_text())
     if len(fixture_cases) < 2:

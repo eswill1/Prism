@@ -29,6 +29,7 @@ The system goal is maximum automation with narrow human-review points.
 - output: `raw_discovered_urls`
 - failure rule: retry with backoff, then source-health alert
 - current state: implemented inside the active discovery poller for verified sitemap sources
+- quality rule: sitemap-only items without substantive extracted text are allowed into discovery, but should not be promoted as homepage-ready story shells on title text alone
 
 #### `backfill_metadata_api`
 
@@ -61,6 +62,7 @@ The system goal is maximum automation with narrow human-review points.
 - cadence: queue-driven after `poll_feeds`, or scheduled in short batches during early staging
 - input: recent linked articles with `fetch_status = pending|normalized`
 - output: lede, first paragraphs, named entities, extracted-body quality markers on `articles`
+- follow-on effect: refresh active `story_clusters.summary` so reader-facing story decks improve after enrichment rather than staying stuck on ingest-time snippets
 - failure rule: mark discovery row failed with retry cooldown; do not block feed polling
 
 #### `classify_media_rights`

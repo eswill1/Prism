@@ -239,6 +239,12 @@ def clean_summary_snippet(text: str | None, max_chars: int) -> str:
     return clamped
 
 
+def normalize_whitespace(text: str | None) -> str:
+    if not text:
+        return ""
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def parse_datetime(value: str | None) -> datetime:
     if not value:
         return datetime.now(UTC)
@@ -457,6 +463,163 @@ def should_use_sitemap_keywords(keywords: str, title: str) -> bool:
     if re.fullmatch(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}", normalized_keywords):
         return False
     return True
+
+
+def summary_looks_title_like(title: str, summary: str) -> bool:
+    normalized_title = normalize_matching_text(title)
+    normalized_summary = normalize_matching_text(summary)
+    if not normalized_summary:
+        return True
+    if normalized_summary == normalized_title:
+        return True
+    if normalized_summary in normalized_title or normalized_title in normalized_summary:
+        return True
+
+    title_tokens = set(re.findall(r"[a-z0-9]{4,}", normalized_title))
+    summary_tokens = set(re.findall(r"[a-z0-9]{4,}", normalized_summary))
+    if not summary_tokens:
+        return True
+
+    overlap = title_tokens & summary_tokens
+    overlap_ratio = len(overlap) / max(1, len(summary_tokens))
+    return overlap_ratio >= 0.85 and len(summary_tokens) <= len(title_tokens) + 2
+
+
+def first_narrative_sentences(text: str, sentence_count: int = 2) -> str:
+    sentences = re.findall(r"[^.!?]+[.!?]+", normalize_whitespace(text))
+    cleaned = [sentence.strip() for sentence in sentences if sentence.strip()]
+    if not cleaned:
+        return normalize_whitespace(text)
+    return " ".join(cleaned[:sentence_count]).strip()
+
+
+def summary_quality_score(
+    title: str,
+    summary: str,
+    *,
+    extraction_quality: str = "rss_only",
+    body_text: str = "",
+) -> int:
+    cleaned_summary = clean_summary_snippet(summary, 320)
+    cleaned_body = normalize_whitespace(body_text)
+    words = re.findall(r"[A-Za-z0-9']+", cleaned_summary)
+
+    score = 0
+    if extraction_quality == "article_body":
+        score += 6
+    elif extraction_quality == "metadata_description":
+        score += 3
+
+    if len(words) >= 18:
+        score += 5
+    elif len(words) >= 12:
+        score += 3
+    elif len(words) >= 8:
+        score += 1
+    else:
+        score -= 5
+
+    if len(cleaned_summary) >= 180:
+        score += 4
+    elif len(cleaned_summary) >= 110:
+        score += 2
+    elif len(cleaned_summary) >= 80:
+        score += 1
+    else:
+        score -= 3
+
+    if re.search(r"[.!?]$", cleaned_summary):
+        score += 1
+    if cleaned_body and len(cleaned_body) >= 240:
+        score += 2
+    if looks_clipped(cleaned_summary):
+        score -= 4
+    if summary_looks_title_like(title, cleaned_summary):
+        score -= 8
+
+    return score
+
+
+def summary_is_substantive(
+    title: str,
+    summary: str,
+    *,
+    extraction_quality: str = "rss_only",
+    body_text: str = "",
+    minimum_score: int = 6,
+) -> bool:
+    return (
+        summary_quality_score(
+            title,
+            summary,
+            extraction_quality=extraction_quality,
+            body_text=body_text,
+        )
+        >= minimum_score
+    )
+
+
+def choose_story_summary(
+    articles: list[object],
+    title: str,
+    sources: list[str],
+) -> tuple[str, int, int]:
+    best_summary = ""
+    best_score = -999
+    substantive_sources: set[str] = set()
+
+    for article in articles:
+        article_title = getattr(article, "title", None) or (article.get("title") if isinstance(article, dict) else "") or title
+        source_name = (
+            getattr(article, "source", None)
+            or (article.get("source") if isinstance(article, dict) else None)
+            or (article.get("site_name") if isinstance(article, dict) else None)
+            or (article.get("outlet") if isinstance(article, dict) else None)
+            or article_title
+        )
+        extraction_quality = (
+            getattr(article, "extraction_quality", None)
+            or (article.get("extraction_quality") if isinstance(article, dict) else None)
+            or "rss_only"
+        )
+        body_text = (
+            getattr(article, "body_preview", None)
+            or (article.get("body_preview") if isinstance(article, dict) else None)
+            or (article.get("body_text") if isinstance(article, dict) else None)
+            or ""
+        )
+        summary_candidate = (
+            getattr(article, "lede", None)
+            or (article.get("lede") if isinstance(article, dict) else None)
+            or (article.get("summary") if isinstance(article, dict) else None)
+            or (article.get("feed_summary") if isinstance(article, dict) else None)
+            or getattr(article, "summary", None)
+            or ""
+        )
+        if extraction_quality == "article_body" and body_text:
+            summary_candidate = first_narrative_sentences(body_text, sentence_count=2) or summary_candidate
+
+        cleaned_candidate = clean_summary_snippet(summary_candidate, 320)
+        score = summary_quality_score(
+            article_title,
+            cleaned_candidate,
+            extraction_quality=extraction_quality,
+            body_text=body_text,
+        )
+        if score >= 6:
+            substantive_sources.add(str(source_name))
+        if cleaned_candidate and score > best_score:
+            best_summary = cleaned_candidate
+            best_score = score
+
+    if best_summary and best_score >= 6:
+        return best_summary, best_score, len(substantive_sources)
+
+    fallback_sources = ", ".join(list(dict.fromkeys(sources))[:3]) if sources else "linked publishers"
+    fallback = (
+        f"{title.rstrip('?!.')} is drawing early coverage from {fallback_sources} as Prism waits for fuller reporting."
+    )
+    return fallback, max(best_score, 0), len(substantive_sources)
 
 
 def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, object]:
@@ -837,10 +1000,7 @@ def build_cluster_payload(
         fetch_article_enrichment(lead.url, lead.summary).get("image") if allow_article_image_fetch else None
     )
     sources = sorted({item.source for item in ordered})
-    cleaned_dek = clean_summary_snippet(lead.lede or lead.summary, 280)
-    dek = cleaned_dek or (
-        f"{lead.title.rstrip('?')} is drawing live coverage from {', '.join(sources)} as Prism tracks what changes next."
-    )
+    dek, summary_score, substantive_source_count = choose_story_summary(ordered, lead.title, sources)
 
     primary_articles: list[FeedItem] = []
     seen_sources: set[str] = set()
@@ -868,6 +1028,8 @@ def build_cluster_payload(
         "latest_at": lead.published_at,
         "article_count": len(ordered),
         "sources": sources,
+        "summary_quality_score": summary_score,
+        "substantive_source_count": substantive_source_count,
         "hero_image": hero_image,
         "hero_credit": "Publisher preview image" if hero_image else "No image available",
         "articles": [

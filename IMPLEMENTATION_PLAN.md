@@ -251,6 +251,7 @@ Institutional plans and saved stories matter early because they align with the b
 - Duplicate story handling is acceptable under manual QA
 - Semantic candidate retrieval meaningfully narrows cluster choices before deterministic merge rules fire
 - Canonical URL cleanup reduces story fragmentation caused by tracking parameters and alias domains
+- Sitemap-derived story shells do not surface reader-facing one-line summaries just because a title was discoverable
 - Preview/staging content refreshes on a predictable cadence
 - Corrections and outlet mappings are stored, not just rendered
 - Returning users see meaningful "what changed" state on followed stories

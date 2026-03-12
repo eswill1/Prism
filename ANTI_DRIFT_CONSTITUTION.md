@@ -58,6 +58,9 @@ These rules apply across official Prism clients.
 
 ### Prism Briefs must stay source-grounded
 
+- title-only discovery rows or one-line feed snippets may enter the pipeline, but they may not be promoted as mature reader-facing story shells
+- automated story summaries must improve when extracted article text becomes available; leaving thin ingest text in place after enrichment is a product failure
+
 - Prism may summarize reporting, but it may not present boilerplate or feed-only filler as if it were a mature multi-source brief
 - single-source stories must remain explicitly provisional until additional substantive reporting arrives
 - slower article extraction and enrichment are allowed, but they may not degrade the freshness of the main feed-polling loop
