@@ -1226,6 +1226,27 @@ button {
     rgba(255, 253, 248, 0.96);
 }
 
+.section-heading .story-section-title,
+.section-heading .reporting-section-title {
+  max-width: 32ch;
+  color: var(--prism-ink);
+  font-family: "Source Serif 4", Georgia, serif;
+  letter-spacing: -0.02em;
+  line-height: 1.14;
+  text-wrap: pretty;
+}
+
+.section-heading .story-section-title {
+  font-size: clamp(1.25rem, 1.7vw, 1.7rem);
+}
+
+.section-heading .reporting-section-title {
+  font-size: clamp(1.05rem, 1.35vw, 1.35rem);
+  line-height: 1.28;
+  letter-spacing: -0.01em;
+  max-width: 48ch;
+}
+
 .story-summary-body {
   display: grid;
   gap: 14px;

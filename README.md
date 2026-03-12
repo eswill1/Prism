@@ -12,6 +12,7 @@ Current build priority:
 - move story formation toward hybrid semantic clustering while keeping deterministic merge guardrails
 - expand mature multi-source briefs beyond minimum viable summaries
 - add paywall-aware alternate-source matching so thin or inaccessible lead sources do not dead-end the reader
+- push paywall-aware alternate-source matching upstream into ingestion metadata so story records know their best open fallback before the reader layer renders
 
 Prism's core loop is:
 
@@ -45,6 +46,7 @@ Current product decisions locked in:
 - homepage story packages should be fully clickable
 - source reads go directly to original reporting when a real source URL exists
 - when the lead source is likely paywalled or thin, Prism should surface a credible open alternate in the read stack when one exists
+- story metadata should preserve lead-source plus open-alternate options so the pipeline, not just the UI, can reason about access and fallback quality
 - Prism should not force source-wrapper detours unless they add clear reader value
 - when Supabase-backed live data is available, connected Prism should surface real sourced stories only, not synthetic editorial stand-ins
 - feed polling stays fast; article-page extraction runs in a dedicated enrichment worker instead of blocking ingest
@@ -127,7 +129,9 @@ Environment baseline:
 - `npm run brief:readiness` reports which active live stories are still limited to early briefs, which have enough substantive sourcing for full Prism Briefs, and whether they already have a usable open alternate
 - `npm run brief:grounding` audits current stored brief sections against their recorded support references so weak or unsupported brief language is visible before it ships
 - `npm run sources:health` reports which discovery sources are contributing recent articles, substantive extraction, and active story coverage versus just generating queue noise
+- `npm run sources:health` now also shows open vs likely-paywalled article volume and highlights thin paywalled sources that still need better fallback handling
 - enrichment now persists article-level access signals so the reader layer and the brief generator can distinguish open reads from likely paywalled ones using article evidence, not outlet lists alone
+- active story metadata now only advertises lead-source confidence and open alternates when those reads clear a minimum quality floor; Prism does not surface weak alternates just because they are open
 - `npm run cluster:candidates` reports how well semantic candidate retrieval covers the current heuristic clusters and validates the offline regression fixtures
 - clustering now shares canonical URL normalization across ingest, sync, and evaluation so tracking parameters and alias domains do not fragment stories
 - sitemap-derived items are now demoted unless they have substantive extracted text or enough source breadth to support a reader-facing story shell

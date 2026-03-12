@@ -117,6 +117,7 @@ The system goal is maximum automation with narrow human-review points.
 - input: canonical URL, title, named entities, active story cluster
 - output: alternate linked article candidates with lower access friction
 - failure rule: keep the original story intact; do not substitute weak alternates just to avoid a paywall
+- current state: active story metadata now stores lead-source plus open-alternate options when the cluster already contains a credible open read, and those options are now gated by a minimum read-quality floor so weak open links are not advertised as real fallbacks; this still needs broader upstream candidate expansion for stories that have no in-cluster alternate yet
 
 #### `score_article_quality`
 
@@ -207,6 +208,7 @@ The system goal is maximum automation with narrow human-review points.
 - output: source-health score
 - failure rule: alert only
 - current state: available locally and in staging as `npm run sources:health`
+- reporting detail: source health now breaks out open vs likely-paywalled article volume and flags thin paywalled sources that still contribute little usable body text
 
 ---
 

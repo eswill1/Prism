@@ -13,6 +13,7 @@ from generate_temporary_live_feed import (
     clean_summary_snippet,
     fetch_article_enrichment,
 )
+from ingest_live_feeds_to_supabase import choose_story_source_options, infer_access_tier
 from sync_story_content import REST_BASE, SUPABASE_SERVICE_ROLE_KEY, SupabaseRestClient
 
 
@@ -23,6 +24,21 @@ LIKELY_PAYWALLED_DOMAINS = (
     "ft.com",
     "nytimes.com",
     "wsj.com",
+)
+OPEN_ACCESS_DOMAINS = (
+    "abcnews.com",
+    "apnews.com",
+    "bbc.com",
+    "cbsnews.com",
+    "cnn.com",
+    "foxnews.com",
+    "msnbc.com",
+    "nbcnews.com",
+    "npr.org",
+    "pbs.org",
+    "politico.com",
+    "reuters.com",
+    "thehill.com",
 )
 
 
@@ -156,6 +172,8 @@ def infer_access_signal(article: dict[str, Any]) -> str:
         domain = hostname.replace("www.", "").lower()
         if any(domain == candidate or domain.endswith(f".{candidate}") for candidate in LIKELY_PAYWALLED_DOMAINS):
             return "likely_paywalled"
+        if any(domain == candidate or domain.endswith(f".{candidate}") for candidate in OPEN_ACCESS_DOMAINS):
+            return "open"
 
     return "unknown"
 
@@ -163,7 +181,7 @@ def infer_access_signal(article: dict[str, Any]) -> str:
 def refresh_story_cluster_summary(client: SupabaseRestClient, story_slug: str) -> bool:
     encoded_slug = parse.quote(story_slug, safe="")
     rows = client.get(
-        f"/story_clusters?select=id,slug,canonical_headline,outlet_count,metadata,cluster_articles!inner(rank_in_cluster,articles!inner(headline,summary,body_text,metadata,site_name))&slug=eq.{encoded_slug}&limit=1"
+        f"/story_clusters?select=id,slug,canonical_headline,outlet_count,metadata,cluster_articles!inner(rank_in_cluster,articles!inner(headline,summary,body_text,original_url,canonical_url,metadata,site_name))&slug=eq.{encoded_slug}&limit=1"
     ) or []
     if not rows:
         return False
@@ -196,6 +214,10 @@ def refresh_story_cluster_summary(client: SupabaseRestClient, story_slug: str) -
                 "body_preview": article.get("body_text") or "",
                 "body_text": article.get("body_text") or "",
                 "extraction_quality": metadata.get("extraction_quality") or "rss_only",
+                "url": article.get("original_url") or article.get("canonical_url") or "",
+                "domain": parse.urlparse(article.get("original_url") or article.get("canonical_url") or "").hostname or "",
+                "access_signal": metadata.get("access_signal") or "unknown",
+                "outlet": site_name,
             }
         )
         if site_name:
@@ -213,6 +235,9 @@ def refresh_story_cluster_summary(client: SupabaseRestClient, story_slug: str) -
     metadata["homepage_eligible"] = outlet_count >= 2 and (
         substantive_source_count >= 2 or summary_quality >= 8
     )
+    for article in articles:
+        article["access_tier"] = infer_access_tier(article)
+    metadata["source_options"] = choose_story_source_options(articles)
     metadata["summary_refreshed_at"] = datetime.now(timezone.utc).isoformat()
 
     client.patch(

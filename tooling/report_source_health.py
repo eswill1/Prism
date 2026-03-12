@@ -39,6 +39,35 @@ def article_is_substantive(article: dict[str, Any]) -> bool:
     return isinstance(summary, str) and len(summary.strip()) >= 110
 
 
+def article_access_signal(article: dict[str, Any]) -> str:
+    metadata = article.get("metadata") or {}
+    signal = metadata.get("access_signal") if isinstance(metadata, dict) else None
+    if isinstance(signal, str) and signal:
+        return signal
+
+    site_name = str(article.get("site_name") or "")
+    if site_name in {
+        "ABC News",
+        "Associated Press",
+        "BBC News",
+        "CBS News",
+        "CNN",
+        "Fox News",
+        "MSNBC",
+        "NBC News",
+        "NPR",
+        "PBS NewsHour",
+        "Politico",
+        "Reuters",
+        "The Hill",
+    }:
+        return "open"
+    if site_name in {"Bloomberg", "Financial Times", "New York Times", "Wall Street Journal"}:
+        return "likely_paywalled"
+
+    return "unknown"
+
+
 def main() -> int:
     client = SupabaseRestClient(REST_BASE, SUPABASE_SERVICE_ROLE_KEY)
     cutoff = datetime.now(timezone.utc) - timedelta(hours=LOOKBACK_HOURS)
@@ -53,7 +82,7 @@ def main() -> int:
         "/raw_discovered_urls?select=source_registry_id,fetch_status,discovered_at,last_attempted_at&order=discovered_at.desc&limit=4000"
     ) or []
     article_rows = client.get(
-        "/articles?select=source_registry_id,summary,body_text,published_at,metadata&order=published_at.desc&limit=4000"
+        "/articles?select=source_registry_id,site_name,summary,body_text,published_at,metadata&order=published_at.desc&limit=4000"
     ) or []
 
     feeds_by_source: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -83,6 +112,13 @@ def main() -> int:
         discoveries = discovery_by_source.get(registry_id, [])
         articles = articles_by_source.get(registry_id, [])
         substantive_articles = [article for article in articles if article_is_substantive(article)]
+        open_articles = [article for article in articles if article_access_signal(article) == "open"]
+        paywalled_articles = [article for article in articles if article_access_signal(article) == "likely_paywalled"]
+        thin_paywalled_articles = [
+            article
+            for article in articles
+            if article_access_signal(article) == "likely_paywalled" and not article_is_substantive(article)
+        ]
         story_slugs = {
             (article.get("metadata") or {}).get("story_slug")
             for article in articles
@@ -117,6 +153,9 @@ def main() -> int:
                 "articles_48h": len(articles),
                 "substantive_articles_48h": len(substantive_articles),
                 "substantive_rate_48h": substantive_rate,
+                "open_articles_48h": len(open_articles),
+                "likely_paywalled_articles_48h": len(paywalled_articles),
+                "thin_paywalled_articles_48h": len(thin_paywalled_articles),
                 "active_story_count_48h": len(story_slugs),
             }
         )
