@@ -15,6 +15,7 @@ from sync_story_content import (
     SUPABASE_SERVICE_ROLE_KEY,
     SupabaseRestClient,
     build_live_context_packs,
+    fetch_existing_articles_index,
     fetch_source_registry,
     fetch_story_cluster_count,
     framing_for_outlet,
@@ -55,7 +56,8 @@ PUBLIC_INTEREST_PATTERNS: list[tuple[str, int]] = [
 LOW_VALUE_PATTERNS: list[tuple[str, int]] = [
     (r"\b(bigfoot|cryptid|celebrity|actor|actress|singer|memoir|divorce|dating|romance|met gala|red carpet)\b", 12),
     (r"\b(nfl|nba|mlb|fanatics|flag football|fantasy football)\b", 10),
-    (r"\b(the takeout|the story|special report|face the nation|nightly news|exclusive interview|interview|breaks silence|joins\b|joined\b|discuss(?:es|ing)?\b)\b", 10),
+    (r"\b(the takeout|the story|special report|face the nation|nightly news|weekend news|evening news|exclusive interview|interview|breaks silence|joins\b|joined\b|discuss(?:es|ing)?\b)\b", 10),
+    (r"^\d{1,2}/\d{1,2}:", 14),
     (r"\b(recipe|horoscope|shopping|travel|style|fashion|podcast)\b", 8),
     (r"/(entertainment|sports|travel|lifestyle|style|food|shopping|opinion|video)/", 10),
 ]
@@ -444,8 +446,9 @@ def main() -> int:
 
     outlet_rows = seed_outlets(client, stories)
     source_registry = fetch_source_registry(client)
+    existing_articles = fetch_existing_articles_index(client)
     for story in stories:
-        sync_story(client, story, outlet_rows, source_registry)
+        sync_story(client, story, outlet_rows, source_registry, existing_articles)
 
     removed = cleanup_stale_live_clusters(client, {story["slug"] for story in stories})
 

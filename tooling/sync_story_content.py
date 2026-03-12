@@ -931,7 +931,28 @@ def seed_outlets(client: SupabaseRestClient, stories: list[dict[str, Any]]) -> d
     return {normalize_domain(row["domain"]): row for row in results}
 
 
-def article_payloads(story: dict[str, Any], outlet_rows: dict[str, dict[str, Any]], source_registry: dict[str, str]) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
+def extraction_quality_rank(value: str | None) -> int:
+    ranks = {
+        "rss_only": 0,
+        "metadata_description": 1,
+        "article_body": 2,
+    }
+    return ranks.get(value or "rss_only", 0)
+
+
+def fetch_existing_articles_index(client: SupabaseRestClient) -> dict[str, dict[str, Any]]:
+    rows = client.get(
+        "/articles?select=canonical_url,summary,body_text,preview_image_url,preview_image_status,metadata&limit=4000"
+    ) or []
+    return {row["canonical_url"]: row for row in rows if row.get("canonical_url")}
+
+
+def article_payloads(
+    story: dict[str, Any],
+    outlet_rows: dict[str, dict[str, Any]],
+    source_registry: dict[str, str],
+    existing_articles: dict[str, dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
     rows = []
     lookup = {}
     for article in story["articles"]:
@@ -939,6 +960,34 @@ def article_payloads(story: dict[str, Any], outlet_rows: dict[str, dict[str, Any
         outlet_row = outlet_rows[domain]
         url = article.get("url")
         canonical_url = url or synthetic_url(story["slug"], article["outlet"], article["title"])
+        existing_row = existing_articles.get(canonical_url) or {}
+        existing_metadata = existing_row.get("metadata") if isinstance(existing_row.get("metadata"), dict) else {}
+        incoming_quality = article.get("extraction_quality") or "rss_only"
+        existing_quality = (
+            existing_metadata.get("extraction_quality") if isinstance(existing_metadata, dict) else None
+        ) or "rss_only"
+        keep_existing_enrichment = extraction_quality_rank(existing_quality) > extraction_quality_rank(incoming_quality)
+        merged_named_entities = (
+            existing_metadata.get("named_entities")
+            if keep_existing_enrichment and isinstance(existing_metadata.get("named_entities"), list)
+            else article.get("named_entities") or existing_metadata.get("named_entities") or []
+        )
+        merged_summary = (
+            existing_row.get("summary")
+            if keep_existing_enrichment and existing_row.get("summary")
+            else article["summary"]
+        )
+        merged_body_text = (
+            existing_row.get("body_text")
+            if keep_existing_enrichment and existing_row.get("body_text")
+            else article.get("body_text") or existing_row.get("body_text") or None
+        )
+        merged_preview_image = article["image"] or existing_row.get("preview_image_url")
+        merged_preview_status = (
+            existing_row.get("preview_image_status")
+            if keep_existing_enrichment and existing_row.get("preview_image_status")
+            else ("unknown" if url else "fallback_only")
+        )
         row = {
             "outlet_id": outlet_row["id"],
             "source_registry_id": source_registry.get(domain),
@@ -946,22 +995,30 @@ def article_payloads(story: dict[str, Any], outlet_rows: dict[str, dict[str, Any
             "original_url": url,
             "headline": article["title"],
             "dek": article.get("feed_summary") or article["summary"],
-            "summary": article["summary"],
-            "body_text": article.get("body_text") or None,
+            "summary": merged_summary,
+            "body_text": merged_body_text,
             "authors": [],
             "site_name": article["site_name"],
             "language_code": "en",
             "published_at": article["published_at"],
             "rights_class": "pointer_metadata" if url else "first_party",
-            "preview_image_url": article["image"],
-            "preview_image_status": "unknown" if url else "fallback_only",
+            "preview_image_url": merged_preview_image,
+            "preview_image_status": merged_preview_status,
             "metadata": {
                 "story_slug": story["slug"],
                 "context_only": bool(article.get("context_only")),
                 "feed_summary": article.get("feed_summary") or article["summary"],
-                "named_entities": article.get("named_entities") or [],
-                "extraction_quality": article.get("extraction_quality") or "rss_only",
+                "named_entities": merged_named_entities,
+                "extraction_quality": existing_quality if keep_existing_enrichment else incoming_quality,
                 "sync_source": "tooling/sync_story_content.py",
+                **(
+                    {
+                        "enrichment_last_attempted_at": existing_metadata.get("enrichment_last_attempted_at"),
+                        "enrichment_worker_version": existing_metadata.get("enrichment_worker_version"),
+                    }
+                    if keep_existing_enrichment
+                    else {}
+                ),
             },
         }
         rows.append(row)
@@ -991,8 +1048,14 @@ def to_story_cluster_row(story: dict[str, Any], hero_article_id: str | None) -> 
     }
 
 
-def sync_story(client: SupabaseRestClient, story: dict[str, Any], outlet_rows: dict[str, dict[str, Any]], source_registry: dict[str, str]) -> None:
-    article_rows, article_lookup = article_payloads(story, outlet_rows, source_registry)
+def sync_story(
+    client: SupabaseRestClient,
+    story: dict[str, Any],
+    outlet_rows: dict[str, dict[str, Any]],
+    source_registry: dict[str, str],
+    existing_articles: dict[str, dict[str, Any]],
+) -> None:
+    article_rows, article_lookup = article_payloads(story, outlet_rows, source_registry, existing_articles)
     upserted_articles = upsert_rows(
         client,
         "articles",
@@ -1108,9 +1171,10 @@ def main() -> int:
     purged_editorial_seeds = purge_editorial_seed_content(client)
     outlet_rows = seed_outlets(client, stories)
     source_registry = fetch_source_registry(client)
+    existing_articles = fetch_existing_articles_index(client)
 
     for story in stories:
-        sync_story(client, story, outlet_rows, source_registry)
+        sync_story(client, story, outlet_rows, source_registry, existing_articles)
 
     print(
         json.dumps(

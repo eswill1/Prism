@@ -70,7 +70,48 @@ STOPWORDS = {
     "why",
     "what",
     "who",
+    "will",
+    "into",
+    "through",
+    "about",
+    "after",
+    "amid",
+    "says",
 }
+
+BROAD_MATCH_TOKENS = {
+    "trump",
+    "iran",
+    "war",
+    "china",
+    "price",
+    "prices",
+    "us",
+    "u",
+    "world",
+    "news",
+    "global",
+}
+
+PHRASE_NORMALIZATIONS: list[tuple[str, str]] = [
+    (r"\bstrategic petroleum reserve\b", "oil reserve"),
+    (r"\boil reserves\b", "oil reserve"),
+    (r"\bemergency oil reserves\b", "oil reserve"),
+    (r"\bgas prices\b", "fuel price"),
+    (r"\bnational people's congress\b", "npc"),
+    (r"\bpolitical meeting\b", "npc meeting"),
+    (r"\btwo sessions\b", "npc"),
+    (r"\btrade wars?\b", "tariff investigation"),
+]
+
+EVENT_TAG_PATTERNS: list[tuple[str, tuple[str, ...]]] = [
+    ("oil_reserve_release", (r"\boil\b", r"\breserve\b", r"\b(release|tap|strategic|petroleum|barrel|fuel price)\b")),
+    ("iran_war_cost", (r"\biran\b", r"\bwar\b", r"\b(cost|billion|pentagon|congress|days?)\b")),
+    ("iran_shipping_attacks", (r"\biran\b", r"\b(ships?|shipping|strait of hormuz|persian gulf|hormuz)\b")),
+    ("china_npc", (r"\bchina\b", r"\b(npc|national people's congress|political meeting|two sessions)\b")),
+    ("trade_investigation", (r"\btrump\b", r"\b(trade|tariff)\b", r"\b(investigation|investigations)\b")),
+    ("iran_school_strike", (r"\biran\b", r"\bschool\b", r"\b(strike|missile)\b")),
+]
 
 ENTITY_STOPWORDS = {
     "Monday",
@@ -112,6 +153,7 @@ class FeedItem:
     extraction_quality: str
     image: str | None
     tokens: set[str]
+    event_tags: set[str]
 
 
 def fetch_text(url: str, timeout: int = 20) -> str:
@@ -197,8 +239,57 @@ def parse_datetime(value: str | None) -> datetime:
 
 
 def tokenize(title: str) -> set[str]:
-    words = re.findall(r"[A-Za-z]{3,}", title.lower())
-    return {word.rstrip("s") for word in words if word not in STOPWORDS}
+    normalized = normalize_matching_text(title)
+    words = re.findall(r"[A-Za-z]{3,}", normalized.lower())
+    return {stem_token(word) for word in words if stem_token(word) and stem_token(word) not in STOPWORDS}
+
+
+def normalize_matching_text(text: str) -> str:
+    normalized = text.lower()
+    for pattern, replacement in PHRASE_NORMALIZATIONS:
+        normalized = re.sub(pattern, replacement, normalized)
+    normalized = normalized.replace("u.s.", "us").replace("u.s", "us")
+    return normalized
+
+
+def stem_token(word: str) -> str:
+    token = word.lower()
+    if len(token) <= 3:
+        return token
+
+    if token.endswith("ies") and len(token) > 4:
+        return token[:-3] + "y"
+
+    if token.endswith("ing") and len(token) > 5:
+        root = token[:-3]
+        if len(root) >= 2 and root[-1] == root[-2]:
+            root = root[:-1]
+        if root.endswith(("as", "iz", "at", "leas")):
+            return f"{root}e"
+        return root
+
+    if token.endswith("ed") and len(token) > 4:
+        root = token[:-2]
+        if root.endswith(("as", "iz", "at", "leas")):
+            return f"{root}e"
+        return root
+
+    if token.endswith("es") and len(token) > 4 and not token.endswith(("ses", "xes")):
+        return token[:-2]
+
+    if token.endswith("s") and len(token) > 4 and not token.endswith("ss"):
+        return token[:-1]
+
+    return token
+
+
+def extract_event_tags(*parts: str) -> set[str]:
+    haystack = normalize_matching_text(" ".join(part for part in parts if part))
+    tags = set()
+    for tag, patterns in EVENT_TAG_PATTERNS:
+        if all(re.search(pattern, haystack) for pattern in patterns):
+            tags.add(tag)
+    return tags
 
 
 def image_from_description(raw: str | None) -> str | None:
@@ -436,42 +527,73 @@ def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[F
                 named_entities=list(enrichment.get("named_entities", [])),
                 extraction_quality=str(enrichment.get("extraction_quality", "rss_only")),
                 image=media_image or image_from_description(description_raw) or enrichment.get("image"),
-                tokens=tokenize(title),
+                tokens=tokenize(" ".join(filter(None, [title, " ".join(list(enrichment.get("named_entities", []))[:4])]))),
+                event_tags=extract_event_tags(title, summary, str(enrichment.get("lede", ""))),
             )
         )
 
     return items
 
 
-def should_join_cluster(item: FeedItem, cluster: list[FeedItem]) -> bool:
+def cluster_match_score(item: FeedItem, cluster: list[FeedItem]) -> float:
     if not item.tokens:
-        return False
+        return 0.0
 
-    def titles_match(left: set[str], right: set[str]) -> bool:
-        if not left or not right:
-            return False
+    cluster_tokens = set().union(*(entry.tokens for entry in cluster))
+    cluster_tags = set().union(*(entry.event_tags for entry in cluster))
+    if not cluster_tokens and not cluster_tags:
+        return 0.0
 
-        overlap = len(left & right)
-        union = len(left | right)
-        smaller = min(len(left), len(right))
+    overlap = item.tokens & cluster_tokens
+    if not overlap and not (item.event_tags & cluster_tags):
+        return 0.0
 
-        if overlap >= 4:
-            return True
-        if overlap >= 3 and union > 0 and overlap / union >= 0.34:
-            return True
-        return smaller > 0 and overlap >= 3 and overlap / smaller >= 0.6
+    specific_overlap = {token for token in overlap if token not in BROAD_MATCH_TOKENS}
+    union = item.tokens | cluster_tokens
+    smaller = min(len(item.tokens), len(cluster_tokens)) if cluster_tokens else 0
+    token_ratio = len(overlap) / len(union) if union else 0.0
+    specific_ratio = len(specific_overlap) / smaller if smaller else 0.0
+    tag_overlap = item.event_tags & cluster_tags
 
-    return any(titles_match(item.tokens, entry.tokens) for entry in cluster[:3])
+    score = len(tag_overlap) * 8.0
+    score += len(specific_overlap) * 2.5
+    score += len(overlap) * 1.25
+    score += token_ratio * 4.0
+    score += specific_ratio * 5.0
+
+    if tag_overlap and len(specific_overlap) >= 1:
+        score += 3.0
+
+    return score
+
+
+def should_join_cluster(item: FeedItem, cluster: list[FeedItem]) -> bool:
+    score = cluster_match_score(item, cluster)
+    if score >= 12.0:
+        return True
+
+    cluster_tokens = set().union(*(entry.tokens for entry in cluster))
+    cluster_tags = set().union(*(entry.event_tags for entry in cluster))
+    overlap = item.tokens & cluster_tokens
+    specific_overlap = {token for token in overlap if token not in BROAD_MATCH_TOKENS}
+
+    if item.event_tags & cluster_tags and len(specific_overlap) >= 2:
+        return True
+    if len(specific_overlap) >= 4:
+        return True
+    return len(specific_overlap) >= 3 and len(overlap) >= 4
 
 
 def cluster_items(items: Iterable[FeedItem]) -> list[list[FeedItem]]:
     clusters: list[list[FeedItem]] = []
     for item in sorted(items, key=lambda entry: entry.published_at, reverse=True):
         target = None
+        best_score = 0.0
         for cluster in clusters:
-            if should_join_cluster(item, cluster):
+            score = cluster_match_score(item, cluster)
+            if score > best_score and should_join_cluster(item, cluster):
                 target = cluster
-                break
+                best_score = score
         if target is None:
             clusters.append([item])
         else:
@@ -480,7 +602,9 @@ def cluster_items(items: Iterable[FeedItem]) -> list[list[FeedItem]]:
 
 
 def pick_cluster_label(items: list[FeedItem]) -> str:
-    tokens = Counter(token for item in items for token in item.tokens)
+    tokens = Counter(
+        token for item in items for token in item.tokens if token not in BROAD_MATCH_TOKENS
+    )
     common = [token for token, _count in tokens.most_common(3)]
     return " / ".join(token.title() for token in common) if common else "Live story"
 
