@@ -268,10 +268,13 @@ export async function StoryPage({ slug }: StoryPageProps) {
   const storyBrief = buildStoryBrief(cluster)
   const coverageSummary = buildCoverageSummary(cluster)
   const perspectiveTakeaways = buildPerspectiveTakeaways(cluster)
-  const primaryReads = selectPrimaryReads(cluster.articles)
-  const moreReads = selectMoreReads(cluster.articles, primaryReads)
+  const linkedArticles = cluster.articles.filter((article) => Boolean(article.url))
+  const primaryReads = selectPrimaryReads(linkedArticles)
+  const moreReads = selectMoreReads(linkedArticles, primaryReads)
   const alternateReads = buildAlternateReads(cluster).filter(
-    (item) => !primaryReads.some((article) => article.outlet === item.outlet && article.title === item.title),
+    (item) =>
+      Boolean(item.url) &&
+      !primaryReads.some((article) => article.outlet === item.outlet && article.title === item.title),
   )
 
   return (
@@ -339,6 +342,7 @@ export async function StoryPage({ slug }: StoryPageProps) {
             ) : null}
           </article>
 
+          {primaryReads.length > 0 ? (
           <article className="panel content-panel">
               <div className="section-heading">
                 <div>
@@ -433,6 +437,7 @@ export async function StoryPage({ slug }: StoryPageProps) {
               </div>
             ) : null}
           </article>
+          ) : null}
 
           {alternateReads.length > 0 ? (
             <article className="panel content-panel">

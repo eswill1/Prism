@@ -57,7 +57,7 @@ function buildHomepagePool(stories: ClusterSummary[]) {
   const preferred = stories.filter(
     (story) =>
       story.homepageEligible ||
-      story.storyOrigin === 'editorial_seed' ||
+      story.storyOrigin === 'automated_feed_ingestion' ||
       (story.qualityScore >= 24 && story.outletCount >= 1),
   )
 

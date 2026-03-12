@@ -282,6 +282,10 @@ function mapSummaryRow(row: StoryClusterRow): ClusterSummary {
   }
 }
 
+function isReaderVisibleStoryOrigin(origin: string) {
+  return origin !== 'editorial_seed'
+}
+
 type ClusterSortMode = 'frontpage' | 'latest'
 
 function coverageDiversityScore(counts: StoryCluster['coverageCounts']) {
@@ -311,7 +315,11 @@ function frontPagePriority(summary: ClusterSummary) {
   score += getNewsSectionKey(summary.topic) === 'more' ? -14 : 10
 
   if (summary.storyOrigin === 'editorial_seed') {
-    score += 14
+    score -= 8
+  }
+
+  if (summary.storyOrigin === 'automated_feed_ingestion') {
+    score += 10
   }
 
   if (summary.homepageEligible) {
@@ -387,13 +395,18 @@ export async function getClusterSummaries(options?: {
     }
 
     if (!data || data.length === 0) {
-      return sortClusterSummaries(mockClusters.map(fallbackClusterSummary), sortMode)
+      return []
     }
 
-    return sortClusterSummaries((data as StoryClusterRow[]).map(mapSummaryRow), sortMode)
+    return sortClusterSummaries(
+      (data as StoryClusterRow[])
+        .map(mapSummaryRow)
+        .filter((summary) => isReaderVisibleStoryOrigin(summary.storyOrigin)),
+      sortMode,
+    )
   } catch (error) {
-    console.error('Falling back to mock cluster summaries', error)
-    return sortClusterSummaries(mockClusters.map(fallbackClusterSummary), sortMode)
+    console.error('Unable to load Supabase cluster summaries', error)
+    return []
   }
 }
 
@@ -417,7 +430,7 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
     }
 
     if (!clusterRow) {
-      return fallbackClusterDetail(slug)
+      return (await loadLiveStoryBySlug(slug)) ?? null
     }
 
     const [{ data: keyFacts }, { data: clusterArticles }, { data: contextPackItems }, { data: evidenceItems }, { data: correctionEvents }] =
@@ -455,6 +468,9 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
       ])
 
     const normalizedCluster = mapSummaryRow(clusterRow as StoryClusterRow)
+    if (!isReaderVisibleStoryOrigin(normalizedCluster.storyOrigin)) {
+      return null
+    }
 
     const articles =
       (clusterArticles as Array<{
@@ -592,7 +608,7 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
       contextPacks,
     }
   } catch (error) {
-    console.error(`Falling back to mock cluster detail for ${slug}`, error)
-    return fallbackClusterDetail(slug)
+    console.error(`Unable to load Supabase cluster detail for ${slug}`, error)
+    return (await loadLiveStoryBySlug(slug)) ?? null
   }
 }

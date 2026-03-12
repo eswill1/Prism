@@ -18,6 +18,7 @@ LIVE_FEED_PATH = ROOT / "src" / "web" / "public" / "data" / "temporary-live-feed
 
 SUPABASE_URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+ENABLE_SNAPSHOT_SYNC = os.environ.get("PRISM_ENABLE_SNAPSHOT_SYNC", "").lower() == "true"
 
 if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
     sys.exit("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set")
@@ -799,13 +800,13 @@ def ensure_context_articles(story: dict[str, Any]) -> None:
 
 
 def build_story_payloads() -> list[dict[str, Any]]:
-    stories = deepcopy(editorial_seed_stories()) + live_snapshot_stories()
+    stories = live_snapshot_stories() if ENABLE_SNAPSHOT_SYNC else []
     for story in stories:
         story.setdefault("metadata", {})
         story["metadata"].update(
             {
                 "display_status": story["display_status"],
-                "story_origin": story["metadata"].get("story_origin", "editorial_seed"),
+                "story_origin": story["metadata"].get("story_origin", "live_snapshot"),
                 "sync_source": "tooling/sync_story_content.py",
             }
         )
@@ -875,6 +876,30 @@ def fetch_source_registry(client: SupabaseRestClient) -> dict[str, str]:
 def fetch_story_cluster_count(client: SupabaseRestClient) -> int:
     rows = client.get("/story_clusters?select=id") or []
     return len(rows)
+
+
+def purge_editorial_seed_content(client: SupabaseRestClient) -> int:
+    cluster_rows = client.get("/story_clusters?select=id,slug,metadata&limit=500") or []
+    editorial_seed_slugs = []
+
+    for row in cluster_rows:
+        metadata = row.get("metadata") or {}
+        if isinstance(metadata, dict) and metadata.get("story_origin") == "editorial_seed":
+            editorial_seed_slugs.append(row["slug"])
+            delete_where(client, "story_clusters", "id", row["id"])
+
+    if not editorial_seed_slugs:
+        return 0
+
+    article_rows = client.get("/articles?select=id,canonical_url,metadata&limit=2000") or []
+    for row in article_rows:
+        canonical_url = row.get("canonical_url") or ""
+        metadata = row.get("metadata") or {}
+        story_slug = metadata.get("story_slug") if isinstance(metadata, dict) else None
+        if canonical_url.startswith("https://seed.prism.local/") or story_slug in editorial_seed_slugs:
+            delete_where(client, "articles", "id", row["id"])
+
+    return len(editorial_seed_slugs)
 
 
 def seed_outlets(client: SupabaseRestClient, stories: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -1069,6 +1094,7 @@ def sync_story(client: SupabaseRestClient, story: dict[str, Any], outlet_rows: d
 def main() -> int:
     stories = build_story_payloads()
     client = SupabaseRestClient(REST_BASE, SUPABASE_SERVICE_ROLE_KEY)
+    purged_editorial_seeds = purge_editorial_seed_content(client)
     outlet_rows = seed_outlets(client, stories)
     source_registry = fetch_source_registry(client)
 
@@ -1078,6 +1104,8 @@ def main() -> int:
     print(
         json.dumps(
             {
+                "editorial_seed_clusters_purged": purged_editorial_seeds,
+                "snapshot_sync_enabled": ENABLE_SNAPSHOT_SYNC,
                 "stories_synced": len(stories),
                 "live_snapshot_stories": len([story for story in stories if story["metadata"]["story_origin"] == "live_snapshot"]),
                 "story_cluster_count": fetch_story_cluster_count(client),

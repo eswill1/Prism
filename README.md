@@ -41,6 +41,7 @@ Current product decisions locked in:
 - homepage story packages should be fully clickable
 - source reads go directly to original reporting when a real source URL exists
 - Prism should not force source-wrapper detours unless they add clear reader value
+- when Supabase-backed live data is available, connected Prism should surface real sourced stories only, not synthetic editorial stand-ins
 
 ## Core Concepts
 

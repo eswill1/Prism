@@ -25,6 +25,7 @@ These rules apply across official Prism clients.
 
 - readers should not have to discover a second "real" news page
 - faster-moving queues may exist as secondary or internal surfaces, but not as the primary reader path
+- in connected mode, homepage and story surfaces may not be padded with synthetic editorial stand-ins when real sourced stories are available
 
 ### The Perspective layer is informational only
 

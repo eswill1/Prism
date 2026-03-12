@@ -194,6 +194,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Perspective rail visually separated from the article column
 - [x] Direct source links in "Reporting to read next" and "Also in the mix"
 - [x] "Another angle" links rendered when source URLs are present
+- [x] Connected reader surfaces restricted to real sourced live stories instead of synthetic editorial stand-ins
 - [ ] Perspective panel v1 backed by real outlet data
 - [x] Methodology page shell
 - [x] Browser-local saved/followed story prototype
@@ -230,7 +231,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [ ] Media-rights policy enforcement in the ingestion pipeline
 - [ ] Scheduled enrichment jobs beyond the temporary live snapshot
 - [ ] Saved/followed story state backed by real persistence
-- [ ] Editorial seed stories backfilled with real source URLs instead of stand-in-only cards
+- [x] Editorial seed stories removed from connected reader surfaces instead of shipping fake source-link affordances
 
 #### Success metrics:
 - Most surfaced stories arrive through automated ingestion rather than manual seeding
