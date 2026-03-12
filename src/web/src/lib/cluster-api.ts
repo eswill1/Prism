@@ -2,6 +2,7 @@ import { clusterBySlug, mockClusters, type FramingGroup, type StoryCluster } fro
 import { loadLiveStoryBySlug } from './live-feed'
 import { getNewsSectionKey } from './news-sections'
 import { inferSourceAccessTier } from './source-access'
+import type { StoryBrief } from './story-brief-types'
 import { getSupabaseServerClient, hasSupabaseServerConfig, type JsonObject } from './supabase/server'
 
 export type ClusterSummary = {
@@ -240,6 +241,49 @@ type StoryClusterRow = {
   metadata: JsonObject | null
 }
 
+type StoryBriefRevisionRow = {
+  label: string
+  title: string
+  status: string
+  paragraphs: string[] | null
+  why_it_matters: string
+  where_sources_agree: string
+  where_coverage_differs: string
+  what_to_watch: string
+  supporting_points: string[] | null
+  metadata: JsonObject | null
+}
+
+function mapStoredBrief(row: StoryBriefRevisionRow | null | undefined): StoryBrief | undefined {
+  if (!row) {
+    return undefined
+  }
+
+  const metadata = row.metadata || {}
+  const paragraphs = Array.isArray(row.paragraphs)
+    ? row.paragraphs.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    : []
+  const supportingPoints = Array.isArray(row.supporting_points)
+    ? row.supporting_points.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    : []
+
+  return {
+    label: row.label,
+    title: row.title,
+    paragraphs,
+    whyItMatters: row.why_it_matters,
+    whereSourcesAgree: row.where_sources_agree,
+    whereCoverageDiffers: row.where_coverage_differs,
+    whatToWatch: row.what_to_watch,
+    supportingPoints,
+    substantiveSourceCount:
+      typeof metadata.substantive_source_count === 'number'
+        ? metadata.substantive_source_count
+        : Number(metadata.substantive_source_count ?? 0),
+    isEarlyBrief: row.status !== 'full',
+  }
+}
+
 function mapSummaryRow(row: StoryClusterRow): ClusterSummary {
   const metadata = row.metadata || {}
   const qualityScore =
@@ -434,7 +478,14 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
       return (await loadLiveStoryBySlug(slug)) ?? null
     }
 
-    const [{ data: keyFacts }, { data: clusterArticles }, { data: contextPackItems }, { data: evidenceItems }, { data: correctionEvents }] =
+    const [
+      { data: keyFacts },
+      { data: clusterArticles },
+      { data: contextPackItems },
+      { data: evidenceItems },
+      { data: correctionEvents },
+      { data: briefRevision },
+    ] =
       await Promise.all([
         client
           .from('cluster_key_facts')
@@ -466,6 +517,14 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
           .eq('cluster_id', clusterRow.id)
           .order('created_at', { ascending: false })
           .limit(8),
+        client
+          .from('story_brief_revisions')
+          .select(
+            'label, title, status, paragraphs, why_it_matters, where_sources_agree, where_coverage_differs, what_to_watch, supporting_points, metadata',
+          )
+          .eq('cluster_id', clusterRow.id)
+          .eq('is_current', true)
+          .maybeSingle(),
       ])
 
     const normalizedCluster = mapSummaryRow(clusterRow as StoryClusterRow)
@@ -632,6 +691,7 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
         })) ?? [],
       corrections,
       contextPacks,
+      generatedBrief: mapStoredBrief(briefRevision as StoryBriefRevisionRow | null | undefined),
     }
   } catch (error) {
     console.error(`Unable to load Supabase cluster detail for ${slug}`, error)

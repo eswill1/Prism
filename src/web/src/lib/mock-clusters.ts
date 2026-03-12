@@ -1,3 +1,5 @@
+import type { StoryBrief } from './story-brief-types'
+
 export type FramingGroup = 'left' | 'center' | 'right'
 
 export type ClusterArticle = {
@@ -64,6 +66,7 @@ export type StoryCluster = {
   evidence: EvidenceItem[]
   corrections: CorrectionItem[]
   contextPacks: Record<string, ContextItem[]>
+  generatedBrief?: StoryBrief
 }
 
 export const mockClusters: StoryCluster[] = [

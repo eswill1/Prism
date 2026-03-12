@@ -161,7 +161,7 @@ export async function StoryPage({ slug }: StoryPageProps) {
 
   const entryHref = '/'
   const entryLabel = 'Back to homepage'
-  const storyBrief = buildStoryBrief(cluster)
+  const storyBrief = cluster.generatedBrief ?? buildStoryBrief(cluster)
   const coverageSummary = buildCoverageSummary(cluster)
   const perspectiveTakeaways = buildPerspectiveTakeaways(cluster)
   const linkedArticles = cluster.articles.filter((article) => Boolean(article.url))

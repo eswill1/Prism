@@ -48,6 +48,7 @@ Current product decisions locked in:
 - Prism should not force source-wrapper detours unless they add clear reader value
 - when Supabase-backed live data is available, connected Prism should surface real sourced stories only, not synthetic editorial stand-ins
 - feed polling stays fast; article-page extraction runs in a dedicated enrichment worker instead of blocking ingest
+- grounded story briefs should be persisted as versioned revisions and read from storage before the page falls back to inline brief assembly
 - clustering is transitioning to a hybrid model: semantic candidate retrieval first, explicit merge guardrails second
 
 ## Core Concepts
@@ -107,6 +108,7 @@ Core commands:
 - `npm run ingest:feeds`
 - `npm run ingest:feeds:raw`
 - `npm run enrich:articles`
+- `npm run brief:generate`
 - `npm run brief:readiness`
 - `npm run sources:health`
 - `npm run cluster:candidates`
@@ -117,9 +119,10 @@ Environment baseline:
 - this repo is now scoped locally to Doppler project `prism-wire` config `dev`
 - `npm run sync:stories` is now for explicit snapshot or manual sync work only; connected Prism should rely on real sourced stories
 - `npm run sources:upsert` activates the current launch feed registry in Supabase
-- `npm run ingest:feeds` is the default operator path: it polls the active RSS and sitemap feeds in Supabase, refreshes the automated live story set, then immediately runs the slower article enrichment pass so fresh stories are not left with thin brief inputs
+- `npm run ingest:feeds` is the default operator path: it polls the active RSS and sitemap feeds in Supabase, refreshes the automated live story set, runs the slower article enrichment pass, and then generates stored grounded brief revisions for active stories
 - `npm run ingest:feeds:raw` runs only the fast discovery and story-sync portion of the pipeline when you explicitly need ingest without enrichment
 - `npm run enrich:articles` performs the slower article-page extraction pass for recent linked articles, upgrades Prism Brief inputs beyond feed snippets, and refreshes active story summaries after enrichment lands
+- `npm run brief:generate` builds grounded story-brief revisions from enriched article inputs and advances the current brief revision for each active story when the input signature changes
 - `npm run brief:readiness` reports which active live stories are still limited to early briefs, which have enough substantive sourcing for full Prism Briefs, and whether they already have a usable open alternate
 - `npm run sources:health` reports which discovery sources are contributing recent articles, substantive extraction, and active story coverage versus just generating queue noise
 - `npm run cluster:candidates` reports how well semantic candidate retrieval covers the current heuristic clusters and validates the offline regression fixtures

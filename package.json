@@ -17,6 +17,7 @@
     "ingest:feeds": "doppler run -- python3 tooling/run_news_ingest_pipeline.py",
     "ingest:feeds:raw": "doppler run -- python3 tooling/ingest_live_feeds_to_supabase.py",
     "enrich:articles": "doppler run -- python3 tooling/enrich_articles_to_supabase.py",
+    "brief:generate": "doppler run -- python3 tooling/generate_story_briefs_to_supabase.py",
     "brief:readiness": "doppler run -- python3 tooling/evaluate_brief_readiness.py",
     "sources:health": "doppler run -- python3 tooling/report_source_health.py",
     "cluster:candidates": "python3 tooling/evaluate_cluster_candidates.py",
