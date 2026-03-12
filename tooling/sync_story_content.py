@@ -968,6 +968,11 @@ def article_payloads(
             if keep_existing_enrichment and isinstance(existing_metadata.get("named_entities"), list)
             else article.get("named_entities") or existing_metadata.get("named_entities") or []
         )
+        merged_access_signal = (
+            existing_metadata.get("access_signal")
+            if keep_existing_enrichment and existing_metadata.get("access_signal")
+            else article.get("access_signal") or existing_metadata.get("access_signal") or "unknown"
+        )
         merged_summary = (
             existing_row.get("summary")
             if keep_existing_enrichment and existing_row.get("summary")
@@ -1005,6 +1010,7 @@ def article_payloads(
                 "context_only": bool(article.get("context_only")),
                 "feed_summary": article.get("feed_summary") or article["summary"],
                 "named_entities": merged_named_entities,
+                "access_signal": merged_access_signal,
                 "extraction_quality": existing_quality if keep_existing_enrichment else incoming_quality,
                 "sync_source": "tooling/sync_story_content.py",
                 **(

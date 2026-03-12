@@ -110,6 +110,7 @@ Core commands:
 - `npm run enrich:articles`
 - `npm run brief:generate`
 - `npm run brief:readiness`
+- `npm run brief:grounding`
 - `npm run sources:health`
 - `npm run cluster:candidates`
 
@@ -124,7 +125,9 @@ Environment baseline:
 - `npm run enrich:articles` performs the slower article-page extraction pass for recent linked articles, upgrades Prism Brief inputs beyond feed snippets, and refreshes active story summaries after enrichment lands
 - `npm run brief:generate` builds grounded story-brief revisions from enriched article inputs and advances the current brief revision for each active story when the input signature changes
 - `npm run brief:readiness` reports which active live stories are still limited to early briefs, which have enough substantive sourcing for full Prism Briefs, and whether they already have a usable open alternate
+- `npm run brief:grounding` audits current stored brief sections against their recorded support references so weak or unsupported brief language is visible before it ships
 - `npm run sources:health` reports which discovery sources are contributing recent articles, substantive extraction, and active story coverage versus just generating queue noise
+- enrichment now persists article-level access signals so the reader layer and the brief generator can distinguish open reads from likely paywalled ones using article evidence, not outlet lists alone
 - `npm run cluster:candidates` reports how well semantic candidate retrieval covers the current heuristic clusters and validates the offline regression fixtures
 - clustering now shares canonical URL normalization across ingest, sync, and evaluation so tracking parameters and alias domains do not fragment stories
 - sitemap-derived items are now demoted unless they have substantive extracted text or enough source breadth to support a reader-facing story shell

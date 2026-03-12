@@ -33,6 +33,16 @@ OUTPUT_PATHS = [
 USER_AGENT = "PrismWirePrototype/0.1 (+local preview)"
 ARTICLE_ENRICHMENT_LIMIT_PER_FEED = 2
 ARTICLE_ENRICHMENT_TIMEOUT_SECONDS = 6
+PAYWALL_HINT_PATTERNS = (
+    r"subscribe to continue",
+    r"subscription required",
+    r"sign in to continue",
+    r"already a subscriber",
+    r"this article is for subscribers",
+    r"meteredcontent",
+    r"gateway-content",
+    r"paywall",
+)
 
 FEEDS = [
     {"source": "NPR", "feed_url": "https://feeds.npr.org/1001/rss.xml"},
@@ -204,6 +214,7 @@ class FeedItem:
     body_preview: str
     named_entities: list[str]
     extraction_quality: str
+    access_signal: str
     image: str | None
     tokens: set[str]
     event_tags: set[str]
@@ -377,6 +388,10 @@ def find_meta_content(markup: str, field_names: tuple[str, ...]) -> str:
     return ""
 
 
+def infer_source_domain(url: str) -> str:
+    return urlparse(url).hostname.replace("www.", "").lower() if urlparse(url).hostname else ""
+
+
 def extract_json_ld_text(markup: str) -> list[str]:
     texts: list[str] = []
     for match in re.finditer(
@@ -415,6 +430,60 @@ def extract_json_ld_text(markup: str) -> list[str]:
     return texts
 
 
+def extract_embedded_json_text(markup: str) -> list[str]:
+    texts: list[str] = []
+    seen: set[str] = set()
+
+    for key in ("articleBody", "description", "summary", "excerpt", "seoDescription", "subHeadline"):
+        pattern = rf'"{key}"\s*:\s*"((?:\\.|[^"\\]){{80,4000}})"'
+        for match in re.finditer(pattern, markup, re.IGNORECASE | re.DOTALL):
+            raw = match.group(1)
+            try:
+                decoded = json.loads(f'"{raw}"')
+            except json.JSONDecodeError:
+                decoded = raw.encode("utf-8").decode("unicode_escape", errors="ignore")
+            cleaned = strip_html(decoded)
+            normalized = cleaned.lower()
+            if len(cleaned) < 80 or normalized in seen:
+                continue
+            seen.add(normalized)
+            texts.append(cleaned)
+            if len(texts) >= 8:
+                return texts
+
+    return texts
+
+
+def extract_paragraphs_from_marker_windows(markup: str, markers: tuple[str, ...]) -> list[str]:
+    paragraphs: list[str] = []
+    seen: set[str] = set()
+    for marker in markers:
+        for match in re.finditer(marker, markup, re.IGNORECASE):
+            window = markup[match.start() : min(len(markup), match.start() + 18000)]
+            for raw in re.findall(r"<p\b[^>]*>(.*?)</p>", window, re.IGNORECASE | re.DOTALL):
+                cleaned = strip_html(raw)
+                normalized = cleaned.lower()
+                if len(cleaned) < 60 or normalized in seen:
+                    continue
+                if any(
+                    phrase in normalized
+                    for phrase in (
+                        "all rights reserved",
+                        "sign up for",
+                        "newsletter",
+                        "click here",
+                        "read more:",
+                        "advertisement",
+                    )
+                ):
+                    continue
+                seen.add(normalized)
+                paragraphs.append(cleaned)
+                if len(paragraphs) >= 5:
+                    return paragraphs
+    return paragraphs
+
+
 def extract_article_paragraphs(markup: str) -> list[str]:
     article_match = re.search(r"<article[^>]*>(.*?)</article>", markup, re.IGNORECASE | re.DOTALL)
     candidate_markup = article_match.group(1) if article_match else markup
@@ -450,6 +519,47 @@ def extract_article_paragraphs(markup: str) -> list[str]:
     return paragraphs
 
 
+def extract_source_specific_paragraphs(markup: str, url: str) -> list[str]:
+    domain = infer_source_domain(url)
+    marker_map: dict[str, tuple[str, ...]] = {
+        "reuters.com": (
+            r'data-testid=["\']paragraph',
+            r'class=["\'][^"\']*(article-body|articleBody|body__content|paywall-article)[^"\']*["\']',
+        ),
+        "ft.com": (
+            r'class=["\'][^"\']*(article-body|story-body|n-content-body|o-teaser__content)[^"\']*["\']',
+            r'data-trackable=["\']story-body["\']',
+        ),
+        "bloomberg.com": (
+            r'class=["\'][^"\']*(body-content|body-copy|story-body|article-body)[^"\']*["\']',
+            r'data-component=["\']article-body["\']',
+        ),
+        "nytimes.com": (
+            r'id=["\']story["\']',
+            r'class=["\'][^"\']*(StoryBodyCompanionColumn|story-body|g-body|meteredContent)[^"\']*["\']',
+        ),
+        "wsj.com": (
+            r'class=["\'][^"\']*(article-content|story-body|wsj-snippet-body)[^"\']*["\']',
+        ),
+    }
+
+    for candidate_domain, markers in marker_map.items():
+        if domain == candidate_domain or domain.endswith(f".{candidate_domain}"):
+            paragraphs = extract_paragraphs_from_marker_windows(markup, markers)
+            if paragraphs:
+                return paragraphs
+    return []
+
+
+def detect_access_signal(markup: str, url: str) -> str:
+    domain = infer_source_domain(url)
+    if domain in {"ft.com", "bloomberg.com", "nytimes.com", "wsj.com"}:
+        return "likely_paywalled"
+    if any(re.search(pattern, markup, re.IGNORECASE) for pattern in PAYWALL_HINT_PATTERNS):
+        return "likely_paywalled"
+    return "open"
+
+
 def extract_named_entities(text: str) -> list[str]:
     seen: set[str] = set()
     entities: list[str] = []
@@ -476,6 +586,7 @@ def default_enrichment(summary: str = "") -> dict[str, object]:
         "body_preview": "",
         "named_entities": [],
         "extraction_quality": "rss_only",
+        "access_signal": "unknown",
     }
 
 
@@ -710,6 +821,7 @@ def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, 
         "body_preview": "",
         "named_entities": [],
         "extraction_quality": "rss_only",
+        "access_signal": "unknown",
     }
 
     try:
@@ -728,9 +840,19 @@ def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, 
 
     meta_description = find_meta_content(markup, ("og:description", "description", "twitter:description"))
     json_ld_text = extract_json_ld_text(markup)
+    embedded_json_text = extract_embedded_json_text(markup)
     paragraphs = extract_article_paragraphs(markup)
+    source_specific_paragraphs = extract_source_specific_paragraphs(markup, url)
+    if source_specific_paragraphs and len(" ".join(source_specific_paragraphs)) > len(" ".join(paragraphs)):
+        paragraphs = source_specific_paragraphs
 
-    lede_candidates = [paragraphs[0] if paragraphs else "", meta_description, *(json_ld_text[:2]), fallback_summary]
+    lede_candidates = [
+        paragraphs[0] if paragraphs else "",
+        meta_description,
+        *(embedded_json_text[:2]),
+        *(json_ld_text[:2]),
+        fallback_summary,
+    ]
     lede = ""
     for candidate in lede_candidates:
         lede = clean_summary_snippet(candidate, 320)
@@ -740,13 +862,15 @@ def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, 
     body_preview = ""
     if paragraphs:
         body_preview = clamp_to_word_boundary(" ".join(paragraphs[:3]), 1200)
+    elif embedded_json_text:
+        body_preview = clamp_to_word_boundary(" ".join(embedded_json_text[:2]), 1200)
     elif json_ld_text:
         body_preview = clamp_to_word_boundary(" ".join(json_ld_text[:2]), 1200)
 
     extraction_quality = "rss_only"
     if paragraphs:
         extraction_quality = "article_body"
-    elif meta_description or json_ld_text:
+    elif meta_description or embedded_json_text or json_ld_text:
         extraction_quality = "metadata_description"
 
     payload = {
@@ -755,6 +879,7 @@ def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, 
         "body_preview": body_preview,
         "named_entities": extract_named_entities(" ".join(part for part in (lede, body_preview) if part)),
         "extraction_quality": extraction_quality,
+        "access_signal": detect_access_signal(markup, url),
     }
     ARTICLE_FETCH_CACHE[url] = payload
     return payload
@@ -813,6 +938,7 @@ def parse_rss_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> li
                 body_preview=body_preview,
                 named_entities=list(enrichment.get("named_entities", [])),
                 extraction_quality=str(enrichment.get("extraction_quality", "rss_only")),
+                access_signal=str(enrichment.get("access_signal", "unknown")),
                 image=media_image or image_from_description(description_raw) or enrichment.get("image"),
                 tokens=tokenize(" ".join(filter(None, [title, " ".join(list(enrichment.get("named_entities", []))[:4])]))),
                 event_tags=extract_event_tags(title, summary, str(enrichment.get("lede", ""))),
@@ -913,6 +1039,7 @@ def parse_news_sitemap(feed: dict[str, str], *, enrich_articles: bool = False) -
                     body_preview=body_preview,
                     named_entities=named_entities,
                     extraction_quality=str(enrichment.get("extraction_quality", "rss_only")),
+                    access_signal=str(enrichment.get("access_signal", "unknown")),
                     image=image or enrichment.get("image"),
                     tokens=tokenize(" ".join(filter(None, [title, keyword_summary, " ".join(named_entities[:4])]))),
                     event_tags=extract_event_tags(title, keyword_summary, str(enrichment.get("lede", ""))),
@@ -1128,6 +1255,7 @@ def build_cluster_payload(
                 "body_preview": item.body_preview,
                 "named_entities": item.named_entities,
                 "extraction_quality": item.extraction_quality,
+                "access_signal": item.access_signal,
                 "image": item.image,
                 "domain": urlparse(item.url).netloc,
             }

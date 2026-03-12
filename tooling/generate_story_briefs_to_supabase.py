@@ -82,7 +82,9 @@ def topic_family_for_story(topic: str) -> str:
     return "general"
 
 
-def infer_access_tier(outlet: str) -> str:
+def infer_access_tier(outlet: str, signal: str | None = None) -> str:
+    if signal in {"open", "likely_paywalled"}:
+        return signal
     if outlet in OPEN_OUTLETS:
         return "open"
     if outlet in PAYWALLED_OUTLETS:
@@ -185,11 +187,52 @@ def build_brief_sources(cluster: dict[str, Any]) -> list[dict[str, Any]]:
                 "snippet": ensure_period(snippet),
                 "focus": article_focus(article),
                 "extraction_quality": metadata.get("extraction_quality") if isinstance(metadata, dict) else None,
-                "access_tier": infer_access_tier(outlet),
+                "access_tier": infer_access_tier(
+                    outlet,
+                    metadata.get("access_signal") if isinstance(metadata, dict) else None,
+                ),
             }
         )
 
     return rows
+
+
+def source_reference(source: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "article_id": source.get("article_id"),
+        "outlet": source.get("outlet"),
+        "headline": source.get("headline"),
+        "canonical_url": source.get("canonical_url"),
+        "original_url": source.get("original_url"),
+        "access_tier": source.get("access_tier"),
+    }
+
+
+def unique_source_references(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen_article_ids: set[str] = set()
+    refs: list[dict[str, Any]] = []
+    for source in sources:
+        article_id = source.get("article_id")
+        if isinstance(article_id, str) and article_id in seen_article_ids:
+            continue
+        if isinstance(article_id, str):
+            seen_article_ids.add(article_id)
+        refs.append(source_reference(source))
+    return refs
+
+
+def support_payload(*sources: dict[str, Any]) -> list[dict[str, Any]]:
+    return unique_source_references([source for source in sources if source])
+
+
+def open_alternate_source(sources: list[dict[str, Any]], exclude_outlet: str | None = None) -> dict[str, Any] | None:
+    for source in sources:
+        if source.get("access_tier") != "open":
+            continue
+        if exclude_outlet and source.get("outlet") == exclude_outlet:
+            continue
+        return source
+    return None
 
 
 def outlet_text(cluster: dict[str, Any]) -> str:
@@ -271,6 +314,11 @@ def why_it_matters_copy(cluster: dict[str, Any], family: str, sources: list[dict
         return facts[1]
     if len(sources) >= 2:
         return f"This matters because the reporting is already pointing beyond the immediate headline and toward {strip_ending_punctuation(sources[1]['focus'])}."
+    if sources:
+        return (
+            f"This matters because the first substantive reporting is already centering "
+            f"{strip_ending_punctuation(sources[0]['focus'])}, which suggests the stakes extend beyond the first headline."
+        )
 
     return {
         "politics": "This matters because the next move here could affect public policy, negotiations, or the balance of political leverage in a visible way.",
@@ -316,56 +364,137 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
     full_brief = len(sources) >= 2 and outlet_count >= 2
     secondary_sources = [source for source in sources if source["outlet"] != (central or {}).get("outlet")][:3]
     corroborating_outlets = outlet_list_text([source["outlet"] for source in secondary_sources])
+    open_alternate = open_alternate_source(
+        secondary_sources if secondary_sources else sources,
+        exclude_outlet=(central or {}).get("outlet"),
+    )
 
-    paragraphs = (
-        [
-            ensure_period(cluster["summary"]),
+    paragraph_entries: list[dict[str, Any]] = []
+
+    def add_paragraph(text: str, *supporting_sources: dict[str, Any]) -> None:
+        cleaned = normalize_whitespace(text)
+        if not cleaned:
+            return
+        if any(sentence_similarity(cleaned, existing["text"]) >= 0.82 for existing in paragraph_entries):
+            return
+        paragraph_entries.append(
+            {
+                "text": cleaned,
+                "support": support_payload(*supporting_sources),
+            }
+        )
+
+    add_paragraph(ensure_period(cluster["summary"]), *(sources[:2] or ([central] if central else [])))
+
+    if full_brief:
+        add_paragraph(
             (
-                f"Across {outlet_text(cluster)}, the core sequence is consistent. {central['snippet']}"
+                f"Across {outlet_text(cluster)}, the baseline is consistent. {central['snippet']}"
                 if central
                 else ensure_period(cluster["summary"])
             ),
-            (
-                f"{corroborating_outlets} add more detail around {strip_ending_punctuation(secondary_sources[0]['focus'] if secondary_sources else 'the practical stakes')}, which helps turn the headline into a clearer working picture of the story."
-                if secondary_sources
-                else ""
-            ),
-            (
-                f"{divergent['outlet']} puts more emphasis on {strip_ending_punctuation(divergent['focus'])}, so the difference in coverage is mostly about what deserves the most attention rather than basic disagreement about the event itself."
-                if divergent
-                else "The coverage is still relatively aligned on the event itself, with the main differences showing up in emphasis and downstream consequences."
-            ),
-        ]
-        if full_brief
-        else [
-            ensure_period(cluster["summary"]),
-            sources[0]["snippet"] if sources and sentence_similarity(sources[0]["snippet"], cluster["summary"]) < 0.72 else "",
-        ]
-    )
+            *(support_payload(central, secondary_sources[0]) if central and secondary_sources else support_payload(central) if central else []),
+        )
+        if len(secondary_sources) >= 2:
+            add_paragraph(
+                (
+                    f"The reporting expands in two directions once you get past the headline. "
+                    f"{secondary_sources[0]['outlet']} adds more around {strip_ending_punctuation(secondary_sources[0]['focus'])}, "
+                    f"while {secondary_sources[1]['outlet']} spends more time on {strip_ending_punctuation(secondary_sources[1]['focus'])}."
+                ),
+                secondary_sources[0],
+                secondary_sources[1],
+            )
+        elif secondary_sources:
+            add_paragraph(
+                (
+                    f"{secondary_sources[0]['outlet']} adds more around {strip_ending_punctuation(secondary_sources[0]['focus'])}, "
+                    "which helps turn the first-wave headline into a fuller working picture."
+                ),
+                secondary_sources[0],
+            )
 
-    filtered_paragraphs: list[str] = []
-    for paragraph in paragraphs:
-        cleaned = normalize_whitespace(paragraph)
-        if not cleaned:
-            continue
-        if any(sentence_similarity(cleaned, existing) >= 0.82 for existing in filtered_paragraphs):
-            continue
-        filtered_paragraphs.append(cleaned)
+        add_paragraph(
+            (
+                f"The main difference in coverage is emphasis. {divergent['outlet']} leans harder on "
+                f"{strip_ending_punctuation(divergent['focus'])}, while {(central or divergent)['outlet']} stays closer to the straight sequence of events."
+                if divergent and central
+                else "The outlets are still more aligned than divided on the event itself, with most of the variation showing up in what each one treats as the bigger downstream stake."
+            ),
+            *(support_payload(central, divergent) if central and divergent else support_payload(*(secondary_sources[:2] or ([central] if central else [])))),
+        )
+    else:
+        if central:
+            add_paragraph(
+                (
+                    f"Right now the clearest linked reporting comes from {central['outlet']}, "
+                    f"which is focusing on {strip_ending_punctuation(central['focus'])}. "
+                    f"{central['snippet']}"
+                ),
+                central,
+            )
+
+        if open_alternate:
+            add_paragraph(
+                (
+                    f"Prism has at least one open alternate in the mix from {open_alternate['outlet']}, "
+                    f"but the coverage is still too thin to separate real disagreement from normal early framing around {strip_ending_punctuation(open_alternate['focus'])}."
+                ),
+                central or open_alternate,
+                open_alternate,
+            )
+        else:
+            add_paragraph(
+                (
+                    f"For now, the clearest through-line in the linked reporting is {strip_ending_punctuation((central or {}).get('focus') or 'the first reported development')}, "
+                    "so Prism is holding this as an early brief until another detailed report arrives."
+                ),
+                *(support_payload(central) if central else []),
+            )
+
+    filtered_paragraphs = [entry["text"] for entry in paragraph_entries]
+    paragraph_support = [
+        {
+            "index": index,
+            "support": entry["support"],
+        }
+        for index, entry in enumerate(paragraph_entries)
+    ]
 
     supporting_points = visible_key_facts(cluster)
+    why_support = support_payload(*(secondary_sources[:2] or ([central] if central else [])))
+    agree_support = support_payload(central, secondary_sources[0]) if central and secondary_sources else support_payload(*(sources[:2]))
+    differs_support = (
+        support_payload(central, divergent)
+        if central and divergent
+        else support_payload(*(secondary_sources[:2] or ([central] if central else [])))
+    )
+    watch_support = (
+        []
+        if cluster.get("correction_events")
+        else support_payload(*(secondary_sources[:1] or ([central] if central else [])))
+    )
+
     where_sources_agree = (
-        f"Across {outlet_text(cluster)}, the shared baseline is clear: {(central or {}).get('snippet') or ensure_period(cluster['summary'])}"
-        if full_brief
-        else "Prism only has one substantive linked report so far, so the shared baseline is still forming from early reporting rather than a mature multi-source comparison."
+        (
+            f"Across {outlet_text(cluster)}, the shared baseline is clear: {(central or {}).get('snippet') or ensure_period(cluster['summary'])}"
+            if full_brief
+            else f"The best-supported baseline right now comes from {(central or {}).get('outlet') or 'the first linked report'}: {(central or {}).get('snippet') or ensure_period(cluster['summary'])}"
+        )
     )
     where_coverage_differs = (
         (
             f"The split so far is more about emphasis than the event itself. {(central or {}).get('outlet') or 'One outlet'} stays closest to the core sequence, while {divergent['outlet']} gives more weight to {divergent['focus']}."
-            if divergent
+            if full_brief and divergent
             else "The reporting is still fairly aligned on the core sequence, but outlets are beginning to diverge in what they emphasize most."
         )
         if full_brief
-        else "There is not enough independent reporting yet to cleanly separate source disagreement from ordinary single-outlet framing."
+        else (
+            (
+                f"There is not enough independent reporting yet to call a real split. "
+                f"The current linked reporting is still centered on {strip_ending_punctuation((open_alternate or central or {}).get('focus') or 'the first reported development')}."
+            )
+        )
     )
 
     source_snapshot = [
@@ -398,12 +527,24 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
             "paragraph_count": len(filtered_paragraphs),
             "family": family,
             "full_brief_ready": full_brief,
+            "open_source_count": sum(1 for source in sources if source.get("access_tier") == "open"),
+            "likely_paywalled_source_count": sum(1 for source in sources if source.get("access_tier") == "likely_paywalled"),
+            "open_alternate_available": bool(open_alternate),
+            "support_strategy_version": "grounded_sections_v1",
+            "section_support": {
+                "paragraphs": paragraph_support,
+                "why_it_matters": why_support,
+                "where_sources_agree": agree_support,
+                "where_coverage_differs": differs_support,
+                "what_to_watch": watch_support,
+            },
         },
         "source_snapshot": source_snapshot,
     }
 
     signature_input = json.dumps(
         {
+            "generator_version": "deterministic_grounded_v1",
             "summary": cluster["summary"],
             "topic_label": cluster["topic_label"],
             "key_facts": supporting_points,
@@ -414,6 +555,7 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
                 "where_sources_agree": where_sources_agree,
                 "where_coverage_differs": where_coverage_differs,
                 "what_to_watch": brief_payload["what_to_watch"],
+                "section_support": brief_payload["metadata"]["section_support"],
             },
         },
         sort_keys=True,
@@ -449,7 +591,7 @@ def patch_cluster_metadata(client: SupabaseRestClient, cluster: dict[str, Any], 
     metadata["brief_revision_tag"] = revision_tag
     metadata["brief_status"] = brief_payload["status"]
     metadata["brief_generated_at"] = datetime.now(timezone.utc).isoformat()
-    metadata["brief_generation_method"] = "deterministic_grounded_v0"
+    metadata["brief_generation_method"] = "deterministic_grounded_v1"
     metadata["brief_substantive_source_count"] = brief_payload["metadata"]["substantive_source_count"]
     client.patch(
         f"/story_clusters?id=eq.{cluster['id']}",
@@ -471,7 +613,7 @@ def insert_version_event(client: SupabaseRestClient, cluster_id: str, revision_t
                     "status": brief_payload["status"],
                     "paragraph_count": brief_payload["metadata"]["paragraph_count"],
                     "substantive_source_count": brief_payload["metadata"]["substantive_source_count"],
-                    "generation_method": "deterministic_grounded_v0",
+                    "generation_method": "deterministic_grounded_v1",
                 },
             }
         ],
@@ -512,7 +654,7 @@ def main() -> int:
                     "is_current": True,
                     "label": brief_payload["label"],
                     "title": brief_payload["title"],
-                    "generation_method": "deterministic_grounded_v0",
+                    "generation_method": "deterministic_grounded_v1",
                     "input_signature": brief_payload["input_signature"],
                     "source_snapshot": brief_payload["source_snapshot"],
                     "paragraphs": brief_payload["paragraphs"],

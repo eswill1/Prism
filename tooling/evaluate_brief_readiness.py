@@ -113,6 +113,11 @@ def main() -> int:
                     if isinstance((brief_revision or {}).get("metadata"), dict)
                     else None
                 ),
+                "stored_brief_support_strategy": (
+                    ((brief_revision or {}).get("metadata") or {}).get("support_strategy_version")
+                    if isinstance((brief_revision or {}).get("metadata"), dict)
+                    else None
+                ),
                 "articles": article_rows[:4],
             }
         )

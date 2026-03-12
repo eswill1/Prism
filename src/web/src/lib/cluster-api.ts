@@ -502,7 +502,7 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
         client
           .from('context_pack_items')
           .select(
-            'lens, rank, title_override, why_included, articles!inner(headline, original_url, canonical_url, outlets(canonical_name))',
+            'lens, rank, title_override, why_included, articles!inner(headline, original_url, canonical_url, metadata, outlets(canonical_name))',
           )
           .eq('cluster_id', clusterRow.id)
           .order('rank', { ascending: true }),
@@ -575,6 +575,10 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
         accessTier: inferSourceAccessTier({
           outlet: item.articles?.outlets?.canonical_name,
           url: item.articles?.original_url || item.articles?.canonical_url,
+          signal:
+            typeof articleMetadata.access_signal === 'string'
+              ? articleMetadata.access_signal
+              : undefined,
         }),
         feedSummary:
           typeof articleMetadata.feed_summary === 'string' ? articleMetadata.feed_summary : undefined,
@@ -596,12 +600,14 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
           headline?: string | null
           original_url?: string | null
           canonical_url?: string | null
+          metadata?: JsonObject | null
           outlets?: { canonical_name?: string | null } | null
         } | null
       }> | null) ?? []).reduce<Array<[string, StoryCluster['contextPacks'][string]]>>(
         (accumulator, item) => {
           const lensLabel = mapLensName(item.lens)
           const existing = accumulator.find(([label]) => label === lensLabel)
+          const contextMetadata = item.articles?.metadata || {}
           const entry = {
             outlet: item.articles?.outlets?.canonical_name || 'Unknown outlet',
             title: item.title_override || item.articles?.headline || 'Untitled article',
@@ -610,6 +616,8 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
             accessTier: inferSourceAccessTier({
               outlet: item.articles?.outlets?.canonical_name,
               url: item.articles?.original_url || item.articles?.canonical_url,
+              signal:
+                typeof contextMetadata.access_signal === 'string' ? contextMetadata.access_signal : undefined,
             }),
           }
 

@@ -60,9 +60,15 @@ export function inferSourceAccessTier(params: {
   outlet?: string | null
   url?: string | null
   domain?: string | null
+  signal?: string | null
 }): SourceAccessTier {
+  const signal = params.signal?.trim() ?? ''
   const outlet = params.outlet?.trim() ?? ''
   const domain = normalizeDomain(params.domain || params.url)
+
+  if (signal === 'open' || signal === 'likely_paywalled') {
+    return signal
+  }
 
   if (OPEN_SOURCE_LABELS.has(outlet)) {
     return 'open'
