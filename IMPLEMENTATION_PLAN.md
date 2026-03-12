@@ -1,5 +1,5 @@
 # Prism Implementation Plan
-### Version 0.8 — Updated 2026-03-12: RSS plus sitemap discovery pass
+### Version 0.9 — Updated 2026-03-12: source-breadth and sitemap quality pass
 
 ---
 
@@ -225,6 +225,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Feed ingestion adapters beyond the temporary snapshot script
 - [x] Dedicated article-enrichment worker decoupled from feed polling
 - [x] News sitemap ingestion
+- [x] Source-specific sitemap handling for Reuters and AP
 - [x] Canonical URL normalization pipeline
 - [x] Semantic candidate-retrieval scaffold for story clustering
 - [x] Candidate-retrieval evaluation harness against current heuristic clusters
@@ -241,6 +242,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Correction and version event persistence
 - [ ] Media-rights policy enforcement in the ingestion pipeline
 - [ ] Scheduled enrichment jobs beyond the temporary live snapshot
+- [x] Source-health reporting for active discovery inputs
 - [ ] Saved/followed story state backed by real persistence
 - [x] Editorial seed stories removed from connected reader surfaces instead of shipping fake source-link affordances
 
@@ -248,10 +250,12 @@ Institutional plans and saved stories matter early because they align with the b
 - Most surfaced stories arrive through automated ingestion rather than manual seeding
 - Feed polling stays fast enough to feel live because article extraction is no longer inline in the polling loop
 - Active discovery is no longer RSS-only; verified sitemap feeds can contribute to the live story graph
+- Reuters and AP now contribute through source-specific sitemap handling instead of generic sitemap parsing alone
 - Duplicate story handling is acceptable under manual QA
 - Semantic candidate retrieval meaningfully narrows cluster choices before deterministic merge rules fire
 - Canonical URL cleanup reduces story fragmentation caused by tracking parameters and alias domains
 - Sitemap-derived story shells do not surface reader-facing one-line summaries just because a title was discoverable
+- Discovery sources can be ranked by recent substantive yield instead of only by anecdotal inspection
 - Preview/staging content refreshes on a predictable cadence
 - Corrections and outlet mappings are stored, not just rendered
 - Returning users see meaningful "what changed" state on followed stories

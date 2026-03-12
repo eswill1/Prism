@@ -30,6 +30,7 @@ The system goal is maximum automation with narrow human-review points.
 - failure rule: retry with backoff, then source-health alert
 - current state: implemented inside the active discovery poller for verified sitemap sources
 - quality rule: sitemap-only items without substantive extracted text are allowed into discovery, but should not be promoted as homepage-ready story shells on title text alone
+- source-specific rule: Reuters and AP use source-specific filtering; Politico remains behind a strict allowlist because its public news sitemap is dominated by newsletters and house material
 
 #### `backfill_metadata_api`
 
@@ -178,6 +179,7 @@ The system goal is maximum automation with narrow human-review points.
 - input: fetch success rates, freshness lag, parse rates
 - output: source-health score
 - failure rule: alert only
+- current state: available locally and in staging as `npm run sources:health`
 
 ---
 

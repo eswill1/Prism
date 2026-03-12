@@ -10,12 +10,13 @@ try:
         FeedItem,
         choose_story_summary,
         cluster_items,
+        normalize_feed_fetch_url,
         summary_quality_score,
     )
     from tooling.semantic_story_candidates import build_similarity_lookup
     from tooling.url_normalization import normalize_canonical_url
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
-    from generate_temporary_live_feed import FeedItem, choose_story_summary, cluster_items, summary_quality_score
+    from generate_temporary_live_feed import FeedItem, choose_story_summary, cluster_items, normalize_feed_fetch_url, summary_quality_score
     from semantic_story_candidates import build_similarity_lookup
     from url_normalization import normalize_canonical_url
 
@@ -91,6 +92,12 @@ def main() -> int:
     normalized = normalize_canonical_url("https://example.com/story?utm_source=test&id=42#top")
     if normalized != "https://example.com/story?id=42":
         raise SystemExit(f"unexpected canonical URL normalization result: {normalized}")
+
+    sitemap_fetch_url = normalize_feed_fetch_url(
+        "https://www.reuters.com/arc/outboundfeeds/news-sitemap/?outputType=xml&from=100"
+    )
+    if sitemap_fetch_url != "https://www.reuters.com/arc/outboundfeeds/news-sitemap/?outputType=xml&from=100":
+        raise SystemExit(f"unexpected sitemap fetch normalization result: {sitemap_fetch_url}")
 
     thin_quality = summary_quality_score(
         "Markets brace for tariff shock",

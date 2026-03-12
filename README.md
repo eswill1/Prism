@@ -104,6 +104,7 @@ Core commands:
 - `npm run ingest:feeds`
 - `npm run enrich:articles`
 - `npm run brief:readiness`
+- `npm run sources:health`
 - `npm run cluster:candidates`
 
 Environment baseline:
@@ -115,11 +116,12 @@ Environment baseline:
 - `npm run ingest:feeds` polls the active RSS and sitemap feeds in Supabase, writes pending discovery rows, and refreshes the automated live story set without article-page extraction inline
 - `npm run enrich:articles` performs the slower article-page extraction pass for recent linked articles, upgrades Prism Brief inputs beyond feed snippets, and refreshes active story summaries after enrichment lands
 - `npm run brief:readiness` reports which active live stories are still limited to early briefs and which now have enough substantive sourcing for full Prism Briefs
+- `npm run sources:health` reports which discovery sources are contributing recent articles, substantive extraction, and active story coverage versus just generating queue noise
 - `npm run cluster:candidates` reports how well semantic candidate retrieval covers the current heuristic clusters and validates the offline regression fixtures
 - clustering now shares canonical URL normalization across ingest, sync, and evaluation so tracking parameters and alias domains do not fragment stories
 - sitemap-derived items are now demoted unless they have substantive extracted text or enough source breadth to support a reader-facing story shell
 - `PRISM_EMBEDDING_PROVIDER` currently supports `hashing`, `sentence-transformers`, and `openai`; local development should stay on `hashing` unless a real provider is configured
-- the current source upsert path activates Bloomberg and FT sitemap discovery in addition to the existing RSS-backed sources; AP, Reuters, and Politico still need source-specific handling before activation
+- the current source upsert path activates Bloomberg, FT, AP, Reuters, and Politico sitemap discovery; Reuters and AP now use source-specific filtering, while Politico remains low-yield under the current strict allowlist
 - keep the initial hosted path aligned to `Vercel + Supabase + Upstash + GitHub Actions`
 - keep local development aligned to [LOCAL_DEVELOPMENT_MODEL.md](./LOCAL_DEVELOPMENT_MODEL.md)
 - when you create the Vercel project, set the root directory to `src/web`
