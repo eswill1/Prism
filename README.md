@@ -10,6 +10,8 @@ Current build priority:
 - prove the core loop before broadening the product surface
 - improve source-grounded Prism Brief quality by separating fast feed polling from slower article enrichment
 - move story formation toward hybrid semantic clustering while keeping deterministic merge guardrails
+- expand mature multi-source briefs beyond minimum viable summaries
+- add paywall-aware alternate-source matching so thin or inaccessible lead sources do not dead-end the reader
 
 Prism's core loop is:
 

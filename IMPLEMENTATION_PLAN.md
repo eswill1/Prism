@@ -284,6 +284,11 @@ Institutional plans and saved stories matter early because they align with the b
 - [ ] Payment and account workflows
 - [ ] Fly.io migration for always-on API or worker workloads
 
+#### Immediate next branch:
+- [ ] Add brief-depth rules so mature multi-source stories target fuller multi-paragraph Prism Briefs instead of minimum viable summary text
+- [ ] Build paywall-aware alternate-source matching using existing discovery and clustering signals so inaccessible lead sources can point to credible open reporting
+- [ ] Use `sources:health` plus `brief:readiness` as the tuning loop for this branch, with the explicit goal of raising full-brief-ready story count without lowering source quality
+
 #### Success metrics:
 - Readers use alternate lenses and Context Packs repeatedly
 - Methodology and correction surfaces are visible enough to build trust
