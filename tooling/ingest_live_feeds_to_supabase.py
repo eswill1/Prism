@@ -70,6 +70,8 @@ LOW_VALUE_PATTERNS: list[tuple[str, int]] = [
 ]
 
 HIGH_VALUE_TOPICS = {"US Politics", "World", "Business", "Technology", "Climate and Infrastructure", "Weather"}
+MIN_CONFIDENT_LEAD_QUALITY = 6
+MIN_CONFIDENT_OPEN_ALTERNATE_QUALITY = 7
 
 
 def infer_access_tier(article: dict[str, Any]) -> str:
@@ -106,6 +108,9 @@ def choose_story_source_options(articles: list[dict[str, Any]]) -> dict[str, Any
 
     ranked = sorted(articles, key=source_read_quality, reverse=True)
     lead = ranked[0]
+    lead_quality_score = source_read_quality(lead)
+    lead_quality_confident = lead_quality_score >= MIN_CONFIDENT_LEAD_QUALITY
+
     open_alternate = next(
         (
             article
@@ -114,17 +119,39 @@ def choose_story_source_options(articles: list[dict[str, Any]]) -> dict[str, Any
         ),
         None,
     )
+    open_alternate_quality_score = source_read_quality(open_alternate) if open_alternate else None
+    open_alternate_quality_confident = bool(
+        open_alternate and open_alternate_quality_score is not None and open_alternate_quality_score >= MIN_CONFIDENT_OPEN_ALTERNATE_QUALITY
+    )
+    if not open_alternate_quality_confident:
+        open_alternate = None
+        open_alternate_quality_score = None
 
     return {
         "lead_outlet": lead.get("outlet"),
         "lead_url": lead.get("url"),
         "lead_access_tier": lead.get("access_tier"),
-        "lead_quality_score": source_read_quality(lead),
+        "lead_quality_score": lead_quality_score,
+        "lead_quality_confident": lead_quality_confident,
         "open_alternate_outlet": open_alternate.get("outlet") if open_alternate else None,
         "open_alternate_url": open_alternate.get("url") if open_alternate else None,
-        "open_alternate_quality_score": source_read_quality(open_alternate) if open_alternate else None,
-        "open_alternate_available": bool(open_alternate),
+        "open_alternate_quality_score": open_alternate_quality_score,
+        "open_alternate_quality_confident": open_alternate_quality_confident,
+        "open_alternate_available": bool(open_alternate and open_alternate_quality_confident),
     }
+
+
+def source_options_key_fact(source_options: dict[str, Any]) -> str:
+    if source_options.get("lead_access_tier") == "likely_paywalled" and source_options.get("open_alternate_available"):
+        return f"Prism found an open alternate read from {source_options['open_alternate_outlet']} to pair with the story."
+
+    if source_options.get("lead_access_tier") == "open" and source_options.get("lead_quality_confident"):
+        return "The strongest available source read is already open."
+
+    if not source_options.get("lead_quality_confident"):
+        return "Linked source reads are still thin, so Prism is waiting for a stronger baseline before treating this as a reliable source stack."
+
+    return "Some linked reporting may be gated, so Prism is watching for stronger open alternates."
 
 
 def item_quality_score(item: FeedItem) -> int:
@@ -392,11 +419,7 @@ def build_story_from_cluster(
                 else "The comparison set is still thin, so this story may move quickly as additional publishers enter the frame."
             ),
             (
-                f"Prism found an open alternate read from {source_options['open_alternate_outlet']} to pair with the story."
-                if source_options.get("lead_access_tier") == "likely_paywalled" and source_options.get("open_alternate_available")
-                else "The strongest available source read is already open."
-                if source_options.get("lead_access_tier") == "open"
-                else "Some linked reporting may be gated, so Prism is watching for stronger open alternates."
+                source_options_key_fact(source_options)
             ),
         ],
         "change_timeline": timeline,

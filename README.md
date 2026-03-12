@@ -131,6 +131,7 @@ Environment baseline:
 - `npm run sources:health` reports which discovery sources are contributing recent articles, substantive extraction, and active story coverage versus just generating queue noise
 - `npm run sources:health` now also shows open vs likely-paywalled article volume and highlights thin paywalled sources that still need better fallback handling
 - enrichment now persists article-level access signals so the reader layer and the brief generator can distinguish open reads from likely paywalled ones using article evidence, not outlet lists alone
+- active story metadata now only advertises lead-source confidence and open alternates when those reads clear a minimum quality floor; Prism does not surface weak alternates just because they are open
 - `npm run cluster:candidates` reports how well semantic candidate retrieval covers the current heuristic clusters and validates the offline regression fixtures
 - clustering now shares canonical URL normalization across ingest, sync, and evaluation so tracking parameters and alias domains do not fragment stories
 - sitemap-derived items are now demoted unless they have substantive extracted text or enough source breadth to support a reader-facing story shell
