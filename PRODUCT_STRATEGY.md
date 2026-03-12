@@ -67,7 +67,7 @@ The correct order is:
 
 That is the clearest practical distinction between Prism and products that mainly optimize for cross-source comparison.
 
-To make that credible, Prism Briefs cannot be built from thin feed snippets alone. The product needs extracted article text, explicit early-brief rules for one-source stories, and source-grounded synthesis once a story has real breadth.
+To make that credible, Prism Briefs cannot be built from thin feed snippets alone. The product needs extracted article text, explicit early-brief rules for one-source stories, source-grounded synthesis once a story has real breadth, and a way to surface credible open alternates when the strongest source is paywalled or too thin to carry the reader experience by itself.
 
 ---
 

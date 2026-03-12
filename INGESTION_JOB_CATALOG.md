@@ -65,6 +65,7 @@ The system goal is maximum automation with narrow human-review points.
 - output: lede, first paragraphs, named entities, extracted-body quality markers on `articles`
 - follow-on effect: refresh active `story_clusters.summary` so reader-facing story decks improve after enrichment rather than staying stuck on ingest-time snippets
 - failure rule: mark discovery row failed with retry cooldown; do not block feed polling
+- future follow-up: longer Prism Brief generation should consume these richer article bodies instead of settling for one-paragraph summaries when the source set is mature
 
 #### `classify_media_rights`
 
@@ -90,6 +91,13 @@ The system goal is maximum automation with narrow human-review points.
 - input: recent article corpus
 - output: relation records between source variants
 - failure rule: non-blocking
+
+#### `find_open_reporting_alternates`
+
+- cadence: queue-driven after article ingest for paywalled or thin-source stories
+- input: canonical URL, title, named entities, active story cluster
+- output: alternate linked article candidates with lower access friction
+- failure rule: keep the original story intact; do not substitute weak alternates just to avoid a paywall
 
 #### `score_article_quality`
 

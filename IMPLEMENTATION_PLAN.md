@@ -272,6 +272,8 @@ Institutional plans and saved stories matter early because they align with the b
 - [ ] Framing presence group generation
 - [ ] Context Pack generation for all four launch lenses
 - [ ] Grounded multi-source Prism Brief generation backed by extracted source text rather than feed snippets
+- [ ] Prism Brief expansion so mature story pages routinely deliver fuller multi-paragraph briefs rather than minimum viable summaries
+- [ ] Paywall-aware alternate-source matching when the strongest available source is too thin or inaccessible to the reader
 - [ ] Methodology pages and version registry
 - [ ] Perspective firewall tests
 - [ ] Morning and evening briefing generation
@@ -286,6 +288,8 @@ Institutional plans and saved stories matter early because they align with the b
 - Readers use alternate lenses and Context Packs repeatedly
 - Methodology and correction surfaces are visible enough to build trust
 - Early subscribers demonstrate willingness to pay for clarity and monitoring value
+- Mature multi-source stories usually produce briefs that can stand on their own without forcing an immediate outbound click
+- Paywalled-source stories still retain usable reader value because Prism can surface a credible open alternative when available
 - No Perspective data leaks into ranking or recommendation logic
 
 #### Team: 2–4 engineers, 1 data/ML engineer, 1 designer
