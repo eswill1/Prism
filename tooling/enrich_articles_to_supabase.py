@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -41,6 +42,47 @@ OPEN_ACCESS_DOMAINS = (
     "thehill.com",
 )
 
+STOPWORD_TOKENS = {
+    "about",
+    "after",
+    "again",
+    "amid",
+    "around",
+    "because",
+    "before",
+    "being",
+    "between",
+    "could",
+    "despite",
+    "during",
+    "first",
+    "from",
+    "have",
+    "into",
+    "its",
+    "just",
+    "like",
+    "more",
+    "most",
+    "over",
+    "says",
+    "saying",
+    "than",
+    "that",
+    "their",
+    "them",
+    "there",
+    "these",
+    "they",
+    "this",
+    "those",
+    "through",
+    "today",
+    "under",
+    "while",
+    "with",
+}
+
 
 def parse_timestamp(value: str | None) -> datetime | None:
     if not value:
@@ -53,7 +95,7 @@ def parse_timestamp(value: str | None) -> datetime | None:
 
 def fetch_recent_articles(client: SupabaseRestClient) -> list[dict[str, Any]]:
     return client.get(
-        "/articles?select=id,original_url,canonical_url,summary,body_text,preview_image_url,preview_image_status,metadata,published_at&order=published_at.desc&limit=240"
+        "/articles?select=id,headline,original_url,canonical_url,summary,body_text,preview_image_url,preview_image_status,metadata,published_at&order=published_at.desc&limit=240"
     ) or []
 
 
@@ -116,12 +158,12 @@ def should_enrich(article: dict[str, Any], discovery: dict[str, Any] | None) -> 
     extraction_quality = metadata.get("extraction_quality") if isinstance(metadata, dict) else None
     body_text = article.get("body_text")
 
-    if extraction_quality == "article_body" and isinstance(body_text, str) and body_text.strip():
+    if extraction_quality == "article_body" and isinstance(body_text, str) and body_text.strip() and not current_article_mismatch(article):
         return False
 
     if discovery:
         status = discovery.get("fetch_status")
-        if status == "fetched" and isinstance(body_text, str) and body_text.strip():
+        if status == "fetched" and isinstance(body_text, str) and body_text.strip() and not current_article_mismatch(article):
             return False
 
         if status == "failed":
@@ -141,6 +183,76 @@ def fallback_summary_for_article(article: dict[str, Any]) -> str:
 
     summary = article.get("summary")
     return summary if isinstance(summary, str) else ""
+
+
+def normalize_matching_text(value: str | None) -> str:
+    return " ".join((value or "").lower().replace("u.s.", "us").replace("u.s", "us").split())
+
+
+def first_narrative_sentences(value: str | None, count: int = 2) -> str:
+    sentences = re.findall(r"[^.!?]+[.!?]+", normalize_matching_text(value))
+    cleaned = [sentence.strip() for sentence in sentences if sentence.strip()]
+    if not cleaned:
+        return normalize_matching_text(value)
+    return " ".join(cleaned[:count]).strip()
+
+
+def comparable_tokens(value: str | None) -> set[str]:
+    tokens = set()
+    for token in re.findall(r"[a-z0-9]{4,}", normalize_matching_text(value)):
+        if token in STOPWORD_TOKENS:
+            continue
+        tokens.add(token)
+    return tokens
+
+
+def alignment_score(reference_text: str, candidate_text: str) -> float:
+    reference_tokens = comparable_tokens(reference_text)
+    candidate_tokens = comparable_tokens(candidate_text)
+    if len(reference_tokens) < 4 or len(candidate_tokens) < 4:
+        return 1.0
+    overlap = reference_tokens & candidate_tokens
+    return len(overlap) / max(1, min(len(reference_tokens), len(candidate_tokens)))
+
+
+def extraction_mismatch(article: dict[str, Any], enrichment: dict[str, Any]) -> bool:
+    metadata = article.get("metadata") if isinstance(article.get("metadata"), dict) else {}
+    reference_text = " ".join(
+        filter(
+            None,
+            [
+                article.get("headline"),
+                metadata.get("feed_summary") if isinstance(metadata, dict) else None,
+            ],
+        )
+    )
+    candidate_text = first_narrative_sentences(
+        " ".join(filter(None, [enrichment.get("lede"), enrichment.get("body_preview")])),
+        2,
+    )
+    if not candidate_text.strip():
+        return False
+    return alignment_score(reference_text, candidate_text) < 0.16
+
+
+def current_article_mismatch(article: dict[str, Any]) -> bool:
+    metadata = article.get("metadata") if isinstance(article.get("metadata"), dict) else {}
+    reference_text = " ".join(
+        filter(
+            None,
+            [
+                article.get("headline"),
+                metadata.get("feed_summary") if isinstance(metadata, dict) else None,
+            ],
+        )
+    )
+    candidate_text = first_narrative_sentences(
+        article.get("body_text") or article.get("summary"),
+        2,
+    )
+    if not reference_text.strip() or not candidate_text.strip():
+        return False
+    return alignment_score(reference_text, candidate_text) < 0.16
 
 
 def patch_discovery_row(client: SupabaseRestClient, discovery_id: str, values: dict[str, Any]) -> None:
@@ -325,6 +437,10 @@ def merge_article_metadata(article: dict[str, Any], enrichment: dict[str, Any], 
     metadata["access_signal"] = enrichment.get("access_signal") or metadata.get("access_signal") or "unknown"
     metadata["enrichment_last_attempted_at"] = attempted_at
     metadata["enrichment_worker_version"] = "0.2.0"
+    if enrichment.get("body_mismatch_detected"):
+        metadata["body_mismatch_detected"] = True
+    else:
+        metadata.pop("body_mismatch_detected", None)
     return metadata
 
 
@@ -350,9 +466,17 @@ def main() -> int:
         try:
             fallback_summary = fallback_summary_for_article(article)
             enrichment = fetch_article_enrichment(url, fallback_summary)
+            mismatch_detected = extraction_mismatch(article, enrichment)
             summary = clean_summary_snippet(str(enrichment.get("lede", "")) or fallback_summary, 320)
             body_preview = str(enrichment.get("body_preview", "") or "").strip()
             extraction_quality = str(enrichment.get("extraction_quality", "rss_only"))
+
+            if mismatch_detected:
+                enrichment["body_mismatch_detected"] = True
+                summary = clean_summary_snippet(fallback_summary, 320) or article.get("summary") or ""
+                body_preview = ""
+                extraction_quality = "rss_only"
+                enrichment["extraction_quality"] = extraction_quality
 
             metadata = merge_article_metadata(article, enrichment, attempted_at)
             patch_payload = {

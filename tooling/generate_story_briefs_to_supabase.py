@@ -71,6 +71,47 @@ GENERIC_FOCUS_TOKENS = {
     "updates",
 }
 
+STOPWORD_TOKENS = {
+    "about",
+    "after",
+    "again",
+    "amid",
+    "around",
+    "because",
+    "before",
+    "being",
+    "between",
+    "could",
+    "despite",
+    "during",
+    "first",
+    "from",
+    "have",
+    "into",
+    "its",
+    "just",
+    "like",
+    "more",
+    "most",
+    "over",
+    "says",
+    "saying",
+    "than",
+    "that",
+    "their",
+    "them",
+    "there",
+    "these",
+    "they",
+    "this",
+    "those",
+    "through",
+    "today",
+    "under",
+    "while",
+    "with",
+}
+
 
 def normalize_whitespace(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
@@ -124,6 +165,73 @@ def sentence_similarity(left: str, right: str) -> float:
     return overlap / max(len(left_tokens), len(right_tokens))
 
 
+def comparable_tokens(value: str) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]{4,}", normalize_whitespace(value).lower().replace("u.s.", "us").replace("u.s", "us"))
+        if token not in STOPWORD_TOKENS
+    }
+
+
+def alignment_score(reference: str, candidate: str) -> float:
+    reference_tokens = comparable_tokens(reference)
+    candidate_tokens = comparable_tokens(candidate)
+    if len(reference_tokens) < 4 or len(candidate_tokens) < 4:
+        return 1.0
+    overlap = reference_tokens & candidate_tokens
+    return len(overlap) / max(1, min(len(reference_tokens), len(candidate_tokens)))
+
+
+def has_body_mismatch(article: dict[str, Any]) -> bool:
+    metadata = article.get("metadata") or {}
+    if isinstance(metadata, dict) and metadata.get("body_mismatch_detected") is True:
+        return True
+
+    reference_text = " ".join(
+        filter(
+            None,
+            [
+                article.get("headline") or "",
+                (metadata.get("feed_summary") if isinstance(metadata, dict) else "") or "",
+            ],
+        )
+    )
+    candidate_text = first_narrative_sentences(
+        str(article.get("body_text") or article.get("summary") or ""),
+        2,
+    )
+    if not reference_text.strip() or not candidate_text.strip():
+        return False
+    return alignment_score(reference_text, candidate_text) < 0.16
+
+
+def detail_text_for_article(article: dict[str, Any]) -> str:
+    body_text = str(article.get("body_text") or "").strip()
+    if not body_text:
+        return ""
+
+    if not has_body_mismatch(article):
+        return ensure_period(later_narrative_sentences(body_text, skip_count=2, sentence_count=2))
+
+    metadata = article.get("metadata") or {}
+    reference_text = " ".join(
+        filter(
+            None,
+            [
+                article.get("headline") or "",
+                (metadata.get("feed_summary") if isinstance(metadata, dict) else "") or "",
+            ],
+        )
+    )
+    sentences = [segment.strip() for segment in re.findall(r"[^.!?]+[.!?]+", normalize_whitespace(body_text)) if segment.strip()]
+    aligned = [
+        sentence
+        for sentence in sentences[2:]
+        if len(sentence) >= 60 and alignment_score(reference_text, sentence) >= 0.12
+    ]
+    return ensure_period(" ".join(aligned[:2])) if aligned else ""
+
+
 def first_narrative_sentences(text: str, sentence_count: int) -> str:
     cleaned = normalize_whitespace(text)
     sentences = [segment.strip() for segment in re.findall(r"[^.!?]+[.!?]+", cleaned) if segment.strip()]
@@ -166,17 +274,19 @@ def infer_access_tier(outlet: str, signal: str | None = None) -> str:
 
 
 def substantive_text_for_article(article: dict[str, Any]) -> str:
+    metadata = article.get("metadata") or {}
+    feed_summary = str((metadata or {}).get("feed_summary") or "").strip()
+    mismatch = has_body_mismatch(article)
     body_text = str(article.get("body_text") or "").strip()
-    if body_text:
+    if body_text and not mismatch:
         body_candidate = first_narrative_sentences(body_text, 3)
         if len(body_candidate) >= 120:
             return body_candidate
 
     summary = str(article.get("summary") or "").strip()
-    if summary:
+    if summary and (not mismatch or not feed_summary):
         return normalize_whitespace(summary)
 
-    feed_summary = str((article.get("metadata") or {}).get("feed_summary") or "").strip()
     if feed_summary:
         return normalize_whitespace(feed_summary)
 
@@ -187,7 +297,7 @@ def is_substantive_article(article: dict[str, Any]) -> bool:
     metadata = article.get("metadata") or {}
     extraction_quality = metadata.get("extraction_quality") if isinstance(metadata, dict) else None
     body_text = str(article.get("body_text") or "").strip()
-    if extraction_quality == "article_body" and len(body_text) >= 180:
+    if extraction_quality == "article_body" and len(body_text) >= 180 and not has_body_mismatch(article):
         return True
     return len(substantive_text_for_article(article)) >= 110
 
@@ -258,7 +368,7 @@ def build_brief_sources(cluster: dict[str, Any]) -> list[dict[str, Any]]:
                 "framing": relation.get("framing_group") or "center",
                 "snippet": ensure_period(snippet),
                 "focus": article_focus(article),
-                "detail": ensure_period(later_narrative_sentences(str(article.get("body_text") or ""), skip_count=2, sentence_count=2)),
+                "detail": detail_text_for_article(article),
                 "extraction_quality": metadata.get("extraction_quality") if isinstance(metadata, dict) else None,
                 "access_tier": infer_access_tier(
                     outlet,
