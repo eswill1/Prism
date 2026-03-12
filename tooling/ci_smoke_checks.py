@@ -45,6 +45,7 @@ def build_item(
         body_preview="",
         named_entities=[],
         extraction_quality="rss_only",
+        access_signal="open",
         image=None,
         tokens=tokens,
         event_tags=event_tags,
