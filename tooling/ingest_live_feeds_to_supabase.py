@@ -9,7 +9,13 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from generate_temporary_live_feed import FeedItem, build_cluster_payload, cluster_items, parse_feed
+from generate_temporary_live_feed import (
+    FeedItem,
+    build_cluster_payload,
+    cluster_items,
+    parse_feed,
+    summary_quality_score,
+)
 from sync_story_content import (
     REST_BASE,
     SUPABASE_SERVICE_ROLE_KEY,
@@ -78,8 +84,13 @@ def item_quality_score(item: FeedItem) -> int:
         if re.search(pattern, haystack):
             score -= points
 
-    if len(item.summary) >= 120:
-        score += 1
+    content_score = summary_quality_score(
+        item.title,
+        item.summary,
+        extraction_quality=item.extraction_quality,
+        body_text=item.body_preview,
+    )
+    score += max(-8, min(8, content_score))
 
     return score
 
@@ -113,15 +124,24 @@ def story_priority_score(cluster: dict[str, Any]) -> int:
     topic = infer_desk_label(cluster["title"], cluster["dek"])
     sources = len(cluster["sources"])
     article_count = int(cluster["article_count"])
+    summary_quality = int(cluster.get("summary_quality_score") or 0)
+    substantive_source_count = int(cluster.get("substantive_source_count") or 0)
     haystack = f"{cluster['title']} {cluster['dek']}".lower()
 
     score = sources * 12 + article_count * 4
     score += 10 if topic in HIGH_VALUE_TOPICS else -10
+    score += max(-10, min(12, summary_quality))
+    score += substantive_source_count * 6
 
     if sources >= 3:
         score += 8
     elif sources == 1:
         score -= 8
+
+    if substantive_source_count == 0:
+        score -= 8
+    elif substantive_source_count == 1:
+        score -= 2
 
     for pattern, points in PUBLIC_INTEREST_PATTERNS:
         if re.search(pattern, haystack):
@@ -134,9 +154,9 @@ def story_priority_score(cluster: dict[str, Any]) -> int:
     return score
 
 
-def fetch_active_rss_feeds(client: SupabaseRestClient) -> list[dict[str, Any]]:
+def fetch_active_discovery_feeds(client: SupabaseRestClient) -> list[dict[str, Any]]:
     rows = client.get(
-        "/source_feeds?select=id,feed_type,feed_url,poll_interval_seconds,consecutive_failures,source_registry_id,source_registry(source_name,primary_domain,ingestion_status,is_active)&is_active=eq.true&feed_type=eq.rss&limit=100"
+        "/source_feeds?select=id,feed_type,feed_url,poll_interval_seconds,consecutive_failures,source_registry_id,source_registry(source_name,primary_domain,ingestion_status,is_active)&is_active=eq.true&limit=150"
     ) or []
 
     active = []
@@ -146,9 +166,12 @@ def fetch_active_rss_feeds(client: SupabaseRestClient) -> list[dict[str, Any]]:
             continue
         if registry.get("ingestion_status") not in ("active", "onboarding"):
             continue
+        if row.get("feed_type") not in {"rss", "atom", "news_sitemap", "sitemap"}:
+            continue
         active.append(
             {
                 "feed_id": row["id"],
+                "feed_type": row["feed_type"],
                 "feed_url": row["feed_url"],
                 "source": registry["source_name"],
                 "primary_domain": registry["primary_domain"],
@@ -285,7 +308,11 @@ def build_story_from_cluster(
         "hero_credit": cluster.get("hero_credit") or "Publisher preview image",
         "hero_rights_class": "pointer_metadata",
         "outlet_count": len(unique_sources),
-        "reliability_range": "Mixed source set" if len(unique_sources) >= 3 else "Early source set",
+        "reliability_range": (
+            "Mixed source set"
+            if cluster.get("substantive_source_count", 0) >= 2 or len(unique_sources) >= 3
+            else "Early source set"
+        ),
         "coverage_counts": coverage_counts,
         "key_facts": [
             (
@@ -320,6 +347,8 @@ def build_story_from_cluster(
             "display_status": "Live intake",
             "story_origin": "automated_feed_ingestion",
             "source_count": len(unique_sources),
+            "substantive_source_count": int(cluster.get("substantive_source_count") or 0),
+            "summary_quality_score": int(cluster.get("summary_quality_score") or 0),
             "quality_score": priority_score,
             "homepage_eligible": homepage_eligible,
             "sync_source": "tooling/ingest_live_feeds_to_supabase.py",
@@ -343,7 +372,7 @@ def cleanup_stale_live_clusters(client: SupabaseRestClient, current_slugs: set[s
 
 def main() -> int:
     client = SupabaseRestClient(REST_BASE, SUPABASE_SERVICE_ROLE_KEY)
-    feeds = fetch_active_rss_feeds(client)
+    feeds = fetch_active_discovery_feeds(client)
     feed_map = {feed["feed_url"]: feed for feed in feeds}
     all_items: list[FeedItem] = []
     feed_errors: list[dict[str, str]] = []
@@ -352,7 +381,7 @@ def main() -> int:
         now = datetime.now(timezone.utc).isoformat()
         try:
             parsed = parse_feed(
-                {"source": feed["source"], "feed_url": feed["feed_url"]},
+                {"source": feed["source"], "feed_url": feed["feed_url"], "feed_type": feed["feed_type"]},
                 enrich_articles=False,
             )
             all_items.extend(parsed)
@@ -406,7 +435,13 @@ def main() -> int:
         payload = build_cluster_payload(len(ranked_clusters) + 1, cluster)
         priority = story_priority_score(payload)
         source_count = len(payload["sources"])
-        homepage_eligible = priority >= 18 and source_count >= 2
+        substantive_source_count = int(payload.get("substantive_source_count") or 0)
+        summary_quality = int(payload.get("summary_quality_score") or 0)
+        homepage_eligible = (
+            priority >= 18
+            and source_count >= 2
+            and (substantive_source_count >= 2 or summary_quality >= 8)
+        )
         ranked_clusters.append((priority, homepage_eligible, payload))
 
     ranked_clusters.sort(

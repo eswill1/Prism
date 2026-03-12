@@ -9,6 +9,44 @@ from sync_story_content import REST_BASE, SUPABASE_SERVICE_ROLE_KEY, SupabaseRes
 
 SOURCE_DEFINITIONS = [
     {
+        "canonical_name": "Bloomberg",
+        "domain": "bloomberg.com",
+        "country_code": "US",
+        "language_code": "en",
+        "outlet_type": "publication",
+        "launch_tier": "launch_core",
+        "ingestion_status": "active",
+        "preferred_discovery_method": "news_sitemap",
+        "poll_interval_seconds": 600,
+        "notes": "Verified Bloomberg latest news sitemap used to improve business and markets overlap.",
+        "feeds": [
+            {
+                "feed_type": "news_sitemap",
+                "feed_url": "https://www.bloomberg.com/sitemaps/news/latest.xml",
+                "poll_interval_seconds": 600,
+            }
+        ],
+    },
+    {
+        "canonical_name": "Financial Times",
+        "domain": "ft.com",
+        "country_code": "GB",
+        "language_code": "en",
+        "outlet_type": "publication",
+        "launch_tier": "launch_core",
+        "ingestion_status": "active",
+        "preferred_discovery_method": "sitemap",
+        "poll_interval_seconds": 900,
+        "notes": "Verified FT sitemap index used to widen international business and geopolitical coverage.",
+        "feeds": [
+            {
+                "feed_type": "sitemap",
+                "feed_url": "https://www.ft.com/sitemaps/index.xml",
+                "poll_interval_seconds": 900,
+            }
+        ],
+    },
+    {
         "canonical_name": "NBC News",
         "domain": "nbcnews.com",
         "country_code": "US",

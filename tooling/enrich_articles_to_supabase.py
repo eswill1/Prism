@@ -8,11 +8,15 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib import parse
 
-from generate_temporary_live_feed import clean_summary_snippet, fetch_article_enrichment
+from generate_temporary_live_feed import (
+    choose_story_summary,
+    clean_summary_snippet,
+    fetch_article_enrichment,
+)
 from sync_story_content import REST_BASE, SUPABASE_SERVICE_ROLE_KEY, SupabaseRestClient
 
 
-MAX_ARTICLES_PER_RUN = 12
+MAX_ARTICLES_PER_RUN = 24
 FAILED_RETRY_MINUTES = 30
 
 
@@ -114,6 +118,69 @@ def patch_article_row(client: SupabaseRestClient, article_id: str, values: dict[
     )
 
 
+def refresh_story_cluster_summary(client: SupabaseRestClient, story_slug: str) -> bool:
+    encoded_slug = parse.quote(story_slug, safe="")
+    rows = client.get(
+        f"/story_clusters?select=id,slug,canonical_headline,outlet_count,metadata,cluster_articles!inner(rank_in_cluster,articles!inner(headline,summary,body_text,metadata,site_name))&slug=eq.{encoded_slug}&limit=1"
+    ) or []
+    if not rows:
+        return False
+
+    row = rows[0]
+    relation_rows = row.get("cluster_articles") or []
+    ordered_relations = sorted(
+        relation_rows,
+        key=lambda item: (
+            item.get("rank_in_cluster") if isinstance(item, dict) else 999,
+        ),
+    )
+
+    articles: list[dict[str, Any]] = []
+    sources: list[str] = []
+    for relation in ordered_relations:
+        article = relation.get("articles") if isinstance(relation, dict) else None
+        if not isinstance(article, dict):
+            continue
+        metadata = article.get("metadata") if isinstance(article.get("metadata"), dict) else {}
+        site_name = article.get("site_name") or ""
+        articles.append(
+            {
+                "source": site_name,
+                "site_name": site_name,
+                "title": article.get("headline") or row.get("canonical_headline") or "",
+                "summary": article.get("summary") or "",
+                "feed_summary": metadata.get("feed_summary") or article.get("summary") or "",
+                "lede": article.get("summary") or metadata.get("feed_summary") or "",
+                "body_preview": article.get("body_text") or "",
+                "body_text": article.get("body_text") or "",
+                "extraction_quality": metadata.get("extraction_quality") or "rss_only",
+            }
+        )
+        if site_name:
+            sources.append(site_name)
+
+    if not articles:
+        return False
+
+    headline = row.get("canonical_headline") or story_slug.replace("-", " ").title()
+    summary, summary_quality, substantive_source_count = choose_story_summary(articles, headline, sources)
+    metadata = dict(row.get("metadata") or {})
+    outlet_count = int(row.get("outlet_count") or 0)
+    metadata["summary_quality_score"] = summary_quality
+    metadata["substantive_source_count"] = substantive_source_count
+    metadata["homepage_eligible"] = outlet_count >= 2 and (
+        substantive_source_count >= 2 or summary_quality >= 8
+    )
+    metadata["summary_refreshed_at"] = datetime.now(timezone.utc).isoformat()
+
+    client.patch(
+        f"/story_clusters?id=eq.{row['id']}",
+        {"summary": summary, "metadata": metadata},
+        prefer="return=minimal",
+    )
+    return True
+
+
 def candidate_articles(client: SupabaseRestClient) -> list[tuple[dict[str, Any], dict[str, Any] | None]]:
     discoveries = fetch_discovery_status(client)
     active_story_slugs = fetch_active_story_slugs(client)
@@ -179,11 +246,17 @@ def main() -> int:
     enriched = 0
     failed = 0
     skipped = 0
+    refreshed_clusters = 0
+    touched_story_slugs: set[str] = set()
 
     for article, discovery in candidates:
         attempted += 1
         url = article["original_url"]
         attempted_at = datetime.now(timezone.utc).isoformat()
+        metadata = article.get("metadata") if isinstance(article.get("metadata"), dict) else {}
+        story_slug = metadata.get("story_slug") if isinstance(metadata, dict) else None
+        if isinstance(story_slug, str) and story_slug:
+            touched_story_slugs.add(story_slug)
 
         try:
             fallback_summary = fallback_summary_for_article(article)
@@ -233,6 +306,10 @@ def main() -> int:
                 )
         time.sleep(0.2)
 
+    for story_slug in sorted(touched_story_slugs):
+        if refresh_story_cluster_summary(client, story_slug):
+            refreshed_clusters += 1
+
     print(
         json.dumps(
             {
@@ -241,6 +318,7 @@ def main() -> int:
                 "enriched": enriched,
                 "rss_only_fallbacks": skipped,
                 "failed": failed,
+                "refreshed_clusters": refreshed_clusters,
             },
             indent=2,
         )

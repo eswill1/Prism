@@ -40,6 +40,8 @@ FEEDS = [
     {"source": "PBS NewsHour", "feed_url": "https://www.pbs.org/newshour/feeds/rss/headlines"},
     {"source": "WSJ World", "feed_url": "https://feeds.a.dj.com/rss/RSSWorldNews.xml"},
 ]
+SITEMAP_CHILD_LIMIT = 6
+SITEMAP_URL_LIMIT = 20
 
 STOPWORDS = {
     "a",
@@ -237,6 +239,12 @@ def clean_summary_snippet(text: str | None, max_chars: int) -> str:
     return clamped
 
 
+def normalize_whitespace(text: str | None) -> str:
+    if not text:
+        return ""
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def parse_datetime(value: str | None) -> datetime:
     if not value:
         return datetime.now(UTC)
@@ -419,6 +427,201 @@ def extract_named_entities(text: str) -> list[str]:
     return entities
 
 
+def default_enrichment(summary: str = "") -> dict[str, object]:
+    return {
+        "image": None,
+        "lede": clean_summary_snippet(summary, 320),
+        "body_preview": "",
+        "named_entities": [],
+        "extraction_quality": "rss_only",
+    }
+
+
+def derive_title_from_url(url: str) -> str:
+    path = urlparse(url).path.strip("/")
+    if not path:
+        return ""
+    segment = path.split("/")[-1]
+    segment = re.sub(r"\.[a-z0-9]+$", "", segment, flags=re.IGNORECASE)
+    segment = re.sub(r"[-_]+", " ", segment).strip()
+    if not segment or len(segment) < 8:
+        return ""
+    words = [word for word in segment.split() if not re.fullmatch(r"\d+", word)]
+    if not words:
+        return ""
+    return " ".join(words).strip().capitalize()
+
+
+def should_use_sitemap_keywords(keywords: str, title: str) -> bool:
+    normalized_keywords = strip_html(keywords)
+    if not normalized_keywords:
+        return False
+    if normalize_matching_text(normalized_keywords) == normalize_matching_text(title):
+        return False
+    if len(normalized_keywords) < 40:
+        return False
+    if re.fullmatch(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}", normalized_keywords):
+        return False
+    return True
+
+
+def summary_looks_title_like(title: str, summary: str) -> bool:
+    normalized_title = normalize_matching_text(title)
+    normalized_summary = normalize_matching_text(summary)
+    if not normalized_summary:
+        return True
+    if normalized_summary == normalized_title:
+        return True
+    if normalized_summary in normalized_title or normalized_title in normalized_summary:
+        return True
+
+    title_tokens = set(re.findall(r"[a-z0-9]{4,}", normalized_title))
+    summary_tokens = set(re.findall(r"[a-z0-9]{4,}", normalized_summary))
+    if not summary_tokens:
+        return True
+
+    overlap = title_tokens & summary_tokens
+    overlap_ratio = len(overlap) / max(1, len(summary_tokens))
+    return overlap_ratio >= 0.85 and len(summary_tokens) <= len(title_tokens) + 2
+
+
+def first_narrative_sentences(text: str, sentence_count: int = 2) -> str:
+    sentences = re.findall(r"[^.!?]+[.!?]+", normalize_whitespace(text))
+    cleaned = [sentence.strip() for sentence in sentences if sentence.strip()]
+    if not cleaned:
+        return normalize_whitespace(text)
+    return " ".join(cleaned[:sentence_count]).strip()
+
+
+def summary_quality_score(
+    title: str,
+    summary: str,
+    *,
+    extraction_quality: str = "rss_only",
+    body_text: str = "",
+) -> int:
+    cleaned_summary = clean_summary_snippet(summary, 320)
+    cleaned_body = normalize_whitespace(body_text)
+    words = re.findall(r"[A-Za-z0-9']+", cleaned_summary)
+
+    score = 0
+    if extraction_quality == "article_body":
+        score += 6
+    elif extraction_quality == "metadata_description":
+        score += 3
+
+    if len(words) >= 18:
+        score += 5
+    elif len(words) >= 12:
+        score += 3
+    elif len(words) >= 8:
+        score += 1
+    else:
+        score -= 5
+
+    if len(cleaned_summary) >= 180:
+        score += 4
+    elif len(cleaned_summary) >= 110:
+        score += 2
+    elif len(cleaned_summary) >= 80:
+        score += 1
+    else:
+        score -= 3
+
+    if re.search(r"[.!?]$", cleaned_summary):
+        score += 1
+    if cleaned_body and len(cleaned_body) >= 240:
+        score += 2
+    if looks_clipped(cleaned_summary):
+        score -= 4
+    if summary_looks_title_like(title, cleaned_summary):
+        score -= 8
+
+    return score
+
+
+def summary_is_substantive(
+    title: str,
+    summary: str,
+    *,
+    extraction_quality: str = "rss_only",
+    body_text: str = "",
+    minimum_score: int = 6,
+) -> bool:
+    return (
+        summary_quality_score(
+            title,
+            summary,
+            extraction_quality=extraction_quality,
+            body_text=body_text,
+        )
+        >= minimum_score
+    )
+
+
+def choose_story_summary(
+    articles: list[object],
+    title: str,
+    sources: list[str],
+) -> tuple[str, int, int]:
+    best_summary = ""
+    best_score = -999
+    substantive_sources: set[str] = set()
+
+    for article in articles:
+        article_title = getattr(article, "title", None) or (article.get("title") if isinstance(article, dict) else "") or title
+        source_name = (
+            getattr(article, "source", None)
+            or (article.get("source") if isinstance(article, dict) else None)
+            or (article.get("site_name") if isinstance(article, dict) else None)
+            or (article.get("outlet") if isinstance(article, dict) else None)
+            or article_title
+        )
+        extraction_quality = (
+            getattr(article, "extraction_quality", None)
+            or (article.get("extraction_quality") if isinstance(article, dict) else None)
+            or "rss_only"
+        )
+        body_text = (
+            getattr(article, "body_preview", None)
+            or (article.get("body_preview") if isinstance(article, dict) else None)
+            or (article.get("body_text") if isinstance(article, dict) else None)
+            or ""
+        )
+        summary_candidate = (
+            getattr(article, "lede", None)
+            or (article.get("lede") if isinstance(article, dict) else None)
+            or (article.get("summary") if isinstance(article, dict) else None)
+            or (article.get("feed_summary") if isinstance(article, dict) else None)
+            or getattr(article, "summary", None)
+            or ""
+        )
+        if extraction_quality == "article_body" and body_text:
+            summary_candidate = first_narrative_sentences(body_text, sentence_count=2) or summary_candidate
+
+        cleaned_candidate = clean_summary_snippet(summary_candidate, 320)
+        score = summary_quality_score(
+            article_title,
+            cleaned_candidate,
+            extraction_quality=extraction_quality,
+            body_text=body_text,
+        )
+        if score >= 6:
+            substantive_sources.add(str(source_name))
+        if cleaned_candidate and score > best_score:
+            best_summary = cleaned_candidate
+            best_score = score
+
+    if best_summary and best_score >= 6:
+        return best_summary, best_score, len(substantive_sources)
+
+    fallback_sources = ", ".join(list(dict.fromkeys(sources))[:3]) if sources else "linked publishers"
+    fallback = (
+        f"{title.rstrip('?!.')} is drawing early coverage from {fallback_sources} as Prism waits for fuller reporting."
+    )
+    return fallback, max(best_score, 0), len(substantive_sources)
+
+
 def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, object]:
     cached = ARTICLE_FETCH_CACHE.get(url)
     if cached is not None:
@@ -480,7 +683,7 @@ def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, 
     return payload
 
 
-def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[FeedItem]:
+def parse_rss_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[FeedItem]:
     xml = fetch_text(feed["feed_url"])
     root = ET.fromstring(xml)
     namespace_map = {"media": "http://search.yahoo.com/mrss/"}
@@ -512,13 +715,7 @@ def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[F
         enrichment = (
             fetch_article_enrichment(url, summary)
             if should_enrich
-            else {
-                "image": None,
-                "lede": clean_summary_snippet(summary, 320),
-                "body_preview": "",
-                "named_entities": [],
-                "extraction_quality": "rss_only",
-            }
+            else default_enrichment(summary)
         )
         feed_summary = clean_summary_snippet(summary, 220)
         lede = clean_summary_snippet(str(enrichment.get("lede", "")) or summary, 320) or feed_summary
@@ -546,6 +743,108 @@ def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[F
         )
 
     return items
+
+
+def parse_news_sitemap(feed: dict[str, str], *, enrich_articles: bool = False) -> list[FeedItem]:
+    def parse_sitemap_url(target_url: str, *, depth: int, remaining: int) -> list[FeedItem]:
+        if remaining <= 0:
+            return []
+
+        try:
+            xml = fetch_text(target_url)
+            root = ET.fromstring(xml)
+        except (ET.ParseError, HTTPError, URLError, TimeoutError, ValueError):
+            return []
+        root_tag = root.tag.rsplit("}", 1)[-1].lower()
+
+        if root_tag == "sitemapindex":
+            child_urls = []
+            for sitemap in root.findall(".//{*}sitemap"):
+                child_url = normalize_canonical_url(strip_html(sitemap.findtext("{*}loc")))
+                if child_url:
+                    child_urls.append(child_url)
+            prioritized = sorted(
+                dict.fromkeys(child_urls),
+                key=lambda value: (
+                    0 if re.search(r"(news|latest)", value, re.IGNORECASE) else 1,
+                    value,
+                ),
+            )
+            nested_items: list[FeedItem] = []
+            for child_url in prioritized[:SITEMAP_CHILD_LIMIT]:
+                budget = remaining - len(nested_items)
+                if budget <= 0:
+                    break
+                nested_items.extend(parse_sitemap_url(child_url, depth=depth + 1, remaining=budget))
+            return nested_items
+
+        if root_tag != "urlset":
+            return []
+
+        items: list[FeedItem] = []
+        for url_node in root.findall(".//{*}url"):
+            if len(items) >= remaining:
+                break
+
+            url = normalize_canonical_url(strip_html(url_node.findtext("{*}loc")))
+            if not url:
+                continue
+
+            news_node = next((child for child in url_node if child.tag.rsplit("}", 1)[-1].lower() == "news"), None)
+            title = strip_html(news_node.findtext("{*}title")) if news_node is not None else ""
+            publication_date = (
+                news_node.findtext("{*}publication_date") if news_node is not None else ""
+            ) or url_node.findtext("{*}lastmod")
+            news_language = (news_node.findtext("{*}language") if news_node is not None else "") or ""
+            keywords = strip_html(news_node.findtext("{*}keywords")) if news_node is not None else ""
+            image = strip_html(url_node.findtext("{*}image/{*}loc")) or None
+
+            if news_language and news_language.lower() != "en":
+                continue
+
+            if not title:
+                title = derive_title_from_url(url)
+            if not title:
+                continue
+
+            keyword_summary = keywords if should_use_sitemap_keywords(keywords, title) else ""
+            summary = keyword_summary or title
+            should_enrich = enrich_articles and len(items) < ARTICLE_ENRICHMENT_LIMIT_PER_FEED and depth == 0
+            enrichment = fetch_article_enrichment(url, summary) if should_enrich else default_enrichment(summary)
+            feed_summary = clean_summary_snippet(keyword_summary or title, 220) or title
+            lede = clean_summary_snippet(str(enrichment.get("lede", "")) or keyword_summary or title, 320) or feed_summary
+            body_preview = clamp_to_word_boundary(str(enrichment.get("body_preview", "")), 1200) if enrichment.get("body_preview") else ""
+            named_entities = list(enrichment.get("named_entities", [])) or extract_named_entities(" ".join(filter(None, [title, keywords])))
+
+            items.append(
+                FeedItem(
+                    source=feed["source"],
+                    feed_url=feed["feed_url"],
+                    title=title,
+                    url=url,
+                    published_at=parse_datetime(publication_date).isoformat(),
+                    summary=lede or feed_summary,
+                    feed_summary=feed_summary,
+                    lede=lede or feed_summary,
+                    body_preview=body_preview,
+                    named_entities=named_entities,
+                    extraction_quality=str(enrichment.get("extraction_quality", "rss_only")),
+                    image=image or enrichment.get("image"),
+                    tokens=tokenize(" ".join(filter(None, [title, keyword_summary, " ".join(named_entities[:4])]))),
+                    event_tags=extract_event_tags(title, keyword_summary, str(enrichment.get("lede", ""))),
+                )
+            )
+
+        return items
+
+    return parse_sitemap_url(feed["feed_url"], depth=0, remaining=SITEMAP_URL_LIMIT)
+
+
+def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[FeedItem]:
+    feed_type = feed.get("feed_type", "rss").lower()
+    if feed_type in {"news_sitemap", "sitemap"}:
+        return parse_news_sitemap(feed, enrich_articles=enrich_articles)
+    return parse_rss_feed(feed, enrich_articles=enrich_articles)
 
 
 def cluster_match_score(
@@ -701,10 +1000,25 @@ def build_cluster_payload(
         fetch_article_enrichment(lead.url, lead.summary).get("image") if allow_article_image_fetch else None
     )
     sources = sorted({item.source for item in ordered})
-    cleaned_dek = clean_summary_snippet(lead.lede or lead.summary, 280)
-    dek = cleaned_dek or (
-        f"{lead.title.rstrip('?')} is drawing live coverage from {', '.join(sources)} as Prism tracks what changes next."
-    )
+    dek, summary_score, substantive_source_count = choose_story_summary(ordered, lead.title, sources)
+
+    primary_articles: list[FeedItem] = []
+    seen_sources: set[str] = set()
+    for item in ordered:
+        if item.source in seen_sources:
+            continue
+        seen_sources.add(item.source)
+        primary_articles.append(item)
+        if len(primary_articles) >= 5:
+            break
+
+    if len(primary_articles) < min(5, len(ordered)):
+        for item in ordered:
+            if item in primary_articles:
+                continue
+            primary_articles.append(item)
+            if len(primary_articles) >= 5:
+                break
 
     return {
         "slug": f"live-{index}-{slugify(lead.title)}",
@@ -714,6 +1028,8 @@ def build_cluster_payload(
         "latest_at": lead.published_at,
         "article_count": len(ordered),
         "sources": sources,
+        "summary_quality_score": summary_score,
+        "substantive_source_count": substantive_source_count,
         "hero_image": hero_image,
         "hero_credit": "Publisher preview image" if hero_image else "No image available",
         "articles": [
@@ -731,7 +1047,7 @@ def build_cluster_payload(
                 "image": item.image,
                 "domain": urlparse(item.url).netloc,
             }
-            for item in ordered[:5]
+            for item in primary_articles
         ],
     }
 
