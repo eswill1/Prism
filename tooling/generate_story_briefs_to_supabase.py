@@ -33,6 +33,43 @@ PLACEHOLDER_KEY_FACT = re.compile(
     r"^Prism has |^Prism only has |^The latest linked reporting came from |^The comparison set ",
     re.IGNORECASE,
 )
+GENERIC_FOCUS_TOKENS = {
+    "another",
+    "around",
+    "current",
+    "currently",
+    "detailed",
+    "development",
+    "first",
+    "general",
+    "headline",
+    "holding",
+    "linked",
+    "main",
+    "potentially",
+    "prism",
+    "report",
+    "reported",
+    "reporting",
+    "source",
+    "sources",
+    "story",
+    "strong",
+    "take",
+    "this",
+    "hold",
+    "driving",
+    "drive",
+    "driven",
+    "set",
+    "likely",
+    "emerge",
+    "persist",
+    "through",
+    "today",
+    "update",
+    "updates",
+}
 
 
 def normalize_whitespace(value: str) -> str:
@@ -48,6 +85,34 @@ def ensure_period(value: str) -> str:
 
 def strip_ending_punctuation(value: str) -> str:
     return normalize_whitespace(value).rstrip(".!?")
+
+
+def focus_fallback_for_family(family: str) -> str:
+    return {
+        "politics": "policy and political consequences",
+        "business": "prices and economic fallout",
+        "technology": "technology policy and platform rules",
+        "weather": "weather and temperature impacts",
+        "world": "international fallout",
+    }.get(family, "the main reported development")
+
+
+def clean_focus_phrase(value: str | None, family: str) -> str:
+    cleaned = strip_ending_punctuation(value or "")
+    if not cleaned:
+        return focus_fallback_for_family(family)
+
+    tokens: list[str] = []
+    for token in re.findall(r"[A-Za-zÀ-ÿ]{4,}", cleaned.lower()):
+        if token in GENERIC_FOCUS_TOKENS or token in tokens:
+            continue
+        tokens.append(token)
+
+    if not tokens:
+        return focus_fallback_for_family(family)
+    if len(tokens) == 1:
+        return tokens[0]
+    return f"{tokens[0]} and {tokens[1]}"
 
 
 def sentence_similarity(left: str, right: str) -> float:
@@ -129,25 +194,24 @@ def article_focus(article: dict[str, Any]) -> str:
         if len(cleaned) == 1:
             return cleaned[0]
 
-    haystack = " ".join(
-        filter(
-            None,
-            [
-                article.get("summary") or "",
-                (metadata.get("feed_summary") if isinstance(metadata, dict) else "") or "",
-                article.get("headline") or "",
-            ],
-        )
-    ).lower()
-    tokens = [
-        token
-        for token in re.findall(r"[a-z]{5,}", haystack)
-        if token not in {"which", "their", "there", "about", "would", "could", "these"}
-    ][:2]
-    if len(tokens) >= 2:
-        return f"{tokens[0]} and {tokens[1]}"
-    if len(tokens) == 1:
-        return tokens[0]
+    for text in (
+        article.get("headline") or "",
+        article.get("summary") or "",
+        (metadata.get("feed_summary") if isinstance(metadata, dict) else "") or "",
+    ):
+        tokens: list[str] = []
+        for token in re.findall(r"[A-Za-zÀ-ÿ]{4,}", text.lower()):
+            if token in GENERIC_FOCUS_TOKENS or token in {"which", "their", "there", "about", "would", "could", "these"}:
+                continue
+            if token not in tokens:
+                tokens.append(token)
+            if len(tokens) >= 2:
+                break
+        if len(tokens) >= 2:
+            return f"{tokens[0]} and {tokens[1]}"
+        if len(tokens) == 1:
+            return tokens[0]
+
     return "the practical stakes"
 
 
@@ -313,14 +377,8 @@ def why_it_matters_copy(cluster: dict[str, Any], family: str, sources: list[dict
     if len(facts) >= 2:
         return facts[1]
     if len(sources) >= 2:
-        return f"This matters because the reporting is already pointing beyond the immediate headline and toward {strip_ending_punctuation(sources[1]['focus'])}."
-    if sources:
-        return (
-            f"This matters because the first substantive reporting is already centering "
-            f"{strip_ending_punctuation(sources[0]['focus'])}, which suggests the stakes extend beyond the first headline."
-        )
-
-    return {
+        return f"This matters because the reporting is already pointing beyond the immediate headline and toward {clean_focus_phrase(sources[1]['focus'], family)}."
+    default_copy = {
         "politics": "This matters because the next move here could affect public policy, negotiations, or the balance of political leverage in a visible way.",
         "business": "This matters because the practical effects are likely to show up in prices, markets, or business decisions faster than in many political stories.",
         "technology": "This matters because the story is really about who sets the rules for platforms, infrastructure, or emerging technology before those rules harden.",
@@ -331,6 +389,11 @@ def why_it_matters_copy(cluster: dict[str, Any], family: str, sources: list[dict
         "This matters because the story is broad enough that reading one outlet alone is already likely to miss part of the picture.",
     )
 
+    if sources:
+        return default_copy
+
+    return default_copy
+
 
 def watch_next_copy(cluster: dict[str, Any], family: str) -> str:
     correction_events = sorted(
@@ -340,7 +403,7 @@ def watch_next_copy(cluster: dict[str, Any], family: str) -> str:
     )
     if correction_events:
         label = str(correction_events[0].get("display_summary") or "").strip()
-        if label:
+        if label and not re.match(r"^Story shell refreshed from \d+ publisher signals$", label, re.IGNORECASE):
             return f"Watch for the next turn: {ensure_period(label)}"
 
     return {
@@ -425,20 +488,26 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
         )
     else:
         if central:
-            add_paragraph(
-                (
-                    f"Right now the clearest linked reporting comes from {central['outlet']}, "
-                    f"which is focusing on {strip_ending_punctuation(central['focus'])}. "
-                    f"{central['snippet']}"
-                ),
-                central,
-            )
+            central_focus = clean_focus_phrase(central["focus"], family)
+            if sentence_similarity(central["snippet"], cluster["summary"]) < 0.72:
+                add_paragraph(
+                    f"The clearest detailed reporting so far comes from {central['outlet']}. {central['snippet']}",
+                    central,
+                )
+            else:
+                add_paragraph(
+                    (
+                        f"The clearest detailed reporting so far comes from {central['outlet']}, "
+                        "and it supports the same overall picture while adding detail beyond the first headline."
+                    ),
+                    central,
+                )
 
         if open_alternate:
             add_paragraph(
                 (
-                    f"Prism has at least one open alternate in the mix from {open_alternate['outlet']}, "
-                    f"but the coverage is still too thin to separate real disagreement from normal early framing around {strip_ending_punctuation(open_alternate['focus'])}."
+                    f"Prism has also linked an open follow-on read from {open_alternate['outlet']}. "
+                    "It broadly tracks the same story, but the source mix is still too thin to treat differences in emphasis as a meaningful split in coverage."
                 ),
                 central or open_alternate,
                 open_alternate,
@@ -446,8 +515,8 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
         else:
             add_paragraph(
                 (
-                    f"For now, the clearest through-line in the linked reporting is {strip_ending_punctuation((central or {}).get('focus') or 'the first reported development')}, "
-                    "so Prism is holding this as an early brief until another detailed report arrives."
+                    "Prism is still working with a thin source set here. "
+                    "This early brief will become more useful once another detailed report arrives and the comparison layer has more than one substantive account to work with."
                 ),
                 *(support_payload(central) if central else []),
             )
@@ -477,9 +546,9 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
 
     where_sources_agree = (
         (
-            f"Across {outlet_text(cluster)}, the shared baseline is clear: {(central or {}).get('snippet') or ensure_period(cluster['summary'])}"
-            if full_brief
-            else f"The best-supported baseline right now comes from {(central or {}).get('outlet') or 'the first linked report'}: {(central or {}).get('snippet') or ensure_period(cluster['summary'])}"
+                f"Across {outlet_text(cluster)}, the shared baseline is clear: {(central or {}).get('snippet') or ensure_period(cluster['summary'])}"
+                if full_brief
+                else f"The best-supported baseline right now comes from {(central or {}).get('outlet') or 'the first linked report'}: {(central or {}).get('snippet') or ensure_period(cluster['summary'])}"
         )
     )
     where_coverage_differs = (
@@ -491,8 +560,8 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
         if full_brief
         else (
             (
-                f"There is not enough independent reporting yet to call a real split. "
-                f"The current linked reporting is still centered on {strip_ending_punctuation((open_alternate or central or {}).get('focus') or 'the first reported development')}."
+                "It is too early to call a real split in coverage. "
+                "Prism needs at least one more detailed independent report before differences in framing become useful to compare."
             )
         )
     )
@@ -515,7 +584,7 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
     brief_payload = {
         "status": "full" if full_brief else "early",
         "label": "Prism brief" if full_brief else "Early brief",
-        "title": "The story so far" if full_brief else "What the first linked report says",
+        "title": "The story so far" if full_brief else "What the reporting says so far",
         "paragraphs": filtered_paragraphs,
         "why_it_matters": why_it_matters_copy(cluster, family, sources),
         "where_sources_agree": where_sources_agree,

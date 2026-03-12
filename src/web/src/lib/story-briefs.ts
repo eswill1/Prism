@@ -13,6 +13,43 @@ type BriefSource = {
 }
 
 const PLACEHOLDER_KEY_FACT = /^Prism has |^Prism only has |^The latest linked reporting came from |^The comparison set /i
+const GENERIC_FOCUS_TOKENS = new Set([
+  'another',
+  'around',
+  'current',
+  'currently',
+  'detailed',
+  'development',
+  'first',
+  'general',
+  'headline',
+  'holding',
+  'linked',
+  'main',
+  'potentially',
+  'prism',
+  'report',
+  'reported',
+  'reporting',
+  'source',
+  'sources',
+  'story',
+  'strong',
+  'take',
+  'this',
+  'hold',
+  'driving',
+  'drive',
+  'driven',
+  'set',
+  'likely',
+  'emerge',
+  'persist',
+  'through',
+  'today',
+  'update',
+  'updates',
+])
 
 function ensurePeriod(value: string) {
   const trimmed = value.trim()
@@ -29,6 +66,48 @@ function normalizeWhitespace(value: string) {
 
 function stripEndingPunctuation(value: string) {
   return value.trim().replace(/[.!?]+$/, '')
+}
+
+function focusFallbackForFamily(family: TopicFamily) {
+  switch (family) {
+    case 'politics':
+      return 'policy and political consequences'
+    case 'business':
+      return 'prices and economic fallout'
+    case 'technology':
+      return 'technology policy and platform rules'
+    case 'weather':
+      return 'weather and temperature impacts'
+    case 'world':
+      return 'international fallout'
+    default:
+      return 'the main reported development'
+  }
+}
+
+function cleanFocusPhrase(value: string, family: TopicFamily) {
+  const cleaned = stripEndingPunctuation(value)
+  if (!cleaned) {
+    return focusFallbackForFamily(family)
+  }
+
+  const tokens: string[] = []
+  for (const token of cleaned.toLowerCase().match(/[a-zà-ÿ]{4,}/g) || []) {
+    if (GENERIC_FOCUS_TOKENS.has(token)) {
+      continue
+    }
+    if (!tokens.includes(token)) {
+      tokens.push(token)
+    }
+  }
+
+  if (tokens.length === 0) {
+    return focusFallbackForFamily(family)
+  }
+  if (tokens.length === 1) {
+    return tokens[0]
+  }
+  return `${tokens[0]} and ${tokens[1]}`
 }
 
 function sentenceSimilarity(left: string, right: string) {
@@ -122,17 +201,26 @@ function articleFocus(article: ClusterArticle) {
     return namedEntities[0]
   }
 
-  const tokens = (article.summary || article.feedSummary || article.title)
-    .toLowerCase()
-    .match(/[a-z]{5,}/g)
-    ?.filter((value) => !['which', 'their', 'there', 'about', 'would', 'could', 'these'].includes(value))
-    .slice(0, 2)
+  for (const text of [article.title, article.summary, article.feedSummary]) {
+    if (!text) {
+      continue
+    }
+    const tokens = text
+      .toLowerCase()
+      .match(/[a-zà-ÿ]{4,}/g)
+      ?.filter(
+        (value) =>
+          !GENERIC_FOCUS_TOKENS.has(value) &&
+          !['which', 'their', 'there', 'about', 'would', 'could', 'these'].includes(value),
+      )
+      .slice(0, 2)
 
-  if (tokens && tokens.length >= 2) {
-    return `${tokens[0]} and ${tokens[1]}`
-  }
-  if (tokens && tokens.length === 1) {
-    return tokens[0]
+    if (tokens && tokens.length >= 2) {
+      return `${tokens[0]} and ${tokens[1]}`
+    }
+    if (tokens && tokens.length === 1) {
+      return tokens[0]
+    }
   }
 
   return 'the practical stakes'
@@ -257,9 +345,27 @@ function whyItMattersCopy(cluster: StoryCluster, family: TopicFamily, sources: B
   }
 
   if (sources[1]) {
-    return `This matters because the reporting is already pointing beyond the immediate headline and toward ${stripEndingPunctuation(
+    return `This matters because the reporting is already pointing beyond the immediate headline and toward ${cleanFocusPhrase(
       sources[1].focus,
+      family,
     )}.`
+  }
+
+  if (sources[0]) {
+    switch (family) {
+      case 'politics':
+        return `This matters because the next move here could affect public policy, negotiations, or the balance of political leverage in a visible way.`
+      case 'business':
+        return `This matters because the practical effects are likely to show up in prices, markets, or business decisions faster than in many political stories.`
+      case 'technology':
+        return `This matters because the story is really about who sets the rules for platforms, infrastructure, or emerging technology before those rules harden.`
+      case 'weather':
+        return `This matters because the real consequences are operational: safety, infrastructure, recovery, and the public systems people rely on every day.`
+      case 'world':
+        return `This matters because the story is already affecting how other governments, markets, or institutions are responding beyond the immediate event itself.`
+      default:
+        return `This matters because the story is broad enough that reading one outlet alone is already likely to miss part of the picture.`
+    }
   }
 
   switch (family) {
@@ -279,7 +385,7 @@ function whyItMattersCopy(cluster: StoryCluster, family: TopicFamily, sources: B
 }
 
 function watchNextCopy(cluster: StoryCluster, family: TopicFamily) {
-  if (cluster.whatChanged[0]) {
+  if (cluster.whatChanged[0] && !/^Story shell refreshed from \d+ publisher signals$/i.test(cluster.whatChanged[0])) {
     return `Watch for the next turn: ${ensurePeriod(cluster.whatChanged[0])}`
   }
 
@@ -329,7 +435,14 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
       ]
     : [
         ensurePeriod(cluster.dek),
-        sources[0] && sentenceSimilarity(sources[0].snippet, cluster.dek) < 0.72 ? sources[0].snippet : '',
+        sources[0]
+          ? sentenceSimilarity(sources[0].snippet, cluster.dek) < 0.72
+            ? `The clearest detailed reporting so far comes from ${sources[0].outlet}. ${sources[0].snippet}`
+            : `The clearest detailed reporting so far comes from ${sources[0].outlet}, and it supports the same overall picture while adding detail beyond the first headline.`
+          : '',
+        sources[1]
+          ? `Prism has also linked another read from ${sources[1].outlet}, but the source mix is still too thin to treat differences in emphasis as a meaningful split in coverage.`
+          : `Prism is still working with a thin source set here. This early brief will become more useful once another detailed report arrives and the comparison layer has more than one substantive account to work with.`,
       ]
 
   const whereSourcesAgree = fullBrief
@@ -340,11 +453,11 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
     ? divergent
       ? `The split so far is more about emphasis than the event itself. ${central?.outlet || 'One outlet'} stays closest to the core sequence, while ${divergent.outlet} gives more weight to ${divergent.focus}.`
       : `The reporting is still fairly aligned on the core sequence, but outlets are beginning to diverge in what they emphasize most.`
-    : `There is not enough independent reporting yet to cleanly separate source disagreement from ordinary single-outlet framing.`
+    : `It is too early to call a real split in coverage. Prism needs at least one more detailed independent report before differences in framing become useful to compare.`
 
   return {
     label: fullBrief ? 'Prism brief' : 'Early brief',
-    title: fullBrief ? 'The story so far' : 'What the first linked report says',
+    title: fullBrief ? 'The story so far' : 'What the reporting says so far',
     paragraphs: paragraphs.filter((paragraph, index, values) => {
       if (!paragraph.trim()) {
         return false
