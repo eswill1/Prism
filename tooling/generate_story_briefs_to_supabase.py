@@ -537,6 +537,45 @@ def watch_next_copy(cluster: dict[str, Any], family: str) -> str:
     )
 
 
+def early_brief_opening(cluster: dict[str, Any], central: dict[str, Any] | None) -> str:
+    summary = ensure_period(cluster["summary"])
+    if not central:
+        return summary
+
+    snippet = str(central.get("snippet") or "").strip()
+    detail = str(central.get("detail") or "").strip()
+    if detail and sentence_similarity(detail, cluster["summary"]) < 0.72:
+        return f"{summary} {detail}".strip()
+    if snippet and sentence_similarity(snippet, cluster["summary"]) < 0.72:
+        return f"{summary} {snippet}".strip()
+    return summary
+
+
+def early_brief_detail_followup(
+    cluster: dict[str, Any],
+    central: dict[str, Any] | None,
+    opening: str,
+) -> str:
+    if not central:
+        return ""
+
+    detail = ensure_period(str(central.get("detail") or "").strip())
+    if detail and normalize_whitespace(detail).lower() not in normalize_whitespace(opening).lower() and sentence_similarity(detail, opening) < 0.72:
+        return detail
+
+    snippet = ensure_period(str(central.get("snippet") or "").strip())
+    summary = ensure_period(cluster["summary"])
+    if (
+        snippet
+        and normalize_whitespace(snippet).lower() not in normalize_whitespace(opening).lower()
+        and sentence_similarity(snippet, summary) < 0.72
+        and sentence_similarity(snippet, opening) < 0.72
+    ):
+        return snippet
+
+    return ""
+
+
 def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
     family = topic_family_for_story(cluster["topic_label"])
     sources = build_brief_sources(cluster)
@@ -566,9 +605,8 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
-    add_paragraph(ensure_period(cluster["summary"]), *(sources[:2] or ([central] if central else [])))
-
     if full_brief:
+        add_paragraph(ensure_period(cluster["summary"]), *(sources[:2] or ([central] if central else [])))
         add_paragraph(
             (
                 f"Across {outlet_text(cluster)}, the baseline is consistent. {central['snippet']}"
@@ -606,44 +644,42 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
             *(support_payload(central, divergent) if central and divergent else support_payload(*(secondary_sources[:2] or ([central] if central else [])))),
         )
     else:
+        opening = early_brief_opening(cluster, central)
+        add_paragraph(opening, *(sources[:2] or ([central] if central else [])))
+        detail_followup = early_brief_detail_followup(cluster, central, opening)
+        if detail_followup:
+            add_paragraph(detail_followup, *(support_payload(central) if central else []))
         if central:
-            central_focus = clean_focus_phrase(central["focus"], family)
-            central_detail = str(central.get("detail") or "").strip()
-            if central_detail and (
-                cluster["summary"] in central["snippet"] or sentence_similarity(central["snippet"], cluster["summary"]) >= 0.72
-            ):
+            if open_alternate:
                 add_paragraph(
-                    f"The clearest detailed reporting so far comes from {central['outlet']}. {central_detail}",
-                    central,
-                )
-            elif sentence_similarity(central["snippet"], cluster["summary"]) < 0.72:
-                add_paragraph(
-                    f"The clearest detailed reporting so far comes from {central['outlet']}. {central['snippet']}",
-                    central,
+                    (
+                        f"Prism has also linked an open follow-on read from {open_alternate['outlet']}. "
+                        "It broadly tracks the same story, but the source mix is still too thin to treat differences in emphasis as a meaningful split in coverage."
+                    ),
+                    central or open_alternate,
+                    open_alternate,
                 )
             else:
                 add_paragraph(
                     (
-                        f"The clearest detailed reporting so far comes from {central['outlet']}, "
-                        "and it supports the same overall picture while adding detail beyond the first headline."
+                        f"Right now Prism has one detailed source on this story, from {central['outlet']}. "
+                        "That gives readers a useful first account, but not yet enough reporting to show where coverage really starts to diverge."
                     ),
-                    central,
+                    *(support_payload(central) if central else []),
                 )
-
-        if open_alternate:
+        elif open_alternate:
             add_paragraph(
                 (
                     f"Prism has also linked an open follow-on read from {open_alternate['outlet']}. "
                     "It broadly tracks the same story, but the source mix is still too thin to treat differences in emphasis as a meaningful split in coverage."
                 ),
-                central or open_alternate,
                 open_alternate,
             )
         else:
             add_paragraph(
                 (
                     "Prism is still working with a thin source set here. "
-                    "This early brief will become more useful once another detailed report arrives and the comparison layer has more than one substantive account to work with."
+                    "This is a useful first read, but it will become more complete once another detailed report arrives."
                 ),
                 *(support_payload(central) if central else []),
             )

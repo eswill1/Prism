@@ -418,6 +418,51 @@ function watchNextCopy(cluster: StoryCluster, family: TopicFamily) {
   }
 }
 
+function earlyBriefOpening(cluster: StoryCluster, central: ReturnType<typeof centralSource>) {
+  const summary = ensurePeriod(cluster.dek)
+  if (!central) {
+    return summary
+  }
+
+  const snippet = central.snippet.trim()
+  const detail = central.detail.trim()
+  if (detail && sentenceSimilarity(detail, cluster.dek) < 0.72) {
+    return `${summary} ${detail}`.trim()
+  }
+  if (snippet && sentenceSimilarity(snippet, cluster.dek) < 0.72) {
+    return `${summary} ${snippet}`.trim()
+  }
+  return summary
+}
+
+function earlyBriefDetailFollowup(
+  cluster: StoryCluster,
+  central: ReturnType<typeof centralSource>,
+  opening: string,
+) {
+  if (!central) {
+    return ''
+  }
+
+  const detail = ensurePeriod(central.detail.trim())
+  if (detail && !normalizeWhitespace(opening).toLowerCase().includes(normalizeWhitespace(detail).toLowerCase()) && sentenceSimilarity(detail, opening) < 0.72) {
+    return detail
+  }
+
+  const snippet = ensurePeriod(central.snippet.trim())
+  const summary = ensurePeriod(cluster.dek)
+  if (
+    snippet &&
+    !normalizeWhitespace(opening).toLowerCase().includes(normalizeWhitespace(snippet).toLowerCase()) &&
+    sentenceSimilarity(snippet, summary) < 0.72 &&
+    sentenceSimilarity(snippet, opening) < 0.72
+  ) {
+    return snippet
+  }
+
+  return ''
+}
+
 export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
   const family = topicFamilyForStory(cluster.topic)
   const sources = buildBriefSources(cluster)
@@ -428,6 +473,8 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
     .filter((source) => source.outlet !== central?.outlet)
     .slice(0, 3)
   const corroboratingOutlets = outletListText(secondarySources.map((source) => source.outlet))
+  const earlyOpening = earlyBriefOpening(cluster, sources[0])
+  const earlyDetailFollowup = earlyBriefDetailFollowup(cluster, sources[0], earlyOpening)
 
   const paragraphs = fullBrief
     ? [
@@ -447,18 +494,13 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
           : `The coverage is still relatively aligned on the event itself, with the main differences showing up in emphasis and downstream consequences.`,
       ]
     : [
-        ensurePeriod(cluster.dek),
-        sources[0]
-          ? sources[0].detail &&
-            (sources[0].snippet.includes(cluster.dek) || sentenceSimilarity(sources[0].snippet, cluster.dek) >= 0.72)
-            ? `The clearest detailed reporting so far comes from ${sources[0].outlet}. ${sources[0].detail}`
-            : sentenceSimilarity(sources[0].snippet, cluster.dek) < 0.72
-            ? `The clearest detailed reporting so far comes from ${sources[0].outlet}. ${sources[0].snippet}`
-            : `The clearest detailed reporting so far comes from ${sources[0].outlet}, and it supports the same overall picture while adding detail beyond the first headline.`
-          : '',
+        earlyOpening,
+        earlyDetailFollowup,
         sources[1]
           ? `Prism has also linked another read from ${sources[1].outlet}, but the source mix is still too thin to treat differences in emphasis as a meaningful split in coverage.`
-          : `Prism is still working with a thin source set here. This early brief will become more useful once another detailed report arrives and the comparison layer has more than one substantive account to work with.`,
+          : sources[0]
+            ? `Right now Prism has one detailed source on this story, from ${sources[0].outlet}. That gives readers a useful first account, but not yet enough reporting to show where coverage really starts to diverge.`
+            : `Prism is still working with a thin source set here. This is a useful first read, but it will become more complete once another detailed report arrives.`,
       ]
 
   const whereSourcesAgree = fullBrief
