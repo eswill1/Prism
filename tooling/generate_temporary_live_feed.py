@@ -711,6 +711,57 @@ def should_keep_sitemap_item(feed: dict[str, str], url: str, title: str) -> bool
     return True
 
 
+ABBREVIATION_PATTERNS = (
+    r"\bU\.S\.",
+    r"\bU\.K\.",
+    r"\bE\.U\.",
+    r"\bMr\.",
+    r"\bMrs\.",
+    r"\bMs\.",
+    r"\bDr\.",
+    r"\bSen\.",
+    r"\bRep\.",
+    r"\bGov\.",
+    r"\bGen\.",
+    r"\bLt\.",
+    r"\bCol\.",
+    r"\bSt\.",
+)
+
+
+def split_narrative_sentences(text: str) -> list[str]:
+    cleaned = normalize_whitespace(text)
+    if not cleaned:
+        return []
+
+    protected = cleaned
+    replacements: dict[str, str] = {}
+    for index, pattern in enumerate(ABBREVIATION_PATTERNS):
+        def repl(match: re.Match[str], token_index: int = index) -> str:
+            token = f"__ABBR_{token_index}_{len(replacements)}__"
+            replacements[token] = match.group(0)
+            return token
+
+        protected = re.sub(pattern, repl, protected, flags=re.IGNORECASE)
+
+    matches = re.findall(r"[^.!?]+[.!?]+", protected)
+    if not matches:
+        restored = protected
+        for token, original in replacements.items():
+            restored = restored.replace(token, original)
+        return [restored]
+
+    sentences = []
+    for segment in matches:
+        restored = segment
+        for token, original in replacements.items():
+            restored = restored.replace(token, original)
+        restored = normalize_whitespace(restored)
+        if restored:
+            sentences.append(restored)
+    return sentences
+
+
 def summary_looks_title_like(title: str, summary: str) -> bool:
     normalized_title = normalize_matching_text(title)
     normalized_summary = normalize_matching_text(summary)
@@ -732,8 +783,7 @@ def summary_looks_title_like(title: str, summary: str) -> bool:
 
 
 def first_narrative_sentences(text: str, sentence_count: int = 2) -> str:
-    sentences = re.findall(r"[^.!?]+[.!?]+", normalize_whitespace(text))
-    cleaned = [sentence.strip() for sentence in sentences if sentence.strip()]
+    cleaned = split_narrative_sentences(text)
     if not cleaned:
         return normalize_whitespace(text)
     return " ".join(cleaned[:sentence_count]).strip()

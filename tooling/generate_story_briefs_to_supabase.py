@@ -112,6 +112,23 @@ STOPWORD_TOKENS = {
     "with",
 }
 
+ABBREVIATION_PATTERNS = (
+    r"\bU\.S\.",
+    r"\bU\.K\.",
+    r"\bE\.U\.",
+    r"\bMr\.",
+    r"\bMrs\.",
+    r"\bMs\.",
+    r"\bDr\.",
+    r"\bSen\.",
+    r"\bRep\.",
+    r"\bGov\.",
+    r"\bGen\.",
+    r"\bLt\.",
+    r"\bCol\.",
+    r"\bSt\.",
+)
+
 
 def normalize_whitespace(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
@@ -182,6 +199,39 @@ def alignment_score(reference: str, candidate: str) -> float:
     return len(overlap) / max(1, min(len(reference_tokens), len(candidate_tokens)))
 
 
+def split_narrative_sentences(text: str) -> list[str]:
+    cleaned = normalize_whitespace(text)
+    if not cleaned:
+        return []
+
+    protected = cleaned
+    replacements: dict[str, str] = {}
+    for index, pattern in enumerate(ABBREVIATION_PATTERNS):
+        def repl(match: re.Match[str], token_index: int = index) -> str:
+            token = f"__ABBR_{token_index}_{len(replacements)}__"
+            replacements[token] = match.group(0)
+            return token
+
+        protected = re.sub(pattern, repl, protected, flags=re.IGNORECASE)
+
+    matches = re.findall(r"[^.!?]+[.!?]+", protected)
+    if not matches:
+        restored = protected
+        for token, original in replacements.items():
+            restored = restored.replace(token, original)
+        return [restored]
+
+    sentences = []
+    for segment in matches:
+        restored = segment
+        for token, original in replacements.items():
+            restored = restored.replace(token, original)
+        restored = normalize_whitespace(restored)
+        if restored:
+            sentences.append(restored)
+    return sentences
+
+
 def has_body_mismatch(article: dict[str, Any]) -> bool:
     metadata = article.get("metadata") or {}
     if isinstance(metadata, dict) and metadata.get("body_mismatch_detected") is True:
@@ -223,7 +273,7 @@ def detail_text_for_article(article: dict[str, Any]) -> str:
             ],
         )
     )
-    sentences = [segment.strip() for segment in re.findall(r"[^.!?]+[.!?]+", normalize_whitespace(body_text)) if segment.strip()]
+    sentences = split_narrative_sentences(body_text)
     aligned = [
         sentence
         for sentence in sentences[2:]
@@ -234,7 +284,7 @@ def detail_text_for_article(article: dict[str, Any]) -> str:
 
 def first_narrative_sentences(text: str, sentence_count: int) -> str:
     cleaned = normalize_whitespace(text)
-    sentences = [segment.strip() for segment in re.findall(r"[^.!?]+[.!?]+", cleaned) if segment.strip()]
+    sentences = split_narrative_sentences(cleaned)
     if not sentences:
         return cleaned
     return " ".join(sentences[:sentence_count]).strip()
@@ -242,7 +292,7 @@ def first_narrative_sentences(text: str, sentence_count: int) -> str:
 
 def later_narrative_sentences(text: str, *, skip_count: int, sentence_count: int) -> str:
     cleaned = normalize_whitespace(text)
-    sentences = [segment.strip() for segment in re.findall(r"[^.!?]+[.!?]+", cleaned) if segment.strip()]
+    sentences = split_narrative_sentences(cleaned)
     if len(sentences) <= skip_count:
         return ""
     return " ".join(sentences[skip_count : skip_count + sentence_count]).strip()

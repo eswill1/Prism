@@ -39,6 +39,22 @@ SCOPE_NOTES = {
     "National frame": "Centers national politics, institutions, or broad domestic effects.",
     "International frame": "Shows how the story is framed outside the immediate domestic lens.",
 }
+ABBREVIATION_PATTERNS = (
+    r"\bU\.S\.",
+    r"\bU\.K\.",
+    r"\bE\.U\.",
+    r"\bMr\.",
+    r"\bMrs\.",
+    r"\bMs\.",
+    r"\bDr\.",
+    r"\bSen\.",
+    r"\bRep\.",
+    r"\bGov\.",
+    r"\bGen\.",
+    r"\bLt\.",
+    r"\bCol\.",
+    r"\bSt\.",
+)
 LOCAL_SCOPE_PATTERN = re.compile(
     r"\b(local|state|city|county|community|residents|families|district|school|utility|utilities|outage|operations|jobs|workers|customers|commuters)\b",
     re.IGNORECASE,
@@ -60,13 +76,46 @@ def ensure_period(value: str | None) -> str:
     return cleaned if re.search(r"[.!?]$", cleaned) else f"{cleaned}."
 
 
+def split_narrative_sentences(value: str | None) -> list[str]:
+    cleaned = normalize_whitespace(value)
+    if not cleaned:
+        return []
+
+    protected = cleaned
+    replacements: dict[str, str] = {}
+    for index, pattern in enumerate(ABBREVIATION_PATTERNS):
+        def repl(match: re.Match[str], token_index: int = index) -> str:
+            token = f"__ABBR_{token_index}_{len(replacements)}__"
+            replacements[token] = match.group(0)
+            return token
+
+        protected = re.sub(pattern, repl, protected, flags=re.IGNORECASE)
+
+    matches = re.findall(r"[^.!?]+[.!?]+", protected)
+    if not matches:
+        restored = protected
+        for token, original in replacements.items():
+            restored = restored.replace(token, original)
+        return [restored]
+
+    sentences = []
+    for segment in matches:
+        restored = segment
+        for token, original in replacements.items():
+            restored = restored.replace(token, original)
+        restored = normalize_whitespace(restored)
+        if restored:
+            sentences.append(restored)
+    return sentences
+
+
 def sentence_split(value: str | None) -> list[str]:
     cleaned = normalize_whitespace(value)
     if not cleaned:
         return []
-    matches = re.findall(r"[^.!?]+[.!?]+", cleaned)
+    matches = split_narrative_sentences(cleaned)
     if matches:
-        return [segment.strip() for segment in matches if segment.strip()]
+        return matches
     return [cleaned]
 
 

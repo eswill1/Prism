@@ -83,6 +83,23 @@ STOPWORD_TOKENS = {
     "with",
 }
 
+ABBREVIATION_PATTERNS = (
+    r"\bU\.S\.",
+    r"\bU\.K\.",
+    r"\bE\.U\.",
+    r"\bMr\.",
+    r"\bMrs\.",
+    r"\bMs\.",
+    r"\bDr\.",
+    r"\bSen\.",
+    r"\bRep\.",
+    r"\bGov\.",
+    r"\bGen\.",
+    r"\bLt\.",
+    r"\bCol\.",
+    r"\bSt\.",
+)
+
 
 def parse_timestamp(value: str | None) -> datetime | None:
     if not value:
@@ -189,9 +206,41 @@ def normalize_matching_text(value: str | None) -> str:
     return " ".join((value or "").lower().replace("u.s.", "us").replace("u.s", "us").split())
 
 
+def split_narrative_sentences(value: str | None) -> list[str]:
+    cleaned = normalize_matching_text(value)
+    if not cleaned:
+        return []
+
+    protected = cleaned
+    replacements: dict[str, str] = {}
+    for index, pattern in enumerate(ABBREVIATION_PATTERNS):
+        def repl(match: re.Match[str], token_index: int = index) -> str:
+            token = f"__ABBR_{token_index}_{len(replacements)}__"
+            replacements[token] = match.group(0)
+            return token
+
+        protected = re.sub(pattern, repl, protected, flags=re.IGNORECASE)
+
+    matches = re.findall(r"[^.!?]+[.!?]+", protected)
+    if not matches:
+        restored = protected
+        for token, original in replacements.items():
+            restored = restored.replace(token, original)
+        return [restored]
+
+    sentences = []
+    for segment in matches:
+        restored = segment
+        for token, original in replacements.items():
+            restored = restored.replace(token, original)
+        restored = " ".join(restored.split()).strip()
+        if restored:
+            sentences.append(restored)
+    return sentences
+
+
 def first_narrative_sentences(value: str | None, count: int = 2) -> str:
-    sentences = re.findall(r"[^.!?]+[.!?]+", normalize_matching_text(value))
-    cleaned = [sentence.strip() for sentence in sentences if sentence.strip()]
+    cleaned = split_narrative_sentences(value)
     if not cleaned:
         return normalize_matching_text(value)
     return " ".join(cleaned[:count]).strip()

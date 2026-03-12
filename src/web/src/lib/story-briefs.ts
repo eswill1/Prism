@@ -51,6 +51,22 @@ const GENERIC_FOCUS_TOKENS = new Set([
   'update',
   'updates',
 ])
+const ABBREVIATION_PATTERNS = [
+  /\bU\.S\./g,
+  /\bU\.K\./g,
+  /\bE\.U\./g,
+  /\bMr\./g,
+  /\bMrs\./g,
+  /\bMs\./g,
+  /\bDr\./g,
+  /\bSen\./g,
+  /\bRep\./g,
+  /\bGov\./g,
+  /\bGen\./g,
+  /\bLt\./g,
+  /\bCol\./g,
+  /\bSt\./g,
+]
 
 function ensurePeriod(value: string) {
   const trimmed = value.trim()
@@ -133,9 +149,44 @@ function isNearDuplicateSentence(candidate: string, existing: string[]) {
   return existing.some((value) => sentenceSimilarity(candidate, value) >= 0.72)
 }
 
+function splitNarrativeSentences(text: string) {
+  const cleaned = normalizeWhitespace(text)
+  if (!cleaned) {
+    return []
+  }
+
+  let protectedText = cleaned
+  const replacements = new Map<string, string>()
+  ABBREVIATION_PATTERNS.forEach((pattern, index) => {
+    protectedText = protectedText.replace(pattern, (match) => {
+      const token = `__ABBR_${index}_${replacements.size}__`
+      replacements.set(token, match)
+      return token
+    })
+  })
+
+  const matches = protectedText.match(/[^.!?]+[.!?]+/g)
+  if (!matches || matches.length === 0) {
+    let restored = protectedText
+    for (const [token, original] of replacements.entries()) {
+      restored = restored.replaceAll(token, original)
+    }
+    return [normalizeWhitespace(restored)].filter(Boolean)
+  }
+
+  return matches
+    .map((sentence) => {
+      let restored = sentence
+      for (const [token, original] of replacements.entries()) {
+        restored = restored.replaceAll(token, original)
+      }
+      return normalizeWhitespace(restored)
+    })
+    .filter(Boolean)
+}
+
 function firstNarrativeSentences(text: string, sentenceCount: number) {
-  const matches = text.match(/[^.!?]+[.!?]+/g) || []
-  const cleaned = matches.map((sentence) => normalizeWhitespace(sentence)).filter(Boolean)
+  const cleaned = splitNarrativeSentences(text)
 
   if (cleaned.length === 0) {
     return normalizeWhitespace(text)
@@ -145,8 +196,7 @@ function firstNarrativeSentences(text: string, sentenceCount: number) {
 }
 
 function laterNarrativeSentences(text: string, skipCount: number, sentenceCount: number) {
-  const matches = text.match(/[^.!?]+[.!?]+/g) || []
-  const cleaned = matches.map((sentence) => normalizeWhitespace(sentence)).filter(Boolean)
+  const cleaned = splitNarrativeSentences(text)
 
   if (cleaned.length <= skipCount) {
     return ''
