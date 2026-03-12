@@ -17,6 +17,7 @@
     "ingest:feeds": "doppler run -- python3 tooling/ingest_live_feeds_to_supabase.py",
     "enrich:articles": "doppler run -- python3 tooling/enrich_articles_to_supabase.py",
     "brief:readiness": "doppler run -- python3 tooling/evaluate_brief_readiness.py",
+    "cluster:candidates": "python3 tooling/evaluate_cluster_candidates.py",
     "build:api": "npm run build --workspace=src/api",
     "build:web": "npm run build --workspace=src/web",
     "lint": "npm run lint --workspaces --if-present"
