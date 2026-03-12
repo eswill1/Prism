@@ -18,6 +18,12 @@ from sync_story_content import REST_BASE, SUPABASE_SERVICE_ROLE_KEY, SupabaseRes
 
 MAX_ARTICLES_PER_RUN = 24
 FAILED_RETRY_MINUTES = 30
+LIKELY_PAYWALLED_DOMAINS = (
+    "bloomberg.com",
+    "ft.com",
+    "nytimes.com",
+    "wsj.com",
+)
 
 
 def parse_timestamp(value: str | None) -> datetime | None:
@@ -137,6 +143,23 @@ def patch_article_row(client: SupabaseRestClient, article_id: str, values: dict[
     )
 
 
+def infer_access_signal(article: dict[str, Any]) -> str:
+    metadata = article.get("metadata") or {}
+    access_signal = metadata.get("access_signal") if isinstance(metadata, dict) else None
+    if isinstance(access_signal, str) and access_signal.strip():
+        return access_signal
+
+    for value in (article.get("canonical_url"), article.get("original_url")):
+        if not isinstance(value, str) or not value.strip():
+            continue
+        hostname = parse.urlparse(value).hostname or ""
+        domain = hostname.replace("www.", "").lower()
+        if any(domain == candidate or domain.endswith(f".{candidate}") for candidate in LIKELY_PAYWALLED_DOMAINS):
+            return "likely_paywalled"
+
+    return "unknown"
+
+
 def refresh_story_cluster_summary(client: SupabaseRestClient, story_slug: str) -> bool:
     encoded_slug = parse.quote(story_slug, safe="")
     rows = client.get(
@@ -223,7 +246,10 @@ def candidate_articles(client: SupabaseRestClient) -> list[tuple[dict[str, Any],
         extraction_quality = metadata.get("extraction_quality") if isinstance(metadata, dict) else None
         story_slug = metadata.get("story_slug") if isinstance(metadata, dict) else None
         body_text = article.get("body_text")
+        summary_text = article.get("summary")
         needs_article_body = extraction_quality != "article_body" or not (isinstance(body_text, str) and body_text.strip())
+        thin_summary = not (isinstance(summary_text, str) and len(summary_text.strip()) >= 110)
+        access_signal = infer_access_signal(article)
         story_metrics = active_story_metrics.get(story_slug) if isinstance(story_slug, str) else None
         outlet_count = int((story_metrics or {}).get("outlet_count") or 0)
         substantive_source_count = int((story_metrics or {}).get("substantive_source_count") or 0)
@@ -246,11 +272,15 @@ def candidate_articles(client: SupabaseRestClient) -> list[tuple[dict[str, Any],
         active_story_priority = 0 if isinstance(story_slug, str) and story_slug in active_story_slugs else 1
         one_source_story_priority = 0 if active_story_priority == 0 and outlet_count <= 1 else 1
         thin_story_priority = 0 if active_story_priority == 0 and substantive_source_count <= 1 else 1
+        access_priority = 0 if access_signal == "likely_paywalled" else 1 if access_signal == "unknown" else 2
+        thin_article_priority = 0 if thin_summary else 1
         return (
             active_story_priority,
             one_source_story_priority,
             thin_story_priority,
+            access_priority,
             0 if needs_article_body else 1,
+            thin_article_priority,
             status_priority,
             queue_timestamp,
             published_at,
@@ -267,8 +297,9 @@ def merge_article_metadata(article: dict[str, Any], enrichment: dict[str, Any], 
 
     metadata["named_entities"] = enrichment.get("named_entities") or []
     metadata["extraction_quality"] = enrichment.get("extraction_quality") or "rss_only"
+    metadata["access_signal"] = enrichment.get("access_signal") or metadata.get("access_signal") or "unknown"
     metadata["enrichment_last_attempted_at"] = attempted_at
-    metadata["enrichment_worker_version"] = "0.1.0"
+    metadata["enrichment_worker_version"] = "0.2.0"
     return metadata
 
 

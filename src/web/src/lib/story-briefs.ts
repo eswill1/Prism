@@ -1,17 +1,7 @@
 import type { ClusterArticle, StoryCluster } from './mock-clusters'
+import type { StoryBrief } from './story-brief-types'
 
-export type StoryBrief = {
-  label: string
-  title: string
-  paragraphs: string[]
-  whyItMatters: string
-  whereSourcesAgree: string
-  whereCoverageDiffers: string
-  whatToWatch: string
-  supportingPoints: string[]
-  substantiveSourceCount: number
-  isEarlyBrief: boolean
-}
+export type { StoryBrief } from './story-brief-types'
 
 type TopicFamily = 'politics' | 'world' | 'business' | 'technology' | 'weather' | 'general'
 

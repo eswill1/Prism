@@ -63,6 +63,7 @@ These rules apply across official Prism clients.
 
 - Prism may summarize reporting, but it may not present boilerplate or feed-only filler as if it were a mature multi-source brief
 - single-source stories must remain explicitly provisional until additional substantive reporting arrives
+- stored brief sections should retain support references so unsupported language can be audited instead of hidden inside polished copy
 - slower article extraction and enrichment are allowed, but they may not degrade the freshness of the main feed-polling loop
 
 ### Inference should not calcify into hard-coded folklore

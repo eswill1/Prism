@@ -234,9 +234,11 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Semantic similarity integrated into merge scoring behind deterministic guardrails
 - [x] Offline clustering regression fixtures for known positive and negative merge cases
 - [x] Article extraction beyond RSS summaries: ledes, first paragraphs, and named-entity capture
-- [ ] Source-grounded brief input records stored per story revision
+- [x] Source-grounded brief input records stored per story revision
 - [x] Early-brief gating for one-source stories so single-source pages do not pretend to be full Prism Briefs
 - [x] Brief-readiness evaluator for active live stories
+- [x] Stored grounded brief revisions wired into the story read path
+- [x] Automated brief-grounding evaluator for stored brief sections
 - [ ] Brief quality evaluation harness with sampled human review
 - [x] Outlet registry seed import
 - [x] Supabase-backed article, outlet, cluster, evidence, and version tables
@@ -272,7 +274,7 @@ Institutional plans and saved stories matter early because they align with the b
 #### Deliverables:
 - [ ] Framing presence group generation
 - [ ] Context Pack generation for all four launch lenses
-- [ ] Grounded multi-source Prism Brief generation backed by extracted source text rather than feed snippets
+- [x] Grounded multi-source Prism Brief generation backed by extracted source text rather than feed snippets
 - [x] Prism Brief expansion so mature story pages routinely deliver fuller multi-paragraph briefs rather than minimum viable summaries
 - [x] Paywall-aware alternate-source matching when the strongest available source is too thin or inaccessible to the reader
 - [ ] Methodology pages and version registry
@@ -289,6 +291,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Add brief-depth rules so mature multi-source stories target fuller multi-paragraph Prism Briefs instead of minimum viable summary text
 - [x] Build paywall-aware alternate-source matching using existing discovery and clustering signals so inaccessible lead sources can point to credible open reporting
 - [x] Use `sources:health` plus `brief:readiness` as the tuning loop for this branch, with the explicit goal of raising full-brief-ready story count without lowering source quality
+- [x] Add section-level support metadata plus `brief:grounding` so stored briefs can be audited for weak or unsupported language
 
 #### Success metrics:
 - Readers use alternate lenses and Context Packs repeatedly
@@ -404,6 +407,7 @@ Before shipping model-generated briefs broadly, build:
 - one-source early-brief rules
 - multi-source brief generation
 - live-story readiness reporting so the team can see which stories qualify for full briefs versus early briefs
+- automated grounding evaluation against stored section support
 - sampled human QA and regression checks
 
 If the brief is not materially better than a normal RSS summary, the feature is not ready.

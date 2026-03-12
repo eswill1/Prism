@@ -68,6 +68,24 @@ The system goal is maximum automation with narrow human-review points.
 - current state: the default operator command `npm run ingest:feeds` now chains this enrichment pass immediately after feed polling; `npm run ingest:feeds:raw` remains available only for explicit ingest-only runs
 - future follow-up: longer Prism Brief generation should consume these richer article bodies instead of settling for one-paragraph summaries when the source set is mature
 
+#### `generate_story_briefs`
+
+- cadence: queue-driven after `enrich_article_content`, or chained directly after the enrich pass during early staging
+- input: active `story_clusters`, linked enriched articles, key facts, and recent correction/change labels
+- output: `story_brief_revisions` plus `version_registry` events for current brief changes
+- grounding rule: only use extracted source text and stored cluster facts; do not invent unsupported disagreement language
+- audit rule: each stored brief section should keep support references so automated grounding checks can flag weak language before it reaches the reader
+- failure rule: keep the previous current brief revision in place; do not blank out story pages
+- current state: `npm run ingest:feeds` now runs brief generation after enrichment, and `npm run brief:generate` can be run directly for brief-only refreshes
+
+#### `evaluate_brief_grounding`
+
+- cadence: after `generate_story_briefs` during tuning, and before shipping major brief-generator changes
+- input: current `story_brief_revisions`, stored section-support metadata, source snapshots
+- output: grounding report showing unsupported or weak brief sections
+- failure rule: do not roll back the current brief automatically, but treat unsupported sections as a release blocker for generator changes
+- current state: available locally and in staging as `npm run brief:grounding`
+
 #### `classify_media_rights`
 
 - cadence: immediately after metadata fetch
@@ -225,11 +243,12 @@ Build these jobs in order:
 1. `poll_feeds`
 2. `normalize_discovered_url`
 3. `enrich_article_content`
-4. `dedupe_articles`
-5. `cluster_recent_articles`
-6. `map_outlets`
-7. `generate_context_pack_candidates`
-8. `emit_correction_events`
-9. `poll_news_sitemaps`
+4. `generate_story_briefs`
+5. `dedupe_articles`
+6. `cluster_recent_articles`
+7. `map_outlets`
+8. `generate_context_pack_candidates`
+9. `emit_correction_events`
+10. `poll_news_sitemaps`
 
 That sequence gets Prism from a static mockup to a living cluster product with the fewest moving parts.
