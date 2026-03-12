@@ -195,6 +195,8 @@ Prism Brief rule:
 - if Prism only has feed-snippet quality inputs, the page should remain visibly provisional
 - richer article extraction belongs in a separate enrichment pass, not in the homepage feed-polling loop
 - the visible brief structure should stay stable: what happened, why it matters, where sources agree, where coverage differs, and what to watch
+- mature multi-source stories should usually resolve into a fuller multi-paragraph brief, not a one-paragraph placeholder
+- if the strongest available reporting is paywalled or too thin, Prism should try to surface a credible open alternate rather than leaving the reader at a dead end
 
 Single-source rule:
 
