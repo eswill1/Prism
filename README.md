@@ -44,6 +44,7 @@ Current product decisions locked in:
 - the story page gives the reader the story first, then Perspective second
 - homepage story packages should be fully clickable
 - source reads go directly to original reporting when a real source URL exists
+- when the lead source is likely paywalled or thin, Prism should surface a credible open alternate in the read stack when one exists
 - Prism should not force source-wrapper detours unless they add clear reader value
 - when Supabase-backed live data is available, connected Prism should surface real sourced stories only, not synthetic editorial stand-ins
 - feed polling stays fast; article-page extraction runs in a dedicated enrichment worker instead of blocking ingest
@@ -119,7 +120,7 @@ Environment baseline:
 - `npm run ingest:feeds` is the default operator path: it polls the active RSS and sitemap feeds in Supabase, refreshes the automated live story set, then immediately runs the slower article enrichment pass so fresh stories are not left with thin brief inputs
 - `npm run ingest:feeds:raw` runs only the fast discovery and story-sync portion of the pipeline when you explicitly need ingest without enrichment
 - `npm run enrich:articles` performs the slower article-page extraction pass for recent linked articles, upgrades Prism Brief inputs beyond feed snippets, and refreshes active story summaries after enrichment lands
-- `npm run brief:readiness` reports which active live stories are still limited to early briefs and which now have enough substantive sourcing for full Prism Briefs
+- `npm run brief:readiness` reports which active live stories are still limited to early briefs, which have enough substantive sourcing for full Prism Briefs, and whether they already have a usable open alternate
 - `npm run sources:health` reports which discovery sources are contributing recent articles, substantive extraction, and active story coverage versus just generating queue noise
 - `npm run cluster:candidates` reports how well semantic candidate retrieval covers the current heuristic clusters and validates the offline regression fixtures
 - clustering now shares canonical URL normalization across ingest, sync, and evaluation so tracking parameters and alias domains do not fragment stories

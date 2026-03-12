@@ -8,6 +8,7 @@ export type ClusterArticle = {
   bodyText?: string
   namedEntities?: string[]
   extractionQuality?: string
+  accessTier?: 'open' | 'likely_paywalled' | 'unknown'
   published: string
   framing: FramingGroup
   image: string
@@ -31,6 +32,7 @@ export type ContextItem = {
   title: string
   why: string
   url?: string
+  accessTier?: 'open' | 'likely_paywalled' | 'unknown'
 }
 
 export type StoryChangeKind = 'summary' | 'coverage' | 'evidence' | 'correction'

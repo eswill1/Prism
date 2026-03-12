@@ -197,6 +197,7 @@ Prism Brief rule:
 - the visible brief structure should stay stable: what happened, why it matters, where sources agree, where coverage differs, and what to watch
 - mature multi-source stories should usually resolve into a fuller multi-paragraph brief, not a one-paragraph placeholder
 - if the strongest available reporting is paywalled or too thin, Prism should try to surface a credible open alternate rather than leaving the reader at a dead end
+- read selection should be accessibility-aware: a likely paywalled lead can still appear, but Prism should prefer to pair it with a strong open alternate when one is available
 
 Single-source rule:
 

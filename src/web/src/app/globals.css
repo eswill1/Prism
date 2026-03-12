@@ -1448,6 +1448,16 @@ button {
   pointer-events: none;
 }
 
+.article-stack-note {
+  margin: -2px 0 18px;
+  padding: 14px 16px;
+  border-left: 3px solid color-mix(in srgb, var(--prism-teal) 72%, white);
+  background: linear-gradient(90deg, rgba(15, 139, 141, 0.1), rgba(15, 139, 141, 0.02));
+  color: color-mix(in srgb, var(--prism-ink) 72%, var(--prism-slate));
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
 
 .alternate-read-list {
   display: grid;
