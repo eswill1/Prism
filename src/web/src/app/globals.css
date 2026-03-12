@@ -1226,8 +1226,8 @@ button {
     rgba(255, 253, 248, 0.96);
 }
 
-.story-section-title,
-.reporting-section-title {
+.section-heading .story-section-title,
+.section-heading .reporting-section-title {
   max-width: 32ch;
   color: var(--prism-ink);
   font-family: "Source Serif 4", Georgia, serif;
@@ -1236,11 +1236,11 @@ button {
   text-wrap: pretty;
 }
 
-.story-section-title {
+.section-heading .story-section-title {
   font-size: clamp(1.25rem, 1.7vw, 1.7rem);
 }
 
-.reporting-section-title {
+.section-heading .reporting-section-title {
   font-size: clamp(1.05rem, 1.35vw, 1.35rem);
   line-height: 1.28;
   letter-spacing: -0.01em;
