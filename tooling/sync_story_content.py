@@ -12,6 +12,13 @@ from pathlib import Path
 from typing import Any
 from urllib import error, parse, request
 
+try:
+    from tooling.url_normalization import normalize_canonical_url as shared_normalize_canonical_url
+    from tooling.url_normalization import normalize_domain as shared_normalize_domain
+except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
+    from url_normalization import normalize_canonical_url as shared_normalize_canonical_url
+    from url_normalization import normalize_domain as shared_normalize_domain
+
 
 ROOT = Path(__file__).resolve().parents[1]
 LIVE_FEED_PATH = ROOT / "src" / "web" / "public" / "data" / "temporary-live-feed.json"
@@ -185,22 +192,11 @@ def minutes_ago_iso(minutes: int) -> str:
 
 
 def normalize_domain(value: str | None) -> str:
-    if not value:
-        return ""
+    return shared_normalize_domain(value)
 
-    domain = value.lower().strip()
-    domain = re.sub(r"^https?://", "", domain)
-    domain = domain.split("/")[0]
-    domain = re.sub(r"^www\.", "", domain)
 
-    aliases = {
-        "abcnews.go.com": "abcnews.com",
-        "edition.cnn.com": "cnn.com",
-        "rss.cnn.com": "cnn.com",
-        "international.reuters.com": "reuters.com",
-        "today.com": "nbcnews.com",
-    }
-    return aliases.get(domain, domain)
+def normalize_canonical_url(value: str | None) -> str:
+    return shared_normalize_canonical_url(value)
 
 
 def slugify(value: str) -> str:
@@ -959,7 +955,7 @@ def article_payloads(
         domain = normalize_domain(article["domain"])
         outlet_row = outlet_rows[domain]
         url = article.get("url")
-        canonical_url = url or synthetic_url(story["slug"], article["outlet"], article["title"])
+        canonical_url = normalize_canonical_url(url) or synthetic_url(story["slug"], article["outlet"], article["title"])
         existing_row = existing_articles.get(canonical_url) or {}
         existing_metadata = existing_row.get("metadata") if isinstance(existing_row.get("metadata"), dict) else {}
         incoming_quality = article.get("extraction_quality") or "rss_only"

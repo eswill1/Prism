@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import os
 import re
 from dataclasses import dataclass
 from typing import Protocol
+from urllib import error, request
 
 
 class StoryLike(Protocol):
@@ -15,6 +17,7 @@ class StoryLike(Protocol):
     title: str
     lede: str
     summary: str
+    body_preview: str
     named_entities: list[str]
     event_tags: set[str]
 
@@ -25,11 +28,47 @@ def normalize_embedding_text(text: str) -> str:
     return cleaned
 
 
+def dedupe_segments(segments: list[str], *, limit: int) -> list[str]:
+    kept: list[str] = []
+    seen: set[str] = set()
+    for segment in segments:
+        normalized = normalize_embedding_text(segment)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        kept.append(segment.strip())
+        if len(kept) >= limit:
+            break
+    return kept
+
+
+def summarize_embedding_body(text: str) -> str:
+    if not text:
+        return ""
+
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    useful = [
+        sentence
+        for sentence in sentences
+        if len(sentence.strip()) >= 50
+        and "newsletter" not in sentence.lower()
+        and "all rights reserved" not in sentence.lower()
+    ]
+    return " ".join(dedupe_segments(useful, limit=3))
+
+
 def build_story_embedding_text(item: StoryLike) -> str:
+    narrative_parts = dedupe_segments(
+        [
+            item.title,
+            item.lede,
+            item.summary,
+            summarize_embedding_body(item.body_preview),
+        ],
+        limit=4,
+    )
     parts = [
-        item.title,
-        item.lede,
-        item.summary,
+        " ".join(narrative_parts),
         " ".join(item.named_entities[:6]),
         " ".join(sorted(item.event_tags)),
     ]
@@ -72,14 +111,74 @@ class HashingEmbeddingProvider:
         return [value / norm for value in vector]
 
 
+@dataclass
+class SentenceTransformerEmbeddingProvider:
+    model_name: str
+
+    def embed_many(self, texts: list[str]) -> list[list[float]]:
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError(
+                "sentence-transformers is not installed. "
+                "Install it or use PRISM_EMBEDDING_PROVIDER=hashing."
+            ) from exc
+
+        model = SentenceTransformer(self.model_name)
+        vectors = model.encode(texts, normalize_embeddings=True)
+        return [list(vector) for vector in vectors]
+
+
+@dataclass
+class OpenAIEmbeddingProvider:
+    api_key: str
+    model: str
+    base_url: str = "https://api.openai.com/v1"
+
+    def embed_many(self, texts: list[str]) -> list[list[float]]:
+        payload = json.dumps({"input": texts, "model": self.model}).encode("utf-8")
+        target = self.base_url.rstrip("/") + "/embeddings"
+        http_request = request.Request(
+            target,
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(http_request, timeout=30) as response:
+                response_payload = json.loads(response.read().decode("utf-8"))
+        except error.HTTPError as exc:  # pragma: no cover - networked provider
+            body = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"embedding request failed with HTTP {exc.code}: {body}") from exc
+
+        data = response_payload.get("data")
+        if not isinstance(data, list):
+            raise RuntimeError("embedding response missing data array")
+        ordered = sorted(data, key=lambda row: row.get("index", 0))
+        return [list(row.get("embedding", [])) for row in ordered]
+
+
 def build_embedding_provider() -> EmbeddingProvider:
     provider = os.getenv("PRISM_EMBEDDING_PROVIDER", "hashing").strip().lower()
     if provider == "hashing":
         dimensions = int(os.getenv("PRISM_HASHING_EMBEDDING_DIMENSIONS", "384"))
         return HashingEmbeddingProvider(dimensions=dimensions)
+    if provider in {"sentence-transformers", "sentence_transformers"}:
+        model_name = os.getenv("PRISM_SENTENCE_TRANSFORMERS_MODEL", "all-MiniLM-L6-v2")
+        return SentenceTransformerEmbeddingProvider(model_name=model_name)
+    if provider == "openai":
+        api_key = os.getenv("PRISM_OPENAI_API_KEY", "").strip()
+        if not api_key:
+            raise ValueError("PRISM_OPENAI_API_KEY must be set when PRISM_EMBEDDING_PROVIDER=openai")
+        model = os.getenv("PRISM_OPENAI_EMBEDDING_MODEL", "text-embedding-3-small").strip()
+        base_url = os.getenv("PRISM_OPENAI_BASE_URL", "https://api.openai.com/v1").strip()
+        return OpenAIEmbeddingProvider(api_key=api_key, model=model, base_url=base_url)
     raise ValueError(
         f"Unsupported PRISM_EMBEDDING_PROVIDER '{provider}'. "
-        "Use 'hashing' for local development."
+        "Use 'hashing', 'sentence-transformers', or 'openai'."
     )
 
 
