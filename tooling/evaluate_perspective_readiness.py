@@ -41,6 +41,14 @@ def main() -> int:
 
         revision = perspective_by_cluster.get(row["id"])
         lens_counts = lens_counts_by_cluster.get(row["id"], {})
+        revision_metadata = (revision or {}).get("metadata") or {}
+        lens_statuses = revision_metadata.get("lens_statuses") if isinstance(revision_metadata, dict) else {}
+        available_lenses = [
+            lens
+            for lens, count in lens_counts.items()
+            if isinstance(count, int) and count > 0
+        ]
+        review_reasons = revision_metadata.get("review_reasons") if isinstance(revision_metadata, dict) else []
         stories.append(
             {
                 "slug": row["slug"],
@@ -48,7 +56,12 @@ def main() -> int:
                 "stored_perspective_current": bool(revision),
                 "stored_perspective_status": (revision or {}).get("status"),
                 "stored_perspective_revision_tag": (revision or {}).get("revision_tag"),
+                "substantive_source_count": revision_metadata.get("substantive_source_count") if isinstance(revision_metadata, dict) else None,
                 "lens_counts": lens_counts,
+                "available_lenses": available_lenses,
+                "lens_statuses": lens_statuses,
+                "manual_review_required": bool(revision_metadata.get("manual_review_required")) if isinstance(revision_metadata, dict) else False,
+                "review_reasons": review_reasons if isinstance(review_reasons, list) else [],
                 "all_launch_lenses_populated": all(
                     lens_counts.get(lens, 0) >= 1
                     for lens in (
@@ -61,7 +74,19 @@ def main() -> int:
             }
         )
 
-    print(json.dumps({"stories": stories[:MAX_STORIES]}, indent=2))
+    summary = {
+        "stories_considered": len(stories),
+        "stories_with_current_perspective": sum(1 for story in stories if story["stored_perspective_current"]),
+        "stories_requiring_manual_review": sum(1 for story in stories if story["manual_review_required"]),
+        "stories_with_full_launch_coverage": sum(1 for story in stories if story["all_launch_lenses_populated"]),
+        "stories_with_evidence_only": sum(
+            1
+            for story in stories
+            if story["available_lenses"] == ["evidence_first"]
+        ),
+    }
+
+    print(json.dumps({"summary": summary, "stories": stories[:MAX_STORIES]}, indent=2))
     return 0
 
 

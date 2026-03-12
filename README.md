@@ -132,12 +132,12 @@ Environment baseline:
 - `npm run brief:readiness` reports which active live stories are still limited to early briefs, which have enough substantive sourcing for full Prism Briefs, and whether they already have a usable open alternate
 - `npm run brief:grounding` audits current stored brief sections against their recorded support references so weak or unsupported brief language is visible before it ships
 - `npm run perspective:generate` builds stored Perspective revisions plus Context Pack selections from current linked coverage and advances the current Perspective revision when the input signature changes
-- `npm run perspective:readiness` reports which active live stories already have current Perspective revisions and how fully the four launch lenses are populated
+- `npm run perspective:readiness` reports which active live stories already have current Perspective revisions, which lenses are actually justified by the current source mix, and which stories still need manual Perspective review
 - `npm run sources:health` reports which discovery sources are contributing recent articles, substantive extraction, and active story coverage versus just generating queue noise
 - `npm run sources:health` now also shows open vs likely-paywalled article volume and highlights thin paywalled sources that still need better fallback handling
 - enrichment now persists article-level access signals so the reader layer and the brief generator can distinguish open reads from likely paywalled ones using article evidence, not outlet lists alone
 - active story metadata now only advertises lead-source confidence and open alternates when those reads clear a minimum quality floor; Prism does not surface weak alternates just because they are open
-- Perspective now uses stored revisions and generated Context Packs in connected mode, with all four launch lenses remaining visible even when a given lens does not yet have enough coverage to populate a strong read set
+- Perspective now uses stored revisions and generated Context Packs in connected mode, with quality gating so only lenses justified by the current source mix populate reads while the UI still shows the full launch lens set
 - `npm run cluster:candidates` reports how well semantic candidate retrieval covers the current heuristic clusters and validates the offline regression fixtures
 - clustering now shares canonical URL normalization across ingest, sync, and evaluation so tracking parameters and alias domains do not fragment stories
 - sitemap-derived items are now demoted unless they have substantive extracted text or enough source breadth to support a reader-facing story shell

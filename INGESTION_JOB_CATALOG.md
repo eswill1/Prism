@@ -91,7 +91,7 @@ The system goal is maximum automation with narrow human-review points.
 
 - cadence: after `generate_perspective` during tuning, and before shipping major Context Pack or Perspective-rule changes
 - input: current `story_perspective_revisions`, active `context_pack_items`, and live story set
-- output: readiness report showing which stories have current Perspective revisions and how fully the four launch lenses are populated
+- output: readiness report showing which stories have current Perspective revisions, which lenses are quality-gated into availability, and which live stories still need manual Perspective review
 - failure rule: no automatic rollback, but missing or stale Perspective revisions should block shipping major Perspective changes
 - current state: available locally and in staging as `npm run perspective:readiness`
 

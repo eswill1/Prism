@@ -244,6 +244,95 @@ def build_source_snapshot(article_rows: list[dict[str, Any]]) -> list[dict[str, 
     return snapshot
 
 
+def lens_candidate_pool(
+    lens: str,
+    article_rows: list[dict[str, Any]],
+    substantive_articles: list[dict[str, Any]],
+    framing_counter: Counter[str],
+    family_counter: Counter[str],
+    scope_counter: Counter[str],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    substantive_outlets = {article["outlet"] for article in substantive_articles}
+    framing_diversity = len([count for count in framing_counter.values() if count > 0])
+    family_diversity = len([count for count in family_counter.values() if count > 0])
+    local_candidates = [article for article in substantive_articles if article["scope"] == "Local impact"]
+    international_candidates = [article for article in substantive_articles if article["scope"] == "International frame"]
+    non_international_candidates = [article for article in substantive_articles if article["scope"] != "International frame"]
+
+    if lens == "Balanced Framing":
+        if len(substantive_articles) < 2 or len(substantive_outlets) < 2:
+            return [], {
+                "status": "unavailable",
+                "reason": "Needs at least two substantive outlets before a balanced alternate-read set is meaningful.",
+            }
+        if framing_diversity < 2 and family_diversity < 2:
+            return [], {
+                "status": "unavailable",
+                "reason": "The current source mix still sits in one coverage lane, so a balanced pack would be artificial.",
+            }
+        return substantive_articles, {
+            "status": "ready",
+            "reason": "The story has enough source breadth to widen the read stack without faking disagreement.",
+        }
+
+    if lens == "Evidence-First":
+        if not substantive_articles:
+            return [], {
+                "status": "unavailable",
+                "reason": "No substantive extracted reporting is available yet for an evidence-first pack.",
+            }
+        return substantive_articles, {
+            "status": "ready" if len(substantive_articles) >= 2 else "limited",
+            "reason": (
+                "Using the strongest extracted reporting available so far."
+                if len(substantive_articles) >= 2
+                else "Only one substantive source is available, so this pack is still thin."
+            ),
+        }
+
+    if lens == "Local Impact":
+        if len(substantive_articles) < 2:
+            return [], {
+                "status": "unavailable",
+                "reason": "Needs a broader source mix before a local-impact pack is meaningful.",
+            }
+        if not local_candidates:
+            return [], {
+                "status": "unavailable",
+                "reason": "The current linked reporting does not yet add a clear local or operational angle.",
+            }
+        return local_candidates, {
+            "status": "ready",
+            "reason": "There is enough reporting to surface a real local or operational angle.",
+        }
+
+    if lens == "International Comparison":
+        if len(substantive_articles) < 2:
+            return [], {
+                "status": "unavailable",
+                "reason": "Needs a broader source mix before an international comparison is meaningful.",
+            }
+        if not international_candidates:
+            return [], {
+                "status": "unavailable",
+                "reason": "No international-framed reporting is present in the current source mix.",
+            }
+        if not non_international_candidates:
+            return [], {
+                "status": "unavailable",
+                "reason": "The current mix does not yet give Prism a domestic baseline to compare against.",
+            }
+        return international_candidates, {
+            "status": "ready",
+            "reason": "The story has both international and non-international reporting to compare.",
+        }
+
+    return article_rows, {
+        "status": "limited",
+        "reason": "Using the current linked reporting as a fallback candidate pool.",
+    }
+
+
 def select_lens_items(lens: str, article_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not article_rows:
         return []
@@ -412,18 +501,50 @@ def build_perspective(cluster: dict[str, Any]) -> tuple[dict[str, Any], dict[str
     source_family_presence = build_presence_items(family_counter, SOURCE_FAMILY_NOTES)
     scope_presence = build_presence_items(scope_counter, SCOPE_NOTES)
 
-    context_packs = {
-        lens: select_lens_items(lens, substantive_articles or article_rows)
-        for lens in LENS_TO_DB
-    }
+    context_packs: dict[str, list[dict[str, Any]]] = {}
+    lens_statuses: dict[str, dict[str, Any]] = {}
+    for lens, db_lens in LENS_TO_DB.items():
+        candidate_rows, lens_status = lens_candidate_pool(
+            lens,
+            article_rows,
+            substantive_articles,
+            framing_counter,
+            family_counter,
+            scope_counter,
+        )
+        items = select_lens_items(lens, candidate_rows)
+        if not items and lens_status["status"] != "unavailable":
+            lens_status = {
+                "status": "unavailable",
+                "reason": "No qualifying reads survived Perspective quality gating for this lens.",
+            }
+        lens_statuses[db_lens] = {
+            **lens_status,
+            "count": len(items),
+        }
+        context_packs[lens] = items
+
+    review_reasons: list[str] = []
+    reviewable_story = len(substantive_articles) >= 2
+    if status == "ready" and lens_statuses["balanced_framing"]["status"] != "ready":
+        review_reasons.append("Balanced Framing is not yet justified on a story that otherwise looks multi-source.")
+    if reviewable_story and lens_statuses["evidence_first"]["status"] != "ready":
+        review_reasons.append("Evidence-First is still running on a thin substantive source set.")
+    if reviewable_story and scope_counter.get("Local impact", 0) > 0 and lens_statuses["local_impact"]["status"] == "unavailable":
+        review_reasons.append("Local Impact did not populate despite local/operational signals in the source mix.")
+    if reviewable_story and scope_counter.get("International frame", 0) > 0 and lens_statuses["international_comparison"]["status"] == "unavailable":
+        review_reasons.append("International Comparison did not populate despite international framing signals in the source mix.")
 
     metadata = {
         "substantive_source_count": len(substantive_articles),
         "article_count": len(article_rows),
         "lens_counts": {lens: len(items) for lens, items in context_packs.items()},
+        "lens_statuses": lens_statuses,
         "framing_diversity": len([count for count in framing_counter.values() if count > 0]),
         "source_family_diversity": len([count for count in family_counter.values() if count > 0]),
         "scope_diversity": len([count for count in scope_counter.values() if count > 0]),
+        "manual_review_required": bool(review_reasons),
+        "review_reasons": review_reasons,
     }
 
     payload = {
@@ -452,7 +573,7 @@ def build_perspective(cluster: dict[str, Any]) -> tuple[dict[str, Any], dict[str
                 "source_family_presence": source_family_presence,
                 "scope_presence": scope_presence,
                 "methodology_note": payload["methodology_note"],
-                "lens_counts": metadata["lens_counts"],
+                "metadata": metadata,
             },
         },
         sort_keys=True,

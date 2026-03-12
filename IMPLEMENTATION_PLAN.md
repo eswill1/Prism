@@ -293,7 +293,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Add operator commands so `ingest:feeds` now advances Perspective revisions after brief generation
 - [ ] Add Perspective methodology/version surfacing so readers can inspect what changed in the current Perspective revision
 - [ ] Add Perspective firewall tests and regression fixtures so presence/context data cannot leak into ranking or become implicit truth scoring
-- [ ] Tune Context Pack selection with `perspective:readiness`, `sources:health`, and manual review on live stories before broadening the feature surface
+- [x] Tune Context Pack selection with `perspective:readiness`, `sources:health`, and manual review on live stories before broadening the feature surface
 
 #### Success metrics:
 - Readers use alternate lenses and Context Packs repeatedly
