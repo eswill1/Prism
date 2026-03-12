@@ -132,6 +132,14 @@ def first_narrative_sentences(text: str, sentence_count: int) -> str:
     return " ".join(sentences[:sentence_count]).strip()
 
 
+def later_narrative_sentences(text: str, *, skip_count: int, sentence_count: int) -> str:
+    cleaned = normalize_whitespace(text)
+    sentences = [segment.strip() for segment in re.findall(r"[^.!?]+[.!?]+", cleaned) if segment.strip()]
+    if len(sentences) <= skip_count:
+        return ""
+    return " ".join(sentences[skip_count : skip_count + sentence_count]).strip()
+
+
 def topic_family_for_story(topic: str) -> str:
     normalized = topic.lower()
     if re.search(r"(policy|politic|government|congress|senate|election|white house|u\.s\.|us )", normalized):
@@ -250,6 +258,7 @@ def build_brief_sources(cluster: dict[str, Any]) -> list[dict[str, Any]]:
                 "framing": relation.get("framing_group") or "center",
                 "snippet": ensure_period(snippet),
                 "focus": article_focus(article),
+                "detail": ensure_period(later_narrative_sentences(str(article.get("body_text") or ""), skip_count=2, sentence_count=2)),
                 "extraction_quality": metadata.get("extraction_quality") if isinstance(metadata, dict) else None,
                 "access_tier": infer_access_tier(
                     outlet,
@@ -489,7 +498,15 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
     else:
         if central:
             central_focus = clean_focus_phrase(central["focus"], family)
-            if sentence_similarity(central["snippet"], cluster["summary"]) < 0.72:
+            central_detail = str(central.get("detail") or "").strip()
+            if central_detail and (
+                cluster["summary"] in central["snippet"] or sentence_similarity(central["snippet"], cluster["summary"]) >= 0.72
+            ):
+                add_paragraph(
+                    f"The clearest detailed reporting so far comes from {central['outlet']}. {central_detail}",
+                    central,
+                )
+            elif sentence_similarity(central["snippet"], cluster["summary"]) < 0.72:
                 add_paragraph(
                     f"The clearest detailed reporting so far comes from {central['outlet']}. {central['snippet']}",
                     central,

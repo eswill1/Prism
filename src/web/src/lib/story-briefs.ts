@@ -10,6 +10,7 @@ type BriefSource = {
   framing: ClusterArticle['framing']
   snippet: string
   focus: string
+  detail: string
 }
 
 const PLACEHOLDER_KEY_FACT = /^Prism has |^Prism only has |^The latest linked reporting came from |^The comparison set /i
@@ -143,6 +144,17 @@ function firstNarrativeSentences(text: string, sentenceCount: number) {
   return cleaned.slice(0, sentenceCount).join(' ')
 }
 
+function laterNarrativeSentences(text: string, skipCount: number, sentenceCount: number) {
+  const matches = text.match(/[^.!?]+[.!?]+/g) || []
+  const cleaned = matches.map((sentence) => normalizeWhitespace(sentence)).filter(Boolean)
+
+  if (cleaned.length <= skipCount) {
+    return ''
+  }
+
+  return cleaned.slice(skipCount, skipCount + sentenceCount).join(' ')
+}
+
 function topicFamilyForStory(topic: string): TopicFamily {
   const normalized = topic.toLowerCase()
 
@@ -256,6 +268,7 @@ function buildBriefSources(cluster: StoryCluster) {
       framing: article.framing,
       snippet: ensurePeriod(snippet),
       focus: articleFocus(article),
+      detail: ensurePeriod(laterNarrativeSentences(article.bodyText || '', 2, 2)),
     })
   }
 
@@ -436,7 +449,10 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
     : [
         ensurePeriod(cluster.dek),
         sources[0]
-          ? sentenceSimilarity(sources[0].snippet, cluster.dek) < 0.72
+          ? sources[0].detail &&
+            (sources[0].snippet.includes(cluster.dek) || sentenceSimilarity(sources[0].snippet, cluster.dek) >= 0.72)
+            ? `The clearest detailed reporting so far comes from ${sources[0].outlet}. ${sources[0].detail}`
+            : sentenceSimilarity(sources[0].snippet, cluster.dek) < 0.72
             ? `The clearest detailed reporting so far comes from ${sources[0].outlet}. ${sources[0].snippet}`
             : `The clearest detailed reporting so far comes from ${sources[0].outlet}, and it supports the same overall picture while adding detail beyond the first headline.`
           : '',

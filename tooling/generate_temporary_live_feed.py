@@ -30,7 +30,11 @@ OUTPUT_PATHS = [
     ROOT / "data" / "temporary-live-feed.json",
     ROOT / "src" / "web" / "public" / "data" / "temporary-live-feed.json",
 ]
-USER_AGENT = "PrismWirePrototype/0.1 (+local preview)"
+USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/123.0.0.0 Safari/537.36"
+)
 ARTICLE_ENRICHMENT_LIMIT_PER_FEED = 2
 ARTICLE_ENRICHMENT_TIMEOUT_SECONDS = 6
 PAYWALL_HINT_PATTERNS = (
@@ -237,15 +241,32 @@ class FeedItem:
 
 
 def fetch_text(url: str, timeout: int = 20) -> str:
-    request = Request(
-        url,
-        headers={
+    header_profiles = (
+        {
             "User-Agent": USER_AGENT,
+            "Accept": "application/rss+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache",
+        },
+        {
+            "User-Agent": "PrismWirePrototype/0.1 (+local preview)",
             "Accept": "application/rss+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.8",
         },
     )
-    with urlopen(request, timeout=timeout) as response:
-        return response.read().decode("utf-8", errors="replace")
+
+    last_error: Exception | None = None
+    for headers in header_profiles:
+        request = Request(url, headers=headers)
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                return response.read().decode("utf-8", errors="replace")
+        except (HTTPError, URLError, TimeoutError, ValueError) as exc:
+            last_error = exc
+            continue
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError(f"Unable to fetch {url}")
 
 
 def strip_html(raw: str | None) -> str:
@@ -478,6 +499,8 @@ def extract_paragraphs_from_marker_windows(markup: str, markers: tuple[str, ...]
             window = markup[match.start() : min(len(markup), match.start() + 18000)]
             for raw in re.findall(r"<p\b[^>]*>(.*?)</p>", window, re.IGNORECASE | re.DOTALL):
                 cleaned = strip_html(raw)
+                cleaned = re.sub(r"\s+hide caption$", "", cleaned, flags=re.IGNORECASE).strip()
+                cleaned = re.sub(r"\s+toggle caption$", "", cleaned, flags=re.IGNORECASE).strip()
                 normalized = cleaned.lower()
                 if len(cleaned) < 60 or normalized in seen:
                     continue
@@ -490,6 +513,10 @@ def extract_paragraphs_from_marker_windows(markup: str, markers: tuple[str, ...]
                         "click here",
                         "read more:",
                         "advertisement",
+                        "hide caption",
+                        "toggle caption",
+                        "getty images",
+                        "ap photo",
                     )
                 ):
                     continue
@@ -509,6 +536,8 @@ def extract_article_paragraphs(markup: str) -> list[str]:
     seen: set[str] = set()
     for raw in raw_paragraphs:
         cleaned = strip_html(raw)
+        cleaned = re.sub(r"\s+hide caption$", "", cleaned, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(r"\s+toggle caption$", "", cleaned, flags=re.IGNORECASE).strip()
         normalized = cleaned.lower()
         if len(cleaned) < 60:
             continue
@@ -524,6 +553,10 @@ def extract_article_paragraphs(markup: str) -> list[str]:
                 "watch:",
                 "read more:",
                 "advertisement",
+                "hide caption",
+                "toggle caption",
+                "getty images",
+                "ap photo",
             )
         ):
             continue
