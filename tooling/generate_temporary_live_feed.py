@@ -40,6 +40,8 @@ FEEDS = [
     {"source": "PBS NewsHour", "feed_url": "https://www.pbs.org/newshour/feeds/rss/headlines"},
     {"source": "WSJ World", "feed_url": "https://feeds.a.dj.com/rss/RSSWorldNews.xml"},
 ]
+SITEMAP_CHILD_LIMIT = 6
+SITEMAP_URL_LIMIT = 20
 
 STOPWORDS = {
     "a",
@@ -419,6 +421,44 @@ def extract_named_entities(text: str) -> list[str]:
     return entities
 
 
+def default_enrichment(summary: str = "") -> dict[str, object]:
+    return {
+        "image": None,
+        "lede": clean_summary_snippet(summary, 320),
+        "body_preview": "",
+        "named_entities": [],
+        "extraction_quality": "rss_only",
+    }
+
+
+def derive_title_from_url(url: str) -> str:
+    path = urlparse(url).path.strip("/")
+    if not path:
+        return ""
+    segment = path.split("/")[-1]
+    segment = re.sub(r"\.[a-z0-9]+$", "", segment, flags=re.IGNORECASE)
+    segment = re.sub(r"[-_]+", " ", segment).strip()
+    if not segment or len(segment) < 8:
+        return ""
+    words = [word for word in segment.split() if not re.fullmatch(r"\d+", word)]
+    if not words:
+        return ""
+    return " ".join(words).strip().capitalize()
+
+
+def should_use_sitemap_keywords(keywords: str, title: str) -> bool:
+    normalized_keywords = strip_html(keywords)
+    if not normalized_keywords:
+        return False
+    if normalize_matching_text(normalized_keywords) == normalize_matching_text(title):
+        return False
+    if len(normalized_keywords) < 40:
+        return False
+    if re.fullmatch(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}", normalized_keywords):
+        return False
+    return True
+
+
 def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, object]:
     cached = ARTICLE_FETCH_CACHE.get(url)
     if cached is not None:
@@ -480,7 +520,7 @@ def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, 
     return payload
 
 
-def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[FeedItem]:
+def parse_rss_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[FeedItem]:
     xml = fetch_text(feed["feed_url"])
     root = ET.fromstring(xml)
     namespace_map = {"media": "http://search.yahoo.com/mrss/"}
@@ -512,13 +552,7 @@ def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[F
         enrichment = (
             fetch_article_enrichment(url, summary)
             if should_enrich
-            else {
-                "image": None,
-                "lede": clean_summary_snippet(summary, 320),
-                "body_preview": "",
-                "named_entities": [],
-                "extraction_quality": "rss_only",
-            }
+            else default_enrichment(summary)
         )
         feed_summary = clean_summary_snippet(summary, 220)
         lede = clean_summary_snippet(str(enrichment.get("lede", "")) or summary, 320) or feed_summary
@@ -546,6 +580,108 @@ def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[F
         )
 
     return items
+
+
+def parse_news_sitemap(feed: dict[str, str], *, enrich_articles: bool = False) -> list[FeedItem]:
+    def parse_sitemap_url(target_url: str, *, depth: int, remaining: int) -> list[FeedItem]:
+        if remaining <= 0:
+            return []
+
+        try:
+            xml = fetch_text(target_url)
+            root = ET.fromstring(xml)
+        except (ET.ParseError, HTTPError, URLError, TimeoutError, ValueError):
+            return []
+        root_tag = root.tag.rsplit("}", 1)[-1].lower()
+
+        if root_tag == "sitemapindex":
+            child_urls = []
+            for sitemap in root.findall(".//{*}sitemap"):
+                child_url = normalize_canonical_url(strip_html(sitemap.findtext("{*}loc")))
+                if child_url:
+                    child_urls.append(child_url)
+            prioritized = sorted(
+                dict.fromkeys(child_urls),
+                key=lambda value: (
+                    0 if re.search(r"(news|latest)", value, re.IGNORECASE) else 1,
+                    value,
+                ),
+            )
+            nested_items: list[FeedItem] = []
+            for child_url in prioritized[:SITEMAP_CHILD_LIMIT]:
+                budget = remaining - len(nested_items)
+                if budget <= 0:
+                    break
+                nested_items.extend(parse_sitemap_url(child_url, depth=depth + 1, remaining=budget))
+            return nested_items
+
+        if root_tag != "urlset":
+            return []
+
+        items: list[FeedItem] = []
+        for url_node in root.findall(".//{*}url"):
+            if len(items) >= remaining:
+                break
+
+            url = normalize_canonical_url(strip_html(url_node.findtext("{*}loc")))
+            if not url:
+                continue
+
+            news_node = next((child for child in url_node if child.tag.rsplit("}", 1)[-1].lower() == "news"), None)
+            title = strip_html(news_node.findtext("{*}title")) if news_node is not None else ""
+            publication_date = (
+                news_node.findtext("{*}publication_date") if news_node is not None else ""
+            ) or url_node.findtext("{*}lastmod")
+            news_language = (news_node.findtext("{*}language") if news_node is not None else "") or ""
+            keywords = strip_html(news_node.findtext("{*}keywords")) if news_node is not None else ""
+            image = strip_html(url_node.findtext("{*}image/{*}loc")) or None
+
+            if news_language and news_language.lower() != "en":
+                continue
+
+            if not title:
+                title = derive_title_from_url(url)
+            if not title:
+                continue
+
+            keyword_summary = keywords if should_use_sitemap_keywords(keywords, title) else ""
+            summary = keyword_summary or title
+            should_enrich = enrich_articles and len(items) < ARTICLE_ENRICHMENT_LIMIT_PER_FEED and depth == 0
+            enrichment = fetch_article_enrichment(url, summary) if should_enrich else default_enrichment(summary)
+            feed_summary = clean_summary_snippet(keyword_summary or title, 220) or title
+            lede = clean_summary_snippet(str(enrichment.get("lede", "")) or keyword_summary or title, 320) or feed_summary
+            body_preview = clamp_to_word_boundary(str(enrichment.get("body_preview", "")), 1200) if enrichment.get("body_preview") else ""
+            named_entities = list(enrichment.get("named_entities", [])) or extract_named_entities(" ".join(filter(None, [title, keywords])))
+
+            items.append(
+                FeedItem(
+                    source=feed["source"],
+                    feed_url=feed["feed_url"],
+                    title=title,
+                    url=url,
+                    published_at=parse_datetime(publication_date).isoformat(),
+                    summary=lede or feed_summary,
+                    feed_summary=feed_summary,
+                    lede=lede or feed_summary,
+                    body_preview=body_preview,
+                    named_entities=named_entities,
+                    extraction_quality=str(enrichment.get("extraction_quality", "rss_only")),
+                    image=image or enrichment.get("image"),
+                    tokens=tokenize(" ".join(filter(None, [title, keyword_summary, " ".join(named_entities[:4])]))),
+                    event_tags=extract_event_tags(title, keyword_summary, str(enrichment.get("lede", ""))),
+                )
+            )
+
+        return items
+
+    return parse_sitemap_url(feed["feed_url"], depth=0, remaining=SITEMAP_URL_LIMIT)
+
+
+def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[FeedItem]:
+    feed_type = feed.get("feed_type", "rss").lower()
+    if feed_type in {"news_sitemap", "sitemap"}:
+        return parse_news_sitemap(feed, enrich_articles=enrich_articles)
+    return parse_rss_feed(feed, enrich_articles=enrich_articles)
 
 
 def cluster_match_score(
@@ -706,6 +842,24 @@ def build_cluster_payload(
         f"{lead.title.rstrip('?')} is drawing live coverage from {', '.join(sources)} as Prism tracks what changes next."
     )
 
+    primary_articles: list[FeedItem] = []
+    seen_sources: set[str] = set()
+    for item in ordered:
+        if item.source in seen_sources:
+            continue
+        seen_sources.add(item.source)
+        primary_articles.append(item)
+        if len(primary_articles) >= 5:
+            break
+
+    if len(primary_articles) < min(5, len(ordered)):
+        for item in ordered:
+            if item in primary_articles:
+                continue
+            primary_articles.append(item)
+            if len(primary_articles) >= 5:
+                break
+
     return {
         "slug": f"live-{index}-{slugify(lead.title)}",
         "topic_label": pick_cluster_label(ordered),
@@ -731,7 +885,7 @@ def build_cluster_payload(
                 "image": item.image,
                 "domain": urlparse(item.url).netloc,
             }
-            for item in ordered[:5]
+            for item in primary_articles
         ],
     }
 

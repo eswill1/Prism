@@ -1,5 +1,5 @@
 # Prism Ingestion Job Catalog
-### Version 0.1
+### Version 0.2
 
 ---
 
@@ -28,6 +28,7 @@ The system goal is maximum automation with narrow human-review points.
 - input: `source_registry`, sitemap URLs
 - output: `raw_discovered_urls`
 - failure rule: retry with backoff, then source-health alert
+- current state: implemented inside the active discovery poller for verified sitemap sources
 
 #### `backfill_metadata_api`
 

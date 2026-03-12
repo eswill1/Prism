@@ -1,5 +1,5 @@
 # Prism Implementation Plan
-### Version 0.7 — Updated 2026-03-12: canonical URL normalization and semantic scoring pass
+### Version 0.8 — Updated 2026-03-12: RSS plus sitemap discovery pass
 
 ---
 
@@ -224,7 +224,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Temporary URL deduplication and heuristic clustering pass
 - [x] Feed ingestion adapters beyond the temporary snapshot script
 - [x] Dedicated article-enrichment worker decoupled from feed polling
-- [ ] News sitemap ingestion
+- [x] News sitemap ingestion
 - [x] Canonical URL normalization pipeline
 - [x] Semantic candidate-retrieval scaffold for story clustering
 - [x] Candidate-retrieval evaluation harness against current heuristic clusters
@@ -247,6 +247,7 @@ Institutional plans and saved stories matter early because they align with the b
 #### Success metrics:
 - Most surfaced stories arrive through automated ingestion rather than manual seeding
 - Feed polling stays fast enough to feel live because article extraction is no longer inline in the polling loop
+- Active discovery is no longer RSS-only; verified sitemap feeds can contribute to the live story graph
 - Duplicate story handling is acceptable under manual QA
 - Semantic candidate retrieval meaningfully narrows cluster choices before deterministic merge rules fire
 - Canonical URL cleanup reduces story fragmentation caused by tracking parameters and alias domains

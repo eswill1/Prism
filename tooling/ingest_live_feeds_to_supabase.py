@@ -134,9 +134,9 @@ def story_priority_score(cluster: dict[str, Any]) -> int:
     return score
 
 
-def fetch_active_rss_feeds(client: SupabaseRestClient) -> list[dict[str, Any]]:
+def fetch_active_discovery_feeds(client: SupabaseRestClient) -> list[dict[str, Any]]:
     rows = client.get(
-        "/source_feeds?select=id,feed_type,feed_url,poll_interval_seconds,consecutive_failures,source_registry_id,source_registry(source_name,primary_domain,ingestion_status,is_active)&is_active=eq.true&feed_type=eq.rss&limit=100"
+        "/source_feeds?select=id,feed_type,feed_url,poll_interval_seconds,consecutive_failures,source_registry_id,source_registry(source_name,primary_domain,ingestion_status,is_active)&is_active=eq.true&limit=150"
     ) or []
 
     active = []
@@ -146,9 +146,12 @@ def fetch_active_rss_feeds(client: SupabaseRestClient) -> list[dict[str, Any]]:
             continue
         if registry.get("ingestion_status") not in ("active", "onboarding"):
             continue
+        if row.get("feed_type") not in {"rss", "atom", "news_sitemap", "sitemap"}:
+            continue
         active.append(
             {
                 "feed_id": row["id"],
+                "feed_type": row["feed_type"],
                 "feed_url": row["feed_url"],
                 "source": registry["source_name"],
                 "primary_domain": registry["primary_domain"],
@@ -343,7 +346,7 @@ def cleanup_stale_live_clusters(client: SupabaseRestClient, current_slugs: set[s
 
 def main() -> int:
     client = SupabaseRestClient(REST_BASE, SUPABASE_SERVICE_ROLE_KEY)
-    feeds = fetch_active_rss_feeds(client)
+    feeds = fetch_active_discovery_feeds(client)
     feed_map = {feed["feed_url"]: feed for feed in feeds}
     all_items: list[FeedItem] = []
     feed_errors: list[dict[str, str]] = []
@@ -352,7 +355,7 @@ def main() -> int:
         now = datetime.now(timezone.utc).isoformat()
         try:
             parsed = parse_feed(
-                {"source": feed["source"], "feed_url": feed["feed_url"]},
+                {"source": feed["source"], "feed_url": feed["feed_url"], "feed_type": feed["feed_type"]},
                 enrich_articles=False,
             )
             all_items.extend(parsed)
