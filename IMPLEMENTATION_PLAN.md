@@ -224,6 +224,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Temporary URL deduplication and heuristic clustering pass
 - [x] Feed ingestion adapters beyond the temporary snapshot script
 - [x] Dedicated article-enrichment worker decoupled from feed polling
+- [x] Default manual ingest path now chains enrichment automatically after feed polling
 - [x] News sitemap ingestion
 - [x] Source-specific sitemap handling for Reuters and AP
 - [x] Canonical URL normalization pipeline

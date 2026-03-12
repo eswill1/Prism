@@ -104,6 +104,7 @@ Core commands:
 - `npm run sync:stories`
 - `npm run sources:upsert`
 - `npm run ingest:feeds`
+- `npm run ingest:feeds:raw`
 - `npm run enrich:articles`
 - `npm run brief:readiness`
 - `npm run sources:health`
@@ -115,7 +116,8 @@ Environment baseline:
 - this repo is now scoped locally to Doppler project `prism-wire` config `dev`
 - `npm run sync:stories` is now for explicit snapshot or manual sync work only; connected Prism should rely on real sourced stories
 - `npm run sources:upsert` activates the current launch feed registry in Supabase
-- `npm run ingest:feeds` polls the active RSS and sitemap feeds in Supabase, writes pending discovery rows, and refreshes the automated live story set without article-page extraction inline
+- `npm run ingest:feeds` is the default operator path: it polls the active RSS and sitemap feeds in Supabase, refreshes the automated live story set, then immediately runs the slower article enrichment pass so fresh stories are not left with thin brief inputs
+- `npm run ingest:feeds:raw` runs only the fast discovery and story-sync portion of the pipeline when you explicitly need ingest without enrichment
 - `npm run enrich:articles` performs the slower article-page extraction pass for recent linked articles, upgrades Prism Brief inputs beyond feed snippets, and refreshes active story summaries after enrichment lands
 - `npm run brief:readiness` reports which active live stories are still limited to early briefs and which now have enough substantive sourcing for full Prism Briefs
 - `npm run sources:health` reports which discovery sources are contributing recent articles, substantive extraction, and active story coverage versus just generating queue noise
