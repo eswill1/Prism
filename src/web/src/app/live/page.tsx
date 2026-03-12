@@ -41,8 +41,9 @@ export default async function LiveFeedPage() {
         </header>
         <section className="panel empty-state-panel">
           <p>
-            Run `npm run ingest:feeds` to poll the configured feeds and refresh the secondary
-            intake queue that powers story movement on the homepage.
+            Run `npm run ingest:feeds` to poll the configured feeds, refresh the secondary
+            intake queue, and then enrich the linked articles so new stories land with fuller
+            brief inputs.
           </p>
           <Link href="/" className="secondary-link">
             Back to homepage

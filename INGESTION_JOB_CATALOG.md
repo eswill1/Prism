@@ -65,6 +65,7 @@ The system goal is maximum automation with narrow human-review points.
 - output: lede, first paragraphs, named entities, extracted-body quality markers on `articles`
 - follow-on effect: refresh active `story_clusters.summary` so reader-facing story decks improve after enrichment rather than staying stuck on ingest-time snippets
 - failure rule: mark discovery row failed with retry cooldown; do not block feed polling
+- current state: the default operator command `npm run ingest:feeds` now chains this enrichment pass immediately after feed polling; `npm run ingest:feeds:raw` remains available only for explicit ingest-only runs
 - future follow-up: longer Prism Brief generation should consume these richer article bodies instead of settling for one-paragraph summaries when the source set is mature
 
 #### `classify_media_rights`
