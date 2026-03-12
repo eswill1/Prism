@@ -20,8 +20,10 @@ from xml.etree import ElementTree as ET
 
 try:
     from tooling.semantic_story_candidates import build_similarity_lookup
+    from tooling.url_normalization import normalize_canonical_url
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
     from semantic_story_candidates import build_similarity_lookup
+    from url_normalization import normalize_canonical_url
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_PATHS = [
@@ -110,7 +112,7 @@ PHRASE_NORMALIZATIONS: list[tuple[str, str]] = [
 ]
 
 EVENT_TAG_PATTERNS: list[tuple[str, tuple[str, ...]]] = [
-    ("oil_reserve_release", (r"\boil\b", r"\breserve\b", r"\b(release|tap|strategic|petroleum|barrel|fuel price)\b")),
+    ("oil_reserve_release", (r"\boil\b", r"\breserves?\b", r"\b(release|tap|strategic|petroleum|barrel|fuel price)\b")),
     ("iran_war_cost", (r"\biran\b", r"\bwar\b", r"\b(cost|billion|pentagon|congress|days?)\b")),
     ("iran_shipping_attacks", (r"\biran\b", r"\b(ships?|shipping|strait of hormuz|persian gulf|hormuz)\b")),
     ("china_npc", (r"\bchina\b", r"\b(npc|national people's congress|political meeting|two sessions)\b")),
@@ -141,6 +143,8 @@ ENTITY_STOPWORDS = {
 }
 
 ARTICLE_FETCH_CACHE: dict[str, dict[str, object]] = {}
+SEMANTIC_SIMILARITY_JOIN_THRESHOLD = float(os.getenv("PRISM_SEMANTIC_JOIN_THRESHOLD", "0.42"))
+SEMANTIC_SIMILARITY_SUPPORT_THRESHOLD = float(os.getenv("PRISM_SEMANTIC_SUPPORT_THRESHOLD", "0.32"))
 
 
 @dataclass
@@ -295,6 +299,10 @@ def extract_event_tags(*parts: str) -> set[str]:
         if all(re.search(pattern, haystack) for pattern in patterns):
             tags.add(tag)
     return tags
+
+
+def normalize_entity(entity: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", entity.lower()).strip()
 
 
 def image_from_description(raw: str | None) -> str | None:
@@ -480,7 +488,7 @@ def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[F
     items: list[FeedItem] = []
     for item in root.findall(".//item")[:10]:
         title = strip_html(item.findtext("title"))
-        url = strip_html(item.findtext("link"))
+        url = normalize_canonical_url(strip_html(item.findtext("link")))
         if not title or not url:
             continue
 
@@ -540,7 +548,12 @@ def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[F
     return items
 
 
-def cluster_match_score(item: FeedItem, cluster: list[FeedItem]) -> float:
+def cluster_match_score(
+    item: FeedItem,
+    cluster: list[FeedItem],
+    *,
+    similarity_lookup: dict[tuple[str, str], float] | None = None,
+) -> float:
     if not item.tokens:
         return 0.0
 
@@ -559,21 +572,41 @@ def cluster_match_score(item: FeedItem, cluster: list[FeedItem]) -> float:
     token_ratio = len(overlap) / len(union) if union else 0.0
     specific_ratio = len(specific_overlap) / smaller if smaller else 0.0
     tag_overlap = item.event_tags & cluster_tags
+    cluster_entities = {
+        normalize_entity(entity)
+        for entry in cluster
+        for entity in entry.named_entities
+        if normalize_entity(entity)
+    }
+    item_entities = {normalize_entity(entity) for entity in item.named_entities if normalize_entity(entity)}
+    entity_overlap = item_entities & cluster_entities
+    semantic_similarity = 0.0
+    if similarity_lookup:
+        semantic_similarity = max(similarity_lookup.get((item.url, entry.url), 0.0) for entry in cluster)
 
     score = len(tag_overlap) * 8.0
     score += len(specific_overlap) * 2.5
     score += len(overlap) * 1.25
     score += token_ratio * 4.0
     score += specific_ratio * 5.0
+    score += len(entity_overlap) * 2.0
+    score += semantic_similarity * 12.0
 
     if tag_overlap and len(specific_overlap) >= 1:
+        score += 3.0
+    if semantic_similarity >= SEMANTIC_SIMILARITY_JOIN_THRESHOLD and (tag_overlap or specific_overlap or entity_overlap):
         score += 3.0
 
     return score
 
 
-def should_join_cluster(item: FeedItem, cluster: list[FeedItem]) -> bool:
-    score = cluster_match_score(item, cluster)
+def should_join_cluster(
+    item: FeedItem,
+    cluster: list[FeedItem],
+    *,
+    similarity_lookup: dict[tuple[str, str], float] | None = None,
+) -> bool:
+    score = cluster_match_score(item, cluster, similarity_lookup=similarity_lookup)
     if score >= 12.0:
         return True
 
@@ -581,6 +614,26 @@ def should_join_cluster(item: FeedItem, cluster: list[FeedItem]) -> bool:
     cluster_tags = set().union(*(entry.event_tags for entry in cluster))
     overlap = item.tokens & cluster_tokens
     specific_overlap = {token for token in overlap if token not in BROAD_MATCH_TOKENS}
+    cluster_entities = {
+        normalize_entity(entity)
+        for entry in cluster
+        for entity in entry.named_entities
+        if normalize_entity(entity)
+    }
+    item_entities = {normalize_entity(entity) for entity in item.named_entities if normalize_entity(entity)}
+    entity_overlap = item_entities & cluster_entities
+    semantic_similarity = 0.0
+    if similarity_lookup:
+        semantic_similarity = max(similarity_lookup.get((item.url, entry.url), 0.0) for entry in cluster)
+
+    if semantic_similarity >= SEMANTIC_SIMILARITY_JOIN_THRESHOLD and (
+        len(specific_overlap) >= 1 or entity_overlap or item.event_tags & cluster_tags
+    ):
+        return True
+    if semantic_similarity >= SEMANTIC_SIMILARITY_SUPPORT_THRESHOLD and (
+        len(specific_overlap) >= 2 or len(entity_overlap) >= 1
+    ):
+        return True
 
     if item.event_tags & cluster_tags and len(specific_overlap) >= 2:
         return True
@@ -593,8 +646,9 @@ def cluster_items(items: Iterable[FeedItem]) -> list[list[FeedItem]]:
     ordered_items = sorted(items, key=lambda entry: entry.published_at, reverse=True)
     candidate_strategy = os.getenv("PRISM_CLUSTERING_CANDIDATE_STRATEGY", "semantic").strip().lower()
     neighbor_lookup: dict[str, list[str]] = {}
+    similarity_lookup: dict[tuple[str, str], float] = {}
     if candidate_strategy == "semantic" and len(ordered_items) > 1:
-        neighbor_lookup, _similarity_lookup = build_similarity_lookup(ordered_items)
+        neighbor_lookup, similarity_lookup = build_similarity_lookup(ordered_items)
 
     clusters: list[list[FeedItem]] = []
     for item in ordered_items:
@@ -611,8 +665,8 @@ def cluster_items(items: Iterable[FeedItem]) -> list[list[FeedItem]]:
             else clusters
         )
         for cluster in candidate_clusters or clusters:
-            score = cluster_match_score(item, cluster)
-            if score > best_score and should_join_cluster(item, cluster):
+            score = cluster_match_score(item, cluster, similarity_lookup=similarity_lookup)
+            if score > best_score and should_join_cluster(item, cluster, similarity_lookup=similarity_lookup):
                 target = cluster
                 best_score = score
         if target is None:

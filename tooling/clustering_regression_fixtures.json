@@ -1,0 +1,94 @@
+[
+  {
+    "name": "oil reserve merge and west bank split",
+    "items": [
+      {
+        "source": "NPR",
+        "title": "US to release emergency oil reserves as prices rise",
+        "url": "https://example.com/oil-1?utm_source=test",
+        "summary": "Oil reserve release as prices rise.",
+        "lede": "The United States said it would release emergency oil reserves as fuel prices rose.",
+        "body_preview": "Officials described the release as a response to price pressure and shipping concerns.",
+        "named_entities": ["United States"],
+        "tokens": ["oil", "reserve", "release", "price"],
+        "event_tags": ["oil_reserve_release"]
+      },
+      {
+        "source": "BBC",
+        "title": "Emergency oil reserve release announced amid fuel price fears",
+        "url": "https://example.com/oil-2?fbclid=tracking",
+        "summary": "Oil reserve release amid fuel price fears.",
+        "lede": "Governments announced an emergency oil reserve release as fuel price fears spread.",
+        "body_preview": "The release is meant to stabilize prices and calm energy markets.",
+        "named_entities": ["United States"],
+        "tokens": ["oil", "reserve", "release", "fuel", "price"],
+        "event_tags": ["oil_reserve_release"]
+      },
+      {
+        "source": "BBC",
+        "title": "West Bank settlers face sanctions review",
+        "url": "https://example.com/west-bank?utm_medium=social",
+        "summary": "West Bank settlers story.",
+        "lede": "Officials are reviewing sanctions tied to violence in the West Bank.",
+        "body_preview": "The review centers on settlement violence and international pressure.",
+        "named_entities": ["West Bank"],
+        "tokens": ["west", "bank", "settlers", "sanctions", "review"],
+        "event_tags": []
+      }
+    ],
+    "expected_cluster_groups": [
+      ["https://example.com/oil-1", "https://example.com/oil-2"],
+      ["https://example.com/west-bank"]
+    ],
+    "expected_neighbors": {
+      "https://example.com/oil-1": ["https://example.com/oil-2"],
+      "https://example.com/west-bank": []
+    }
+  },
+  {
+    "name": "shipping attack stories merge without pulling in china npc",
+    "items": [
+      {
+        "source": "CBS News",
+        "title": "Iran-backed attacks on ships raise fears in Strait of Hormuz",
+        "url": "https://example.com/shipping-1",
+        "summary": "Attacks on ships raise fears in the Strait of Hormuz.",
+        "lede": "Shipping attacks linked to Iran are raising fears around the Strait of Hormuz.",
+        "body_preview": "Analysts say tanker routes and insurance costs could be affected.",
+        "named_entities": ["Iran", "Strait of Hormuz"],
+        "tokens": ["iran", "shipping", "ship", "strait", "hormuz"],
+        "event_tags": ["iran_shipping_attacks"]
+      },
+      {
+        "source": "PBS NewsHour",
+        "title": "Commercial ships reroute after Iranian threats in Hormuz",
+        "url": "https://example.com/shipping-2",
+        "summary": "Commercial ships reroute after Iranian threats.",
+        "lede": "Commercial ships are rerouting after Iranian threats around Hormuz.",
+        "body_preview": "Maritime firms are weighing route changes after escalating threats.",
+        "named_entities": ["Iran", "Hormuz"],
+        "tokens": ["iran", "commercial", "ship", "hormuz", "reroute"],
+        "event_tags": ["iran_shipping_attacks"]
+      },
+      {
+        "source": "BBC",
+        "title": "China's biggest political meeting is ending. What have we learned?",
+        "url": "https://example.com/china-npc",
+        "summary": "China NPC summary.",
+        "lede": "China's biggest political meeting is ending after a week of signals from leaders.",
+        "body_preview": "State messaging focused on growth, defense, and internal security priorities.",
+        "named_entities": ["China"],
+        "tokens": ["china", "npc", "meeting", "political"],
+        "event_tags": ["china_npc"]
+      }
+    ],
+    "expected_cluster_groups": [
+      ["https://example.com/shipping-1", "https://example.com/shipping-2"],
+      ["https://example.com/china-npc"]
+    ],
+    "expected_neighbors": {
+      "https://example.com/shipping-1": ["https://example.com/shipping-2"],
+      "https://example.com/china-npc": []
+    }
+  }
+]

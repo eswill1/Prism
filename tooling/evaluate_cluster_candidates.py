@@ -3,12 +3,75 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
-from generate_temporary_live_feed import FEEDS, cluster_items, parse_feed
-from semantic_story_candidates import build_similarity_lookup
+try:
+    from tooling.generate_temporary_live_feed import FEEDS, FeedItem, cluster_items, parse_feed
+    from tooling.semantic_story_candidates import build_similarity_lookup
+    from tooling.url_normalization import normalize_canonical_url
+except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
+    from generate_temporary_live_feed import FEEDS, FeedItem, cluster_items, parse_feed
+    from semantic_story_candidates import build_similarity_lookup
+    from url_normalization import normalize_canonical_url
 
 
 MAX_ITEMS = 60
+FIXTURES_PATH = Path(__file__).with_name("clustering_regression_fixtures.json")
+
+
+def load_fixture_items() -> tuple[list[dict[str, object]], list[str]]:
+    if not FIXTURES_PATH.exists():
+        return [], []
+
+    cases = json.loads(FIXTURES_PATH.read_text())
+    failure_messages: list[str] = []
+    reports: list[dict[str, object]] = []
+
+    for case in cases:
+        items = [
+            FeedItem(
+                source=item["source"],
+                feed_url=f"https://example.com/{item['source'].lower()}",
+                title=item["title"],
+                url=normalize_canonical_url(item["url"]),
+                published_at="2026-03-11T12:00:00+00:00",
+                summary=item["summary"],
+                feed_summary=item["summary"],
+                lede=item["lede"],
+                body_preview=item["body_preview"],
+                named_entities=item["named_entities"],
+                extraction_quality="article_body",
+                image=None,
+                tokens=set(item["tokens"]),
+                event_tags=set(item["event_tags"]),
+            )
+            for item in case["items"]
+        ]
+        clusters = cluster_items(items)
+        cluster_groups = sorted(sorted(entry.url for entry in cluster) for cluster in clusters)
+        expected_groups = sorted(sorted(group) for group in case["expected_cluster_groups"])
+        if cluster_groups != expected_groups:
+            failure_messages.append(
+                f"{case['name']}: expected clusters {expected_groups}, got {cluster_groups}"
+            )
+
+        neighbors, _similarity_lookup = build_similarity_lookup(items)
+        for url, expected_neighbors in case.get("expected_neighbors", {}).items():
+            actual_neighbors = neighbors.get(url, [])
+            if actual_neighbors[: len(expected_neighbors)] != expected_neighbors:
+                failure_messages.append(
+                    f"{case['name']}: expected neighbors for {url} to start with {expected_neighbors}, got {actual_neighbors}"
+                )
+
+        reports.append(
+            {
+                "name": case["name"],
+                "cluster_groups": cluster_groups,
+                "neighbor_counts": {url: len(urls) for url, urls in neighbors.items()},
+            }
+        )
+
+    return reports, failure_messages
 
 
 def main() -> int:
@@ -61,7 +124,11 @@ def main() -> int:
         "average_candidate_recall_at_6": round(recall_total / with_mates, 3) if with_mates else 0.0,
         "example_rows": examples,
     }
+    fixture_reports, fixture_failures = load_fixture_items()
+    report["fixture_reports"] = fixture_reports
     print(json.dumps(report, indent=2))
+    if fixture_failures:
+        raise SystemExit("\n".join(fixture_failures))
     return 0
 
 

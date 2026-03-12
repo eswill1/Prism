@@ -22,6 +22,7 @@ python3 tooling/ci_smoke_checks.py
 ```
 
 If your change touches live ingestion or connected-mode data, also run the relevant connected commands and note what you checked.
+If your change touches clustering logic, also run `npm run cluster:candidates` when network access is available and include the report summary in the PR.
 
 ## Review standard
 

@@ -1,5 +1,5 @@
 # Prism Implementation Plan
-### Version 0.6 — Updated 2026-03-12: hybrid clustering transition baseline
+### Version 0.7 — Updated 2026-03-12: canonical URL normalization and semantic scoring pass
 
 ---
 
@@ -225,10 +225,12 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Feed ingestion adapters beyond the temporary snapshot script
 - [x] Dedicated article-enrichment worker decoupled from feed polling
 - [ ] News sitemap ingestion
-- [ ] Canonical URL normalization pipeline
+- [x] Canonical URL normalization pipeline
 - [x] Semantic candidate-retrieval scaffold for story clustering
 - [x] Candidate-retrieval evaluation harness against current heuristic clusters
-- [ ] Embedding-backed clustering provider beyond local hashing fallback
+- [x] Embedding-provider abstraction beyond local hashing fallback
+- [x] Semantic similarity integrated into merge scoring behind deterministic guardrails
+- [x] Offline clustering regression fixtures for known positive and negative merge cases
 - [x] Article extraction beyond RSS summaries: ledes, first paragraphs, and named-entity capture
 - [ ] Source-grounded brief input records stored per story revision
 - [x] Early-brief gating for one-source stories so single-source pages do not pretend to be full Prism Briefs
@@ -247,6 +249,7 @@ Institutional plans and saved stories matter early because they align with the b
 - Feed polling stays fast enough to feel live because article extraction is no longer inline in the polling loop
 - Duplicate story handling is acceptable under manual QA
 - Semantic candidate retrieval meaningfully narrows cluster choices before deterministic merge rules fire
+- Canonical URL cleanup reduces story fragmentation caused by tracking parameters and alias domains
 - Preview/staging content refreshes on a predictable cadence
 - Corrections and outlet mappings are stored, not just rendered
 - Returning users see meaningful "what changed" state on followed stories
@@ -330,6 +333,7 @@ The intended progression is:
 
 - deterministic normalization and URL hygiene
 - semantic candidate retrieval over enriched article text
+- semantic similarity folded into merge scoring behind explicit thresholds
 - explicit merge and split guardrails
 - audited versioning for material clustering changes
 

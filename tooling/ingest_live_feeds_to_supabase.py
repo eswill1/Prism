@@ -26,6 +26,7 @@ from sync_story_content import (
     seed_outlets,
     sync_story,
 )
+from url_normalization import normalize_canonical_url
 
 SOURCE_PRIORITY_BONUS = {
     "Associated Press": 4,
@@ -168,8 +169,13 @@ def patch_feed_state(client: SupabaseRestClient, feed_id: str, values: dict[str,
 
 
 def fetch_existing_discovered_urls(client: SupabaseRestClient) -> set[tuple[str, str]]:
-    rows = client.get("/raw_discovered_urls?select=source_registry_id,discovered_url&limit=5000") or []
-    return {(row["source_registry_id"], row["discovered_url"]) for row in rows}
+    rows = client.get("/raw_discovered_urls?select=source_registry_id,discovered_url,canonical_url&limit=5000") or []
+    existing = set()
+    for row in rows:
+        canonical_url = row.get("canonical_url") or row.get("discovered_url")
+        if canonical_url:
+            existing.add((row["source_registry_id"], canonical_url))
+    return existing
 
 
 def insert_raw_discovered_urls(
@@ -179,10 +185,10 @@ def insert_raw_discovered_urls(
 ) -> int:
     existing = fetch_existing_discovered_urls(client)
     rows = []
-    now = datetime.now(timezone.utc).isoformat()
     for item in items:
         feed = feed_map[item.feed_url]
-        key = (feed["source_registry_id"], item.url)
+        canonical_url = normalize_canonical_url(item.url) or item.url
+        key = (feed["source_registry_id"], canonical_url)
         if key in existing:
             continue
         rows.append(
@@ -190,7 +196,7 @@ def insert_raw_discovered_urls(
                 "source_registry_id": feed["source_registry_id"],
                 "source_feed_id": feed["feed_id"],
                 "discovered_url": item.url,
-                "canonical_url": item.url,
+                "canonical_url": canonical_url,
                 "discovery_method": "rss",
                 "discovered_at": item.published_at,
                 "fetch_status": "pending",
