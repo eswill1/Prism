@@ -273,8 +273,8 @@ Institutional plans and saved stories matter early because they align with the b
 - [ ] Framing presence group generation
 - [ ] Context Pack generation for all four launch lenses
 - [ ] Grounded multi-source Prism Brief generation backed by extracted source text rather than feed snippets
-- [ ] Prism Brief expansion so mature story pages routinely deliver fuller multi-paragraph briefs rather than minimum viable summaries
-- [ ] Paywall-aware alternate-source matching when the strongest available source is too thin or inaccessible to the reader
+- [x] Prism Brief expansion so mature story pages routinely deliver fuller multi-paragraph briefs rather than minimum viable summaries
+- [x] Paywall-aware alternate-source matching when the strongest available source is too thin or inaccessible to the reader
 - [ ] Methodology pages and version registry
 - [ ] Perspective firewall tests
 - [ ] Morning and evening briefing generation
@@ -286,9 +286,9 @@ Institutional plans and saved stories matter early because they align with the b
 - [ ] Fly.io migration for always-on API or worker workloads
 
 #### Immediate next branch:
-- [ ] Add brief-depth rules so mature multi-source stories target fuller multi-paragraph Prism Briefs instead of minimum viable summary text
-- [ ] Build paywall-aware alternate-source matching using existing discovery and clustering signals so inaccessible lead sources can point to credible open reporting
-- [ ] Use `sources:health` plus `brief:readiness` as the tuning loop for this branch, with the explicit goal of raising full-brief-ready story count without lowering source quality
+- [x] Add brief-depth rules so mature multi-source stories target fuller multi-paragraph Prism Briefs instead of minimum viable summary text
+- [x] Build paywall-aware alternate-source matching using existing discovery and clustering signals so inaccessible lead sources can point to credible open reporting
+- [x] Use `sources:health` plus `brief:readiness` as the tuning loop for this branch, with the explicit goal of raising full-brief-ready story count without lowering source quality
 
 #### Success metrics:
 - Readers use alternate lenses and Context Packs repeatedly

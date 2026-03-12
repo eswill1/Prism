@@ -201,6 +201,20 @@ function outletText(cluster: StoryCluster) {
   return `${outlets.slice(0, -1).join(', ')} and ${outlets[outlets.length - 1]}`
 }
 
+function outletListText(outlets: string[]) {
+  const unique = Array.from(new Set(outlets.filter(Boolean)))
+  if (unique.length === 0) {
+    return 'multiple outlets'
+  }
+  if (unique.length === 1) {
+    return unique[0]
+  }
+  if (unique.length === 2) {
+    return `${unique[0]} and ${unique[1]}`
+  }
+  return `${unique.slice(0, -1).join(', ')}, and ${unique[unique.length - 1]}`
+}
+
 function centralSource(sources: BriefSource[]) {
   if (sources.length === 0) {
     return null
@@ -301,17 +315,32 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
   const central = centralSource(sources)
   const divergent = divergentSource(sources, central)
   const fullBrief = sources.length >= 2 && distinctOutletCount(cluster) >= 2
+  const secondarySources = sources
+    .filter((source) => source.outlet !== central?.outlet)
+    .slice(0, 3)
+  const corroboratingOutlets = outletListText(secondarySources.map((source) => source.outlet))
 
-  const paragraphs = [ensurePeriod(cluster.dek)]
-  if (central && sentenceSimilarity(central.snippet, cluster.dek) < 0.72) {
-    paragraphs.push(central.snippet)
-  }
-  if (fullBrief && divergent && sentenceSimilarity(divergent.snippet, central?.snippet || cluster.dek) < 0.72) {
-    paragraphs.push(divergent.snippet)
-  }
-  if (!fullBrief && sources[0] && sentenceSimilarity(sources[0].snippet, cluster.dek) < 0.72) {
-    paragraphs.push(sources[0].snippet)
-  }
+  const paragraphs = fullBrief
+    ? [
+        ensurePeriod(cluster.dek),
+        central
+          ? `Across ${outletText(cluster)}, the core sequence is consistent. ${central.snippet}`
+          : ensurePeriod(cluster.dek),
+        secondarySources.length > 0
+          ? `${corroboratingOutlets} add more detail around ${stripEndingPunctuation(
+              secondarySources[0]?.focus || 'the practical stakes',
+            )}, which helps turn the headline into a clearer working picture of the story.`
+          : '',
+        divergent
+          ? `${divergent.outlet} puts more emphasis on ${stripEndingPunctuation(
+              divergent.focus,
+            )}, so the difference in coverage is mostly about what deserves the most attention rather than basic disagreement about the event itself.`
+          : `The coverage is still relatively aligned on the event itself, with the main differences showing up in emphasis and downstream consequences.`,
+      ]
+    : [
+        ensurePeriod(cluster.dek),
+        sources[0] && sentenceSimilarity(sources[0].snippet, cluster.dek) < 0.72 ? sources[0].snippet : '',
+      ]
 
   const whereSourcesAgree = fullBrief
     ? `Across ${outletText(cluster)}, the shared baseline is clear: ${central?.snippet || ensurePeriod(cluster.dek)}`

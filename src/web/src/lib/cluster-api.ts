@@ -1,6 +1,7 @@
 import { clusterBySlug, mockClusters, type FramingGroup, type StoryCluster } from './mock-clusters'
 import { loadLiveStoryBySlug } from './live-feed'
 import { getNewsSectionKey } from './news-sections'
+import { inferSourceAccessTier } from './source-access'
 import { getSupabaseServerClient, hasSupabaseServerConfig, type JsonObject } from './supabase/server'
 
 export type ClusterSummary = {
@@ -512,6 +513,10 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
           item.selection_reason ||
           'Included because it materially adds reporting or framing context to the story.',
         url: publicArticleUrl(item.articles?.original_url || item.articles?.canonical_url),
+        accessTier: inferSourceAccessTier({
+          outlet: item.articles?.outlets?.canonical_name,
+          url: item.articles?.original_url || item.articles?.canonical_url,
+        }),
         feedSummary:
           typeof articleMetadata.feed_summary === 'string' ? articleMetadata.feed_summary : undefined,
         bodyText: item.articles?.body_text || undefined,
@@ -543,6 +548,10 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
             title: item.title_override || item.articles?.headline || 'Untitled article',
             why: item.why_included,
             url: publicArticleUrl(item.articles?.original_url || item.articles?.canonical_url),
+            accessTier: inferSourceAccessTier({
+              outlet: item.articles?.outlets?.canonical_name,
+              url: item.articles?.original_url || item.articles?.canonical_url,
+            }),
           }
 
           if (existing) {

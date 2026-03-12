@@ -5,6 +5,7 @@ import { SiteFooter } from './site-footer'
 import { SiteNav } from './site-nav'
 import { getClusterDetail } from '../lib/cluster-api'
 import type { ContextItem, StoryCluster } from '../lib/mock-clusters'
+import type { SourceAccessTier } from '../lib/source-access'
 import { buildStoryBrief } from '../lib/story-briefs'
 
 type StoryPageProps = {
@@ -88,6 +89,9 @@ function articleBaseScore(article: StoryCluster['articles'][number], index: numb
   score += article.framing === 'center' ? 10 : 6
   score += article.url ? 6 : 0
   score += Math.min(article.summary.length, 180) / 18
+  score += article.extractionQuality === 'article_body' ? 8 : article.extractionQuality === 'metadata_description' ? 4 : 0
+  score += article.bodyText && article.bodyText.length >= 180 ? 5 : 0
+  score += article.accessTier === 'open' ? 10 : article.accessTier === 'likely_paywalled' ? -10 : 0
 
   if (/direct|baseline|process|best|strong|clear/i.test(article.reason)) {
     score += 6
@@ -96,9 +100,22 @@ function articleBaseScore(article: StoryCluster['articles'][number], index: numb
   return score
 }
 
+function alternateReadScore(item: ContextItem) {
+  let score = 12
+  score += item.accessTier === 'open' ? 8 : item.accessTier === 'likely_paywalled' ? -8 : 0
+  if (/baseline|clear|direct|evidence|detail/i.test(item.why)) {
+    score += 4
+  }
+  return score
+}
+
+function hasOpenRead(articles: StoryCluster['articles']) {
+  return articles.some((article) => article.accessTier === 'open')
+}
+
 function selectPrimaryReads(articles: StoryCluster['articles']) {
   if (articles.length <= 2) {
-    return articles
+    return [...articles].sort((left, right) => articleBaseScore(right, articles.indexOf(right)) - articleBaseScore(left, articles.indexOf(left)))
   }
 
   const ranked = articles
@@ -150,11 +167,23 @@ export async function StoryPage({ slug }: StoryPageProps) {
   const linkedArticles = cluster.articles.filter((article) => Boolean(article.url))
   const primaryReads = selectPrimaryReads(linkedArticles)
   const moreReads = selectMoreReads(linkedArticles, primaryReads)
-  const alternateReads = buildAlternateReads(cluster).filter(
+  const alternateReads = buildAlternateReads(cluster)
+    .filter(
     (item) =>
       Boolean(item.url) &&
       !primaryReads.some((article) => article.outlet === item.outlet && article.title === item.title),
-  )
+    )
+    .sort((left, right) => alternateReadScore(right) - alternateReadScore(left))
+
+  const leadRead = primaryReads[0]
+  const leadNeedsOpenAlternate =
+    leadRead?.accessTier === 'likely_paywalled' && hasOpenRead(primaryReads.concat(moreReads))
+  const openAlternate =
+    primaryReads.concat(moreReads).find((article) => article.accessTier === 'open' && article.url) || null
+
+  const reportingHeading = leadNeedsOpenAlternate
+    ? 'Start with Prism’s strongest available reads, including an open alternate when the lead source may be gated.'
+    : 'Start with these source reads if you want the original reporting behind the brief.'
 
   return (
     <main className="page-shell cluster-page">
@@ -234,9 +263,15 @@ export async function StoryPage({ slug }: StoryPageProps) {
               <div className="section-heading">
                 <div>
                   <p className="panel-label">Reporting to read next</p>
-                  <h2>Start with these source reads if you want the original reporting behind the brief.</h2>
+                  <h2>{reportingHeading}</h2>
                 </div>
               </div>
+
+            {leadNeedsOpenAlternate && openAlternate ? (
+              <p className="article-stack-note">
+                The strongest lead source here may be harder to access directly. Prism is also surfacing an open alternate from <strong>{openAlternate.outlet}</strong> so the story does not dead-end on a paywall.
+              </p>
+            ) : null}
 
             <div className="article-stack">
               {primaryReads.map((article, index) => (
