@@ -13,6 +13,7 @@ Current build priority:
 - expand mature multi-source briefs beyond minimum viable summaries
 - add paywall-aware alternate-source matching so thin or inaccessible lead sources do not dead-end the reader
 - push paywall-aware alternate-source matching upstream into ingestion metadata so story records know their best open fallback before the reader layer renders
+- generate stored Perspective revisions and Context Packs from linked story coverage instead of inventing Perspective entirely in the page layer
 
 Prism's core loop is:
 
@@ -113,6 +114,8 @@ Core commands:
 - `npm run brief:generate`
 - `npm run brief:readiness`
 - `npm run brief:grounding`
+- `npm run perspective:generate`
+- `npm run perspective:readiness`
 - `npm run sources:health`
 - `npm run cluster:candidates`
 
@@ -122,16 +125,19 @@ Environment baseline:
 - this repo is now scoped locally to Doppler project `prism-wire` config `dev`
 - `npm run sync:stories` is now for explicit snapshot or manual sync work only; connected Prism should rely on real sourced stories
 - `npm run sources:upsert` activates the current launch feed registry in Supabase
-- `npm run ingest:feeds` is the default operator path: it polls the active RSS and sitemap feeds in Supabase, refreshes the automated live story set, runs the slower article enrichment pass, and then generates stored grounded brief revisions for active stories
+- `npm run ingest:feeds` is the default operator path: it polls the active RSS and sitemap feeds in Supabase, refreshes the automated live story set, runs the slower article enrichment pass, generates stored grounded brief revisions, and then generates stored Perspective revisions plus Context Packs for active stories
 - `npm run ingest:feeds:raw` runs only the fast discovery and story-sync portion of the pipeline when you explicitly need ingest without enrichment
 - `npm run enrich:articles` performs the slower article-page extraction pass for recent linked articles, upgrades Prism Brief inputs beyond feed snippets, and refreshes active story summaries after enrichment lands
 - `npm run brief:generate` builds grounded story-brief revisions from enriched article inputs and advances the current brief revision for each active story when the input signature changes
 - `npm run brief:readiness` reports which active live stories are still limited to early briefs, which have enough substantive sourcing for full Prism Briefs, and whether they already have a usable open alternate
 - `npm run brief:grounding` audits current stored brief sections against their recorded support references so weak or unsupported brief language is visible before it ships
+- `npm run perspective:generate` builds stored Perspective revisions plus Context Pack selections from current linked coverage and advances the current Perspective revision when the input signature changes
+- `npm run perspective:readiness` reports which active live stories already have current Perspective revisions and how fully the four launch lenses are populated
 - `npm run sources:health` reports which discovery sources are contributing recent articles, substantive extraction, and active story coverage versus just generating queue noise
 - `npm run sources:health` now also shows open vs likely-paywalled article volume and highlights thin paywalled sources that still need better fallback handling
 - enrichment now persists article-level access signals so the reader layer and the brief generator can distinguish open reads from likely paywalled ones using article evidence, not outlet lists alone
 - active story metadata now only advertises lead-source confidence and open alternates when those reads clear a minimum quality floor; Prism does not surface weak alternates just because they are open
+- Perspective now uses stored revisions and generated Context Packs in connected mode, with all four launch lenses remaining visible even when a given lens does not yet have enough coverage to populate a strong read set
 - `npm run cluster:candidates` reports how well semantic candidate retrieval covers the current heuristic clusters and validates the offline regression fixtures
 - clustering now shares canonical URL normalization across ingest, sync, and evaluation so tracking parameters and alias domains do not fragment stories
 - sitemap-derived items are now demoted unless they have substantive extracted text or enough source breadth to support a reader-facing story shell

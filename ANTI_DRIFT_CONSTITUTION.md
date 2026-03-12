@@ -32,6 +32,7 @@ These rules apply across official Prism clients.
 - Perspective data may explain coverage
 - Perspective data may not act as covert editorial enforcement
 - Perspective data may not silently suppress or boost content for ideological reasons
+- Perspective revisions and Context Pack choices must be persisted and auditable; the reader-facing rail may not silently invent new structural claims at render time
 
 ### No single neutral verdict
 

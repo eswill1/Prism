@@ -61,17 +61,37 @@ export function ContextPackPanel({ packs }: ContextPackPanelProps) {
       {activeItems.length > 0 ? (
         <div className="context-grid">
           {activeItems.map((item, index) => (
-            <article className="context-card" key={`${activeLens}-${item.outlet}-${item.title}`}>
-              <div className="context-card-top">
-                <span className="context-outlet">{item.outlet}</span>
-                <span className="context-count">{`0${index + 1}`}</span>
-              </div>
-              <h3>{item.title}</h3>
-              <div className="context-why">
-                <span className="context-why-label">Why this read</span>
-                <p>{item.why}</p>
-              </div>
-            </article>
+            item.url ? (
+              <a
+                className="context-card context-card-link"
+                href={item.url}
+                key={`${activeLens}-${item.outlet}-${item.title}`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <div className="context-card-top">
+                  <span className="context-outlet">{item.outlet}</span>
+                  <span className="context-count">{`0${index + 1}`}</span>
+                </div>
+                <h3>{item.title}</h3>
+                <div className="context-why">
+                  <span className="context-why-label">Why this read</span>
+                  <p>{item.why}</p>
+                </div>
+              </a>
+            ) : (
+              <article className="context-card" key={`${activeLens}-${item.outlet}-${item.title}`}>
+                <div className="context-card-top">
+                  <span className="context-outlet">{item.outlet}</span>
+                  <span className="context-count">{`0${index + 1}`}</span>
+                </div>
+                <h3>{item.title}</h3>
+                <div className="context-why">
+                  <span className="context-why-label">Why this read</span>
+                  <p>{item.why}</p>
+                </div>
+              </article>
+            )
           ))}
         </div>
       ) : (

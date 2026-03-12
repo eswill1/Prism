@@ -247,6 +247,8 @@ Rules:
 - labels are informational, not punitive
 - the opening Perspective summary should read like a note, not a second article body
 - the rail should be visually distinct from the article column without overpowering it
+- Perspective should prefer stored generated summaries and presence groups over page-local heuristics once the pipeline is available
+- all four launch lenses should remain visible in the Context Pack module, even when a given lens is currently empty
 
 ### 3.4 Context Pack
 

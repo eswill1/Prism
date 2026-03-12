@@ -1,69 +1,16 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { ContextPackPanel } from './context-pack-panel'
 import { SiteFooter } from './site-footer'
 import { SiteNav } from './site-nav'
 import { getClusterDetail } from '../lib/cluster-api'
-import type { ContextItem, StoryCluster } from '../lib/mock-clusters'
-import type { SourceAccessTier } from '../lib/source-access'
+import type { StoryCluster } from '../lib/mock-clusters'
 import { buildStoryBrief } from '../lib/story-briefs'
+import { buildFallbackPerspective } from '../lib/story-perspective'
 
 type StoryPageProps = {
   slug: string
-}
-
-function buildCoverageSummary(cluster: StoryCluster) {
-  if (cluster.outletCount <= 1) {
-    return `Prism only has one linked report in this story so far, so treat this as an early read rather than a full comparison view.`
-  }
-
-  const counts = cluster.coverageCounts
-  const parts = []
-
-  if (counts.left > 0) parts.push(`${counts.left} left-leaning`)
-  if (counts.center > 0) parts.push(`${counts.center} center-leaning`)
-  if (counts.right > 0) parts.push(`${counts.right} right-leaning`)
-
-  if (parts.length === 0) {
-    return `Prism is still gathering enough coverage to show a useful comparison set for this story.`
-  }
-
-  return `Prism has ${cluster.outletCount} outlets in this comparison set, with ${parts.join(', ')} sources represented so far.`
-}
-
-function buildPerspectiveTakeaways(cluster: StoryCluster) {
-  const agreement = cluster.keyFacts[0] || cluster.dek
-  const disagreement =
-    cluster.keyFacts[2] ||
-    `Outlets are putting different weight on politics, practical fallout, and who to blame.`
-  const watchNext =
-    cluster.whatChanged[0] ||
-    `Expect the story to keep moving as more outlets add fresh reporting and official updates.`
-
-  return [
-    `Shared baseline: ${agreement}`,
-    `Main split in coverage: ${disagreement}`,
-    `What to watch next: ${watchNext}`,
-  ]
-}
-
-function buildAlternateReads(cluster: StoryCluster): ContextItem[] {
-  const seen = new Set<string>()
-  const items: ContextItem[] = []
-
-  for (const pack of Object.values(cluster.contextPacks)) {
-    for (const item of pack) {
-      const key = `${item.outlet}:${item.title}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      items.push(item)
-      if (items.length === 3) {
-        return items
-      }
-    }
-  }
-
-  return items
 }
 
 function titleTokenOverlap(left: string, right: string) {
@@ -97,15 +44,6 @@ function articleBaseScore(article: StoryCluster['articles'][number], index: numb
     score += 6
   }
 
-  return score
-}
-
-function alternateReadScore(item: ContextItem) {
-  let score = 12
-  score += item.accessTier === 'open' ? 8 : item.accessTier === 'likely_paywalled' ? -8 : 0
-  if (/baseline|clear|direct|evidence|detail/i.test(item.why)) {
-    score += 4
-  }
   return score
 }
 
@@ -162,18 +100,10 @@ export async function StoryPage({ slug }: StoryPageProps) {
   const entryHref = '/'
   const entryLabel = 'Back to homepage'
   const storyBrief = cluster.generatedBrief ?? buildStoryBrief(cluster)
-  const coverageSummary = buildCoverageSummary(cluster)
-  const perspectiveTakeaways = buildPerspectiveTakeaways(cluster)
+  const perspective = cluster.generatedPerspective ?? buildFallbackPerspective(cluster)
   const linkedArticles = cluster.articles.filter((article) => Boolean(article.url))
   const primaryReads = selectPrimaryReads(linkedArticles)
   const moreReads = selectMoreReads(linkedArticles, primaryReads)
-  const alternateReads = buildAlternateReads(cluster)
-    .filter(
-    (item) =>
-      Boolean(item.url) &&
-      !primaryReads.some((article) => article.outlet === item.outlet && article.title === item.title),
-    )
-    .sort((left, right) => alternateReadScore(right) - alternateReadScore(left))
 
   const leadRead = primaryReads[0]
   const leadNeedsOpenAlternate =
@@ -361,42 +291,8 @@ export async function StoryPage({ slug }: StoryPageProps) {
           </article>
           ) : null}
 
-          {alternateReads.length > 0 ? (
-            <article className="panel content-panel">
-              <div className="section-heading">
-                <div>
-                  <p className="panel-label">Another angle</p>
-                  <h2>Three useful alternate reads.</h2>
-                </div>
-              </div>
-              <div className="alternate-read-list">
-                {alternateReads.map((item) => (
-                  item.url ? (
-                    <a
-                      className="alternate-read-item alternate-read-link"
-                      href={item.url}
-                      key={`${item.outlet}-${item.title}`}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      <div className="alternate-read-top">
-                        <strong>{item.outlet}</strong>
-                      </div>
-                      <h3>{item.title}</h3>
-                      <p>{item.why}</p>
-                    </a>
-                  ) : (
-                    <article className="alternate-read-item" key={`${item.outlet}-${item.title}`}>
-                      <div className="alternate-read-top">
-                        <strong>{item.outlet}</strong>
-                      </div>
-                      <h3>{item.title}</h3>
-                      <p>{item.why}</p>
-                    </article>
-                  )
-                ))}
-              </div>
-            </article>
+          {Object.values(cluster.contextPacks).some((items) => items.length > 0) ? (
+            <ContextPackPanel packs={cluster.contextPacks} />
           ) : null}
 
           <details className="panel content-panel disclosure-panel">
@@ -450,9 +346,9 @@ export async function StoryPage({ slug }: StoryPageProps) {
               </div>
             </div>
             <div className="perspective-summary-block">
-              <p className="coverage-summary">{coverageSummary}</p>
+              <p className="coverage-summary">{perspective.summary}</p>
               <ul className="simple-list perspective-list">
-                {perspectiveTakeaways.map((item) => (
+                {perspective.takeaways.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
@@ -486,10 +382,59 @@ export async function StoryPage({ slug }: StoryPageProps) {
                 </div>
               </div>
             </div>
-            <p className="inspector-note perspective-note">
-              Perspective shows the mix Prism is seeing in coverage. It does not decide who is
-              right.
-            </p>
+
+            {perspective.framingPresence.length > 0 ? (
+              <div className="perspective-presence-block">
+                <p className="panel-label">Framing present</p>
+                <ul className="perspective-presence-list">
+                  {perspective.framingPresence.map((item) => (
+                    <li key={`framing-${item.label}`}>
+                      <div className="presence-row-top">
+                        <strong>{item.label}</strong>
+                        <span>{item.count}</span>
+                      </div>
+                      <p>{item.note}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {perspective.sourceFamilyPresence.length > 0 ? (
+              <div className="perspective-presence-block">
+                <p className="panel-label">Source families present</p>
+                <ul className="perspective-presence-list">
+                  {perspective.sourceFamilyPresence.map((item) => (
+                    <li key={`family-${item.label}`}>
+                      <div className="presence-row-top">
+                        <strong>{item.label}</strong>
+                        <span>{item.count}</span>
+                      </div>
+                      <p>{item.note}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {perspective.scopePresence.length > 0 ? (
+              <div className="perspective-presence-block">
+                <p className="panel-label">Coverage scope</p>
+                <ul className="perspective-presence-list">
+                  {perspective.scopePresence.map((item) => (
+                    <li key={`scope-${item.label}`}>
+                      <div className="presence-row-top">
+                        <strong>{item.label}</strong>
+                        <span>{item.count}</span>
+                      </div>
+                      <p>{item.note}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <p className="inspector-note perspective-note">{perspective.methodologyNote}</p>
           </article>
         </aside>
       </section>

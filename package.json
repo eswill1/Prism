@@ -20,6 +20,8 @@
     "brief:generate": "doppler run -- python3 tooling/generate_story_briefs_to_supabase.py",
     "brief:readiness": "doppler run -- python3 tooling/evaluate_brief_readiness.py",
     "brief:grounding": "doppler run -- python3 tooling/evaluate_brief_grounding.py",
+    "perspective:generate": "doppler run -- python3 tooling/generate_perspective_to_supabase.py",
+    "perspective:readiness": "doppler run -- python3 tooling/evaluate_perspective_readiness.py",
     "sources:health": "doppler run -- python3 tooling/report_source_health.py",
     "cluster:candidates": "python3 tooling/evaluate_cluster_candidates.py",
     "build:api": "npm run build --workspace=src/api",

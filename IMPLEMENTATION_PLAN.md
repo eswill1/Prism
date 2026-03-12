@@ -195,7 +195,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Direct source links in "Reporting to read next" and "Also in the mix"
 - [x] "Another angle" links rendered when source URLs are present
 - [x] Connected reader surfaces restricted to real sourced live stories instead of synthetic editorial stand-ins
-- [ ] Perspective panel v1 backed by real outlet data
+- [x] Perspective panel v1 backed by real outlet data
 - [x] Methodology page shell
 - [x] Browser-local saved/followed story prototype
 - [ ] Saved stories
@@ -272,8 +272,8 @@ Institutional plans and saved stories matter early because they align with the b
 **Goal: Make Prism's differentiator operational: inspectable coverage structure, auditable methodology, and a first paid reader value loop.**
 
 #### Deliverables:
-- [ ] Framing presence group generation
-- [ ] Context Pack generation for all four launch lenses
+- [x] Framing presence group generation
+- [x] Context Pack generation for all four launch lenses
 - [x] Grounded multi-source Prism Brief generation backed by extracted source text rather than feed snippets
 - [x] Prism Brief expansion so mature story pages routinely deliver fuller multi-paragraph briefs rather than minimum viable summaries
 - [x] Paywall-aware alternate-source matching when the strongest available source is too thin or inaccessible to the reader
@@ -288,11 +288,12 @@ Institutional plans and saved stories matter early because they align with the b
 - [ ] Fly.io migration for always-on API or worker workloads
 
 #### Immediate next branch:
-- [x] Add brief-depth rules so mature multi-source stories target fuller multi-paragraph Prism Briefs instead of minimum viable summary text
-- [x] Build paywall-aware alternate-source matching using existing discovery and clustering signals so inaccessible lead sources can point to credible open reporting
-- [x] Use `sources:health` plus `brief:readiness` as the tuning loop for this branch, with the explicit goal of raising full-brief-ready story count without lowering source quality
-- [x] Move paywall/open-alternate handling upstream so active story metadata stores lead-source and open-alternate options instead of leaving access logic entirely to the reader layer
-- [x] Add section-level support metadata plus `brief:grounding` so stored briefs can be audited for weak or unsupported language
+- [x] Persist current Perspective revisions and generated Context Packs instead of computing the Perspective rail entirely in the page layer
+- [x] Wire the story page to stored Perspective summaries, presence groups, and lens-based Context Packs
+- [x] Add operator commands so `ingest:feeds` now advances Perspective revisions after brief generation
+- [ ] Add Perspective methodology/version surfacing so readers can inspect what changed in the current Perspective revision
+- [ ] Add Perspective firewall tests and regression fixtures so presence/context data cannot leak into ranking or become implicit truth scoring
+- [ ] Tune Context Pack selection with `perspective:readiness`, `sources:health`, and manual review on live stories before broadening the feature surface
 
 #### Success metrics:
 - Readers use alternate lenses and Context Packs repeatedly
