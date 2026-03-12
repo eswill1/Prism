@@ -112,7 +112,7 @@ PHRASE_NORMALIZATIONS: list[tuple[str, str]] = [
 ]
 
 EVENT_TAG_PATTERNS: list[tuple[str, tuple[str, ...]]] = [
-    ("oil_reserve_release", (r"\boil\b", r"\breserve\b", r"\b(release|tap|strategic|petroleum|barrel|fuel price)\b")),
+    ("oil_reserve_release", (r"\boil\b", r"\breserves?\b", r"\b(release|tap|strategic|petroleum|barrel|fuel price)\b")),
     ("iran_war_cost", (r"\biran\b", r"\bwar\b", r"\b(cost|billion|pentagon|congress|days?)\b")),
     ("iran_shipping_attacks", (r"\biran\b", r"\b(ships?|shipping|strait of hormuz|persian gulf|hormuz)\b")),
     ("china_npc", (r"\bchina\b", r"\b(npc|national people's congress|political meeting|two sessions)\b")),

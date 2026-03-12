@@ -192,10 +192,13 @@ def build_similarity_lookup(
     items: list[StoryLike],
     *,
     top_k: int = 6,
-    min_similarity: float = 0.14,
+    min_similarity: float | None = None,
 ) -> tuple[dict[str, list[str]], dict[tuple[str, str], float]]:
     if len(items) <= 1:
         return {}, {}
+
+    if min_similarity is None:
+        min_similarity = float(os.getenv("PRISM_SEMANTIC_MIN_SIMILARITY", "0.10"))
 
     provider = build_embedding_provider()
     texts = [build_story_embedding_text(item) for item in items]
