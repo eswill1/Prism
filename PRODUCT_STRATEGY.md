@@ -37,7 +37,7 @@ Prism has to solve for comprehension.
 
 ## The Core Product Move
 
-The primary object is the **Story Cluster**.
+The primary object is the **Story**.
 
 Not:
 
@@ -45,7 +45,7 @@ Not:
 - a headline river
 - a generic "for you" recommendation
 
-A cluster is an event-centered workspace with a clear reader promise:
+A story is an event-centered workspace with a clear reader promise:
 
 - here is the event
 - here is the coverage spread
@@ -54,6 +54,18 @@ A cluster is an event-centered workspace with a clear reader promise:
 - here is what changed
 
 That shift matters because it changes the emotional contract. The user is not asked to keep scrolling. The user is invited to get oriented.
+
+### Story first, comparison second
+
+Prism should not behave like a comparison tool that immediately sends the reader elsewhere to understand the news.
+
+The correct order is:
+
+1. tell the reader what happened in plain language
+2. show how coverage differs
+3. let the reader open original reporting when they want depth
+
+That is the clearest practical distinction between Prism and products that mainly optimize for cross-source comparison.
 
 ---
 
@@ -78,6 +90,43 @@ That is a repeatable product loop if the experience is fast, calm, and obviously
 
 ---
 
+## The Core Loop
+
+Prism should be built around one repeatable reader loop:
+
+1. a user opens Prism because a story matters
+2. Prism gets them oriented faster than normal news browsing
+3. Prism gives them one or two high-value inspection moves:
+   - another framing
+   - an evidence item
+   - a correction or "what changed" note
+4. the user saves or follows the story because Prism is now the easiest place to come back
+5. the user returns later and immediately understands what changed
+
+This is the product loop that matters.
+
+Not:
+
+- total article clicks
+- feed depth
+- session length for its own sake
+- generic "engagement"
+
+If Prism does not make this loop feel obviously better than opening many tabs manually, then the product will remain a principled prototype.
+
+### What this means in practice
+
+The product should optimize first for:
+
+- orientation speed
+- inspection quality
+- trustworthy change tracking
+- repeat-use value through saved/followed stories and briefings
+
+Everything else is secondary until this loop is real.
+
+---
+
 ## Prism Does Not Sell Neutrality
 
 Prism should be explicit about what it is not doing.
@@ -98,6 +147,8 @@ It shows:
 
 This is a more defensible promise than "trust us, we solved bias."
 
+Perspective is also stronger language than "anti-bias" because it does not pretend Prism can remove viewpoint from journalism. It promises something more honest: show the reader how the same story looks from different angles without telling them which one to believe.
+
 ---
 
 ## The Product Wedge
@@ -106,9 +157,9 @@ Prism should launch as a premium current-events understanding tool, not as a mas
 
 ### Entry wedge
 
-- major story clusters with transparent Perspective panels
-- morning and evening briefings organized by cluster, not headline list
-- saved clusters and follow-up alerts
+- major stories with transparent Perspective panels
+- morning and evening briefings organized by story, not headline list
+- saved stories and follow-up alerts
 - institutional pilot plans for schools, libraries, and workplaces
 
 ### Why this wedge is strong
@@ -142,6 +193,12 @@ The launch promise should be:
 
 This is the most credible first market because it already pays for clarity.
 
+The product proof for Motion 1 is simple:
+
+- a serious reader uses Prism on a meaningful story
+- they feel more oriented in less time
+- they choose to return when the story moves
+
 ### Motion 2: Expand through team and institutional access
 
 Once the individual product is credible, Prism should sell:
@@ -163,10 +220,12 @@ After trust is earned, Prism can expand from "tool you use when something matter
 
 - a morning briefing
 - an evening catch-up
-- saved-cluster follow-up alerts
+- saved-story follow-up alerts
 - topic briefings for specific domains
 
 The habit must form around orientation and decision utility, not compulsive checking.
+
+That habit should grow from the core loop, not replace it. The daily briefing exists to bring the user back to stories they care about. It should not become a generic headline treadmill.
 
 ---
 
@@ -176,8 +235,8 @@ Prism should copy the structure of premium information products, not cheap mass-
 
 Recommended shape:
 
-- free tier with limited cluster views and saved stories
-- individual subscription for full cluster access, Context Packs, and follow alerts
+- free tier with limited story views and saved stories
+- individual subscription for full story access, Context Packs, and follow alerts
 - professional tier for power users who need advanced monitoring and exports
 - institutional plans with seat-based pricing and admin controls
 
@@ -190,18 +249,23 @@ Prism should not try to be the cheapest option in the market. It should try to b
 The main channels should be:
 
 - launch briefings and newsletters
-- X and LinkedIn clips of major cluster comparisons
+- X and LinkedIn clips of major story comparisons
 - media-literacy and education partnerships
 - podcast and newsletter sponsorship in adjacent "smart reader" audiences
-- referral loops from shared clusters and saved briefings
+- referral loops from shared stories and saved briefings
 
 Paid acquisition should support a strong product loop, not substitute for one.
 
-The best acquisition asset will be the cluster itself:
+The best acquisition asset will be the story itself:
 
 - visually distinctive
 - useful when shared
 - obviously different from a standard aggregator card
+
+The best retention asset will be the feeling:
+
+- "Prism helped me get oriented faster."
+- "Prism is where I go back to see what changed."
 
 ---
 
@@ -233,7 +297,7 @@ Prism should not be funded by:
 - engagement-optimized display ads
 - behavioral microtargeting
 - paid political placement
-- sponsorship structures that influence cluster prominence
+- sponsorship structures that influence story prominence
 
 The business model has to reinforce the product thesis. If revenue grows when readers are confused, angry, or compulsively checking the app, the system will drift.
 
@@ -272,7 +336,7 @@ Prism still needs habits. Just different ones.
 
 | Attention Loop | Prism Loop |
 |---|---|
-| headline spike -> react -> refresh | cluster opens -> context understood -> save or compare -> leave informed |
+| headline spike -> react -> refresh | story opens -> context understood -> save or compare -> leave informed |
 
 ### Replace tribal certainty with inspectable structure
 
@@ -287,7 +351,7 @@ The reader should feel:
 
 Return triggers:
 
-- cluster changed materially
+- story changed materially
 - a new outlet family entered the coverage set
 - an evidence item was corrected
 - a context pack was revised under a new data version

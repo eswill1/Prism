@@ -1,5 +1,5 @@
 # Vercel Bootstrap
-### Version 0.1
+### Version 0.2 — Updated 2026-03-12: story-first preview checks aligned
 
 Use this when you create the new GitHub repo and wire Prism into the first hosted preview environment.
 
@@ -13,8 +13,7 @@ Before connecting Vercel:
 - push this repo content into it
 - keep `.env.example` as the documented variable list
 - keep `.github/workflows/web-ci.yml` and `.github/workflows/refresh-live-feed.yml` enabled
-
-This project is not initialized as a git repo locally yet, so repository creation still needs to happen on your side.
+- keep local development aligned with `LOCAL_DEVELOPMENT_MODEL.md`
 
 ---
 
@@ -79,16 +78,16 @@ This is the cheap-content loop for the Vercel preview path.
 After Vercel is connected, verify:
 
 - `/`
-- `/live`
-- `/clusters/federal-budget-deadline`
+- `/stories/federal-budget-deadline`
 - `/api/health`
-- `/api/live`
+- `/api/clusters`
 
 Expected behavior:
 
-- the homepage and live page render without needing the Fastify API
+- the homepage renders as the definitive current-news front door without needing the Fastify API
+- the story page renders as an article-first Prism Brief with a distinct Perspective rail
 - `/api/health` returns `ok: true`
-- `/api/live` returns `ready: true` after the live snapshot is generated
+- `/api/clusters` returns story data from the current preview data path
 
 ---
 
@@ -101,6 +100,7 @@ Do not add these on the first hosted pass:
 - BullMQ
 - self-hosted Postgres
 - self-hosted Redis
+- daily-development dependence on Vercel itself
 
 The first hosted goal is product validation, not infrastructure completeness.
 

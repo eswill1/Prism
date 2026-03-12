@@ -10,7 +10,7 @@ type RouteContext = {
 
 export async function GET(_request: Request, context: RouteContext) {
   const { slug } = await context.params
-  const cluster = getClusterDetail(slug)
+  const cluster = await getClusterDetail(slug)
 
   if (!cluster) {
     return NextResponse.json(

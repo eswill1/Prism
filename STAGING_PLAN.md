@@ -1,5 +1,5 @@
 # Prism Staging Plan
-### Version 0.1
+### Version 0.2 — Updated 2026-03-12: homepage-first reader model and story-page preview path
 
 ---
 
@@ -31,12 +31,15 @@ Current constraints:
 - very limited development budget
 - an existing VPS with `2 GB` RAM already carrying other projects
 - no need to run the full Prism stack 24/7 yet
+- local development is happening on a MacBook that also hosts another Node 20 project
 - priority is product iteration, design validation, and staged proof of live content
+- priority is a homepage-first news experience and story-first reading flow
 
 This means the wrong move is standing up:
 
 - a full always-on web + API + worker + Postgres + Redis stack immediately
 - a single-box deployment on the existing VPS
+- a global Node upgrade that risks another local project
 - a staging environment that behaves like production before the product surface is proven
 
 ---
@@ -72,8 +75,8 @@ Doppler
 **What runs here**
 
 - homepage
-- cluster detail page
-- live feed prototype
+- story page
+- secondary live queue / compatibility surfaces
 - basic read APIs
 - scheduled content snapshots
 - light editorial/admin tooling
@@ -93,6 +96,12 @@ Doppler
 - GitHub Actions is free on public repos, and private repos get included minutes on GitHub Free
 
 This is the lowest-cost setup that still feels like a real staged product.
+
+The product assumption in this phase is:
+
+- `/` is the definitive current-news front door
+- `/stories/[slug]` is the main reader surface
+- faster-moving queues such as `/live` are secondary, not required for the core product to make sense
 
 ### Phase 2: Integrated Staging
 
@@ -299,6 +308,8 @@ Do not tie deployed environments to personal tokens.
 3. Keep the public-facing app online before you keep background machinery online.
 4. Keep Postgres managed before you self-host databases.
 5. Treat the existing `2 GB` VPS as unrelated infrastructure, not Prism's default staging home.
+6. Treat the MacBook as a local-first product workstation, not a full local cluster.
+7. Do not require a global Node change on the development machine.
 
 ---
 

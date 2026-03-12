@@ -8,6 +8,7 @@ export type ClusterArticle = {
   framing: FramingGroup
   image: string
   reason: string
+  url?: string
 }
 
 export type EvidenceItem = {
@@ -25,6 +26,16 @@ export type ContextItem = {
   outlet: string
   title: string
   why: string
+  url?: string
+}
+
+export type StoryChangeKind = 'summary' | 'coverage' | 'evidence' | 'correction'
+
+export type StoryChangeItem = {
+  timestamp: string
+  kind: StoryChangeKind
+  label: string
+  detail: string
 }
 
 export type StoryCluster = {
@@ -42,6 +53,7 @@ export type StoryCluster = {
   coverageCounts: Record<FramingGroup, number>
   keyFacts: string[]
   whatChanged: string[]
+  changeTimeline: StoryChangeItem[]
   articles: ClusterArticle[]
   evidence: EvidenceItem[]
   corrections: CorrectionItem[]
@@ -73,9 +85,39 @@ export const mockClusters: StoryCluster[] = [
       'Coverage diverges most on political blame and the likely economic fallout of delay.',
     ],
     whatChanged: [
-      'Two more national outlets entered the cluster after leadership comments late this morning.',
+      'Two more national outlets entered the story after leadership comments late this morning.',
       'An evidence item was added for the latest committee memo.',
-      'The cluster summary was revised to reflect the shift from shutdown rhetoric toward stopgap negotiations.',
+      'The story summary was revised to reflect the shift from shutdown rhetoric toward stopgap negotiations.',
+    ],
+    changeTimeline: [
+      {
+        timestamp: '10:42 AM',
+        kind: 'summary',
+        label: 'Story summary recast around the stopgap path',
+        detail:
+          'Prism updated the core summary after leadership clarified that negotiators were now converging on a short-term extension rather than a larger package.',
+      },
+      {
+        timestamp: '10:17 AM',
+        kind: 'coverage',
+        label: 'Two additional national outlets entered the comparison set',
+        detail:
+          'The coverage stack widened after late-morning leadership comments pulled more process-heavy reporting into the story.',
+      },
+      {
+        timestamp: '9:58 AM',
+        kind: 'correction',
+        label: 'Syndicated duplicate merged into the canonical AP item',
+        detail:
+          'A duplicate pickup was removed so the comparison stack reflects distinct reporting rather than repeated wire copy.',
+      },
+      {
+        timestamp: '9:41 AM',
+        kind: 'evidence',
+        label: 'Committee memo added to the evidence ledger',
+        detail:
+          'The latest stopgap language memo now anchors the procedural claims surfaced in the story summary and article stack.',
+      },
     ],
     articles: [
       {
@@ -86,7 +128,7 @@ export const mockClusters: StoryCluster[] = [
         published: '14m ago',
         framing: 'center',
         image: 'https://picsum.photos/seed/ap-capitol/640/420',
-        reason: 'Most direct process-focused reporting in the cluster',
+        reason: 'Most direct process-focused reporting in the story',
       },
       {
         outlet: 'The Hill',
@@ -149,7 +191,7 @@ export const mockClusters: StoryCluster[] = [
     corrections: [
       {
         timestamp: '10:42 AM',
-        note: 'Cluster summary updated after leadership clarified the stopgap duration under discussion.',
+        note: 'Story summary updated after leadership clarified the stopgap duration under discussion.',
       },
       {
         timestamp: '9:58 AM',
@@ -226,7 +268,16 @@ export const mockClusters: StoryCluster[] = [
       'International outlets are framing the move as a global precedent-setting step.',
     ],
     whatChanged: [
-      'The cluster was created from a fast-growing set of business and policy stories.',
+      'This story was assembled from a fast-growing set of business and policy reports.',
+    ],
+    changeTimeline: [
+      {
+        timestamp: '9:24 AM',
+        kind: 'coverage',
+        label: 'Business and policy coverage began to converge',
+        detail:
+          'The story moved from scattered compliance reporting into a more coherent cross-outlet regulation narrative.',
+      },
     ],
     articles: [],
     evidence: [],
@@ -259,6 +310,15 @@ export const mockClusters: StoryCluster[] = [
     ],
     whatChanged: [
       'Regional utility outage maps were added as evidence references.',
+    ],
+    changeTimeline: [
+      {
+        timestamp: '8:52 AM',
+        kind: 'evidence',
+        label: 'Regional outage maps entered the story file',
+        detail:
+          'Utility and local-government operational data now support the recovery and resilience framing on the story page.',
+      },
     ],
     articles: [],
     evidence: [],

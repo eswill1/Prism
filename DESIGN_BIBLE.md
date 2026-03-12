@@ -1,5 +1,5 @@
 # Prism Design Bible
-### Version 0.1
+### Version 0.2 — Updated 2026-03-12: homepage-first IA, story-first reading, distinct Perspective rail
 
 ---
 
@@ -12,6 +12,18 @@ Every Prism design decision should answer one question:
 **Does this increase understanding without increasing manipulation?**
 
 If it sensationalizes disagreement, rewards compulsive checking, or hides method behind polish, it is wrong for Prism.
+
+### 0.1 Core Loop UX Requirement
+
+Prism's design must make this loop feel natural:
+
+1. open a story that matters
+2. understand the shape of coverage quickly
+3. inspect another angle, evidence item, or correction note
+4. save or follow the story
+5. return later and immediately see what changed
+
+If the interface looks impressive but does not help the reader complete that loop, the design is failing.
 
 ---
 
@@ -115,53 +127,90 @@ Motion is restrained and functional.
 
 ## 3. Core Surfaces
 
-### 3.1 Cluster Stream
+### 3.1 Story Stream
 
-The homepage is a finite stream of Story Clusters, not an endless river of links.
+The homepage is the definitive current-news front door, not a teaser for some other "real" news page.
 
-Each cluster card shows:
+It should read like a real front page: finite, current, and clearly prioritized.
+
+Its frame should feel like a serious newsroom:
+
+- a utility strap for edition/date and quiet utility links
+- a recognizable Prism masthead and mark
+- a section nav bar that supports scanning without feeling like product chrome
+
+Each story card shows:
 
 - a real visual when available and rights-cleared
 - event title
 - short event summary
 - timeline freshness
-- number of outlets in the cluster
-- the collapsed Perspective strip
-- a visible "Open cluster" action
+- number of outlets covering the story
+- a visible "Open story" action
+
+Interaction rule:
+
+- the whole story package should be clickable wherever practical, not just a small CTA
+
+Perspective and deeper structure can stay mostly on the story page. The homepage should stay news-first.
 
 Rules:
 
 - no infinite scroll as the primary mode
 - clear section boundaries between time windows or topics
+- broad categories such as World, Politics, Business, Technology, and Weather should help readers scan the homepage
+- section labels are wayfinding, not replacements for the story-first product model
 - card ordering can change with significance and freshness, but must remain explainable
-- top clusters should usually feel visually alive, not logo-only
+- top stories should usually feel visually alive, not logo-only
 
-### 3.2 Story Cluster Page
+Secondary page rule:
+
+- fast-moving story movement should usually be folded into the homepage itself rather than exposed as a second primary front door
+
+### 3.2 Story Page
 
 This is the primary product surface.
 
 **Required zones:**
 
 1. Event header
-2. What changed
-3. Coverage structure
-4. Perspective layer
-5. Evidence ledger
-6. Context pack
-7. Corrections and methodology
+2. Prism Brief
+3. Reporting to read next
+4. Another angle
+5. Perspective rail
+6. Source notes, evidence, corrections, and methodology
 
 The page should feel like an inspectable briefing, not like a comment thread.
 
+The current structural rule is:
+
+- left two-thirds: article-first reading flow
+- right one-third: Perspective and supporting inspection surfaces
+
+The story must come before the comparison layer.
+
+The story page must also support the full Prism loop:
+
+- orient first
+- inspect second
+- retain through save/follow third
+- make return visits legible through visible change tracking
+
 Visual expectation:
 
-- most major clusters should open with real photography, video stills, or licensed editorial art
+- most major stories should open with real photography, video stills, or licensed editorial art
 - when media is unavailable or risky, the replacement should be an intentional first-party visual, not an empty hole
+
+Linking rule:
+
+- source reads should open original reporting directly when a real source URL exists
+- Prism should not add an intermediate wrapper page unless that wrapper adds clear editorial value
 
 ### 3.3 Perspective Panel
 
 The Perspective panel is the core signature interaction.
 
-Collapsed state on a cluster card:
+Collapsed state on a story card:
 
 - outlet count
 - reliability range
@@ -182,10 +231,12 @@ Rules:
 - show rater disagreement honestly
 - coverage split must not imply truth
 - labels are informational, not punitive
+- the opening Perspective summary should read like a note, not a second article body
+- the rail should be visually distinct from the article column without overpowering it
 
 ### 3.4 Context Pack
 
-Context Packs are short sets of alternate reads selected from the cluster.
+Context Packs are short sets of alternate reads selected from the story.
 
 Supported lenses in v1:
 
@@ -216,7 +267,7 @@ The evidence ledger is one of Prism's main trust surfaces. It should look durabl
 
 ### 3.6 Corrections Ribbon
 
-If anything material changes in the cluster, the user should see it.
+If anything material changes in the story, the user should see it.
 
 Display:
 
@@ -227,9 +278,11 @@ Display:
 
 Rules:
 
-- do not silently rewrite cluster summaries
+- do not silently rewrite story summaries
 - do not bury corrections in footers
 - every substantive Perspective or clustering change needs a visible version note
+
+This is not just a trust affordance. It is part of the return loop. Readers should feel that Prism is the place to come back when a story evolves.
 
 ---
 
@@ -285,7 +338,7 @@ Prism should look like a living news product.
 
 Rules:
 
-- real media is the default on homepage hero modules, major cluster cards, and briefings where rights are clear
+- real media is the default on homepage hero modules, major story cards, and briefings where rights are clear
 - premium or licensed media should be prioritized on major stories
 - preview images from source pages must obey production media policy and rights constraints
 - fallback states should use first-party timelines, maps, charts, or structured cards with intent
@@ -301,8 +354,8 @@ The reader can:
 
 - choose a lens
 - inspect the rating sources
-- save a cluster
-- follow a cluster
+- save a story
+- follow a story
 - compare alternate reads
 
 The reader cannot:
@@ -334,7 +387,7 @@ Visible correction discipline is part of the product identity. Silent cleanup is
 - autoplay video blocks
 - trending outrage rails
 - "people are furious" modules
-- engagement counts on cluster cards
+- engagement counts on story cards
 - fake objectivity badges
 - partisan palette coding
 - unlabeled AI summaries
@@ -345,7 +398,7 @@ Visible correction discipline is part of the product identity. Silent cleanup is
 
 - Home
 - Cluster detail
-- Saved clusters
+- Saved stories
 - Morning briefing
 - Methodology
 - Pricing

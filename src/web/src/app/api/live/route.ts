@@ -11,7 +11,7 @@ export async function GET() {
     return NextResponse.json(
       {
         ready: false,
-        message: 'No live feed snapshot has been generated yet.',
+        message: 'No latest snapshot is available yet.',
       },
       { status: 200 },
     )

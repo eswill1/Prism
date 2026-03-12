@@ -10,7 +10,11 @@
     "dev": "npm run dev:web",
     "dev:api": "npm run dev --workspace=src/api",
     "dev:web": "npm run dev --workspace=src/web",
+    "dev:web:connected": "doppler run -- npm run dev --workspace=src/web -- --hostname 127.0.0.1 --port 3002",
     "refresh:live-feed": "python3 tooling/generate_temporary_live_feed.py",
+    "sync:stories": "doppler run -- python3 tooling/sync_story_content.py",
+    "sources:upsert": "doppler run -- python3 tooling/upsert_source_feeds.py",
+    "ingest:feeds": "doppler run -- python3 tooling/ingest_live_feeds_to_supabase.py",
     "build:api": "npm run build --workspace=src/api",
     "build:web": "npm run build --workspace=src/web",
     "lint": "npm run lint --workspaces --if-present"

@@ -5,7 +5,7 @@ import { getClusterSummaries } from '../../../lib/cluster-api'
 export const runtime = 'nodejs'
 
 export async function GET() {
-  const clusters = getClusterSummaries()
+  const clusters = await getClusterSummaries()
 
   return NextResponse.json({
     clusters,

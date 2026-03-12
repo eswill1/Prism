@@ -103,6 +103,58 @@ def strip_html(raw: str | None) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def looks_clipped(text: str) -> bool:
+    trimmed = text.strip()
+    if len(trimmed) < 80:
+        return False
+    if trimmed.endswith("...") or trimmed.endswith("…"):
+        return True
+    if not re.search(r"[.!?]$", trimmed):
+        return True
+
+    words = re.findall(r"[A-Za-z']+", trimmed)
+    if len(words) < 2:
+        return False
+
+    last_word = words[-1]
+    previous_word = words[-2].lower()
+    if len(last_word) <= 2 and previous_word in {"a", "an", "the", "to", "of", "in", "on", "for", "with", "from", "at"}:
+        return True
+
+    return False
+
+
+def clamp_to_word_boundary(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+
+    sentence_matches = list(re.finditer(r".+?[.!?](?:\s|$)", text))
+    for match in reversed(sentence_matches):
+        if match.end() <= max_chars and match.end() >= int(max_chars * 0.55):
+            return text[: match.end()].strip()
+
+    truncated = text[:max_chars].rsplit(" ", 1)[0].strip()
+    return f"{truncated}..." if truncated else text[:max_chars].strip()
+
+
+def clean_summary_snippet(text: str | None, max_chars: int) -> str:
+    if not text:
+        return ""
+
+    trimmed = re.sub(r"\s+", " ", text).strip()
+    if not trimmed:
+        return ""
+
+    clamped = clamp_to_word_boundary(trimmed, max_chars)
+    if looks_clipped(clamped):
+        sentence_match = re.search(r"^(.+?[.!?])(?:\s|$)", trimmed)
+        if sentence_match and len(sentence_match.group(1).strip()) >= 60:
+            return sentence_match.group(1).strip()
+        return ""
+
+    return clamped
+
+
 def parse_datetime(value: str | None) -> datetime:
     if not value:
         return datetime.now(UTC)
@@ -128,7 +180,7 @@ def image_from_description(raw: str | None) -> str | None:
 def image_from_article(url: str) -> str | None:
     try:
         markup = fetch_text(url)
-    except (HTTPError, URLError, TimeoutError):
+    except (HTTPError, URLError, TimeoutError, ValueError):
         return None
 
     match = re.search(
@@ -186,14 +238,24 @@ def parse_feed(feed: dict[str, str]) -> list[FeedItem]:
 
 
 def should_join_cluster(item: FeedItem, cluster: list[FeedItem]) -> bool:
-    cluster_tokens = set().union(*(entry.tokens for entry in cluster))
-    if not item.tokens or not cluster_tokens:
+    if not item.tokens:
         return False
-    overlap = len(item.tokens & cluster_tokens)
-    if overlap >= 3:
-        return True
-    smaller = min(len(item.tokens), len(cluster_tokens))
-    return smaller > 0 and overlap / smaller >= 0.55
+
+    def titles_match(left: set[str], right: set[str]) -> bool:
+        if not left or not right:
+            return False
+
+        overlap = len(left & right)
+        union = len(left | right)
+        smaller = min(len(left), len(right))
+
+        if overlap >= 4:
+            return True
+        if overlap >= 3 and union > 0 and overlap / union >= 0.34:
+            return True
+        return smaller > 0 and overlap >= 3 and overlap / smaller >= 0.6
+
+    return any(titles_match(item.tokens, entry.tokens) for entry in cluster[:3])
 
 
 def cluster_items(items: Iterable[FeedItem]) -> list[list[FeedItem]]:
@@ -222,18 +284,28 @@ def slugify(value: str) -> str:
     return slug[:60] or "story"
 
 
-def build_cluster_payload(index: int, items: list[FeedItem]) -> dict[str, object]:
+def build_cluster_payload(
+    index: int,
+    items: list[FeedItem],
+    *,
+    allow_article_image_fetch: bool = False,
+) -> dict[str, object]:
     ordered = sorted(items, key=lambda item: item.published_at, reverse=True)
     lead = ordered[0]
-    hero_image = lead.image or image_from_article(lead.url)
+    hero_image = lead.image or (
+        image_from_article(lead.url) if allow_article_image_fetch else None
+    )
     sources = sorted({item.source for item in ordered})
-    dek = lead.summary or f"Live prototype cluster built from {', '.join(sources)} coverage."
+    cleaned_dek = clean_summary_snippet(lead.summary, 280)
+    dek = cleaned_dek or (
+        f"{lead.title.rstrip('?')} is drawing live coverage from {', '.join(sources)} as Prism tracks what changes next."
+    )
 
     return {
         "slug": f"live-{index}-{slugify(lead.title)}",
         "topic_label": pick_cluster_label(ordered),
         "title": lead.title,
-        "dek": dek[:280],
+        "dek": dek,
         "latest_at": lead.published_at,
         "article_count": len(ordered),
         "sources": sources,
@@ -245,7 +317,8 @@ def build_cluster_payload(index: int, items: list[FeedItem]) -> dict[str, object
                 "title": item.title,
                 "url": item.url,
                 "published_at": item.published_at,
-                "summary": item.summary[:220],
+                "summary": clean_summary_snippet(item.summary, 220)
+                or f"{item.source} is covering this development from its own reporting angle.",
                 "image": item.image,
                 "domain": urlparse(item.url).netloc,
             }

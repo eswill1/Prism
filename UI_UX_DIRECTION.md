@@ -1,11 +1,11 @@
 # Prism UI/UX Direction
-### Version 0.1
+### Version 0.2 — Updated 2026-03-12: newsroom-style homepage and article-first story surface
 
 ---
 
 ## Design Position
 
-Prism should not look like a newspaper homepage and it should not look like a generic SaaS dashboard.
+Prism should not clone a newspaper homepage blindly, and it should not look like a generic SaaS dashboard.
 
 It needs a hybrid identity:
 
@@ -18,6 +18,20 @@ The right direction for Prism is:
 > **Editorial Instrument Panel**
 
 The product should feel like a calm briefing desk built for serious readers, not a feed built for stimulation.
+
+It should also respect the mainstream reader mental model:
+
+- the homepage is where the news lives
+- broad section labels help readers scan
+- the story page is where depth happens
+- any faster-moving queue is secondary or internal, not the primary front door
+
+The design should actively support Prism's core loop:
+
+- orient quickly
+- inspect structure
+- save or follow what matters
+- return to "what changed"
 
 ---
 
@@ -115,15 +129,21 @@ This means:
 - visible data panels
 - restrained but confident accent color
 
-### 2. Make the cluster page feel like a workstation
+### 2. Make the story page feel like a story-first workstation
 
-Prism's signature surface should be a three-part layout on desktop:
+Prism's signature surface should be an article-first layout on desktop:
 
-- **Summary rail**: what happened, what changed, save/follow state
-- **Main cluster column**: event summary, article stack, Context Packs
+- **Main story column**: event header, Prism Brief, source reads, alternate reads
 - **Inspector rail**: Perspective, evidence ledger, methodology, corrections
 
 This is the core differentiator. The user should feel they are inspecting a live story structure, not reading a prettier feed.
+
+It should also be obvious where the user goes next:
+
+- inspect another angle
+- check evidence
+- save the story
+- follow updates
 
 ### 3. Use modern polish, not trend-chasing gloss
 
@@ -148,6 +168,8 @@ Avoid:
 
 Perspective, evidence, and correction surfaces should be visually prominent enough to feel central, but never loud enough to feel ideological.
 
+The opening Perspective summary should read like a note or annotation, not like another giant story headline.
+
 Prism's visual signature should come from:
 
 - dot-group coverage displays
@@ -164,37 +186,50 @@ These are product assets, not footnotes.
 
 ### Home
 
+The homepage should behave more like BBC, CNN, and NBC News than an internal tool screen:
+
+- it is the main live/current surface
+- it has broad section wayfinding
+- it uses a three-column editorial top deck
+- it does not require the reader to discover another page to see the real news product
+
+The global frame should also feel like a real national news product:
+
+- a tight utility strap
+- a centered masthead with a distinct Prism mark
+- a section nav bar that reads like a newsroom, not an app tab strip
+
 The home page should read like a finite daily briefing.
 
 Recommended zones:
 
-1. Signature hero with one major cluster already partially unpacked
-2. Top story clusters in a structured grid
-3. Topic rails with visible cluster counts
-4. Saved and followed cluster area
-5. Methodology and corrections access in the global frame
+1. Lead story package in the left column
+2. Mixed-size supporting story blocks in the center column
+3. A right-rail latest-news feed with timestamps
+4. Section-led story blocks below the fold
+5. Methodology and corrections access in the global frame, not the body of the front page
 
-### Cluster Detail
+The home page should not try to do everything. Its job is to get the reader into the right story fast enough for the core loop to begin. Story packages should feel clickable and immediate, not like static promo units.
+
+### Story Detail
 
 This is the hero surface and should receive the most design energy.
 
 Desktop:
 
-- sticky summary rail on the left
-- main reading column in the center
-- sticky inspector rail on the right
+- wide article column on the left
+- sticky Perspective / inspection rail on the right
 
 Mobile:
 
 - top summary block
-- swipeable section tabs or sticky subnav
-- Perspective and evidence in bottom-sheet or collapsible inspector modules
+- Perspective and evidence in collapsible or stacked inspector modules
 
 ### Saved View
 
 Saved should feel like a working notebook, not a bookmark dump.
 
-- cluster cards grouped by topic or urgency
+- story cards grouped by topic or urgency
 - visible "updated since saved" markers
 - direct access to correction notes
 
@@ -218,7 +253,7 @@ The product should feel warmer and more grounded than blue-white tech news sites
 
 Use editorial contrast aggressively:
 
-- serif for large headlines and cluster titles
+- serif for large headlines and story titles
 - sans for everything interactive
 - mono for methodology, versions, and ledger metadata
 
@@ -248,7 +283,7 @@ This mix helps the product feel both refined and operational.
 
 ### Mobile priorities
 
-- cluster summary always reachable within one thumb move
+- story summary always reachable within one thumb move
 - Perspective panel opens quickly and closes cleanly
 - evidence items should be easy to skim without losing place
 

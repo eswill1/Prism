@@ -1,6 +1,10 @@
 import Link from 'next/link'
 
-import { loadLiveFeed } from '../../lib/live-feed'
+import { SiteFooter } from '../../components/site-footer'
+import { SiteNav } from '../../components/site-nav'
+import { getClusterDetail, getClusterSummaries } from '../../lib/cluster-api'
+import { loadLiveFeed, mapLiveClusterToStoryCluster } from '../../lib/live-feed'
+import type { StoryCluster } from '../../lib/mock-clusters'
 
 function formatTimestamp(value: string) {
   const date = new Date(value)
@@ -14,65 +18,93 @@ function formatTimestamp(value: string) {
 
 export default async function LiveFeedPage() {
   const liveFeed = await loadLiveFeed()
+  const liveSummaries = (await getClusterSummaries({ sort: 'latest' })).filter(
+    (cluster) => cluster.status === 'Live intake',
+  )
+  const dbBackedStories = (
+    await Promise.all(liveSummaries.map((story) => getClusterDetail(story.slug)))
+  ).filter((story): story is StoryCluster => Boolean(story))
+  const visibleStories =
+    dbBackedStories.length > 0
+      ? dbBackedStories
+      : liveFeed?.clusters.map((cluster) => mapLiveClusterToStoryCluster(cluster)) ?? []
 
-  if (!liveFeed) {
+  if (!liveFeed && visibleStories.length === 0) {
     return (
       <main className="page-shell live-page">
+        <SiteNav />
         <header className="masthead">
           <div>
-            <p className="eyebrow">Temporary live feed</p>
-            <h1>No generated live feed found yet.</h1>
+            <p className="eyebrow">Secondary queue</p>
+            <h1>No fast-moving story intake is available yet.</h1>
           </div>
         </header>
         <section className="panel empty-state-panel">
           <p>
-            Run `python3 tooling/generate_temporary_live_feed.py` to fetch a temporary set
-            of live publisher headlines and cluster them for the Prism prototype.
+            Run `npm run ingest:feeds` to poll the configured feeds and refresh the secondary
+            intake queue that powers story movement on the homepage.
           </p>
           <Link href="/" className="secondary-link">
             Back to homepage
           </Link>
         </section>
+        <SiteFooter />
       </main>
     )
   }
 
   return (
     <main className="page-shell live-page">
+      <SiteNav />
       <header className="masthead">
         <div>
-          <p className="eyebrow">Temporary live feed</p>
-          <h1>Live source input, clustered into a Prism-style prototype view.</h1>
+          <p className="eyebrow">Secondary queue</p>
+          <h1>Fast-moving intake behind the homepage.</h1>
           <p className="hero-dek">
-            Generated from {liveFeed.source_count} feeds and {liveFeed.article_count}{' '}
-            discovered articles. This is a temporary clustering preview, not a production
-            ranking or rights-cleared media pipeline.
+            {liveFeed
+              ? `Generated from ${liveFeed.source_count} feeds and ${liveFeed.article_count} discovered articles.`
+              : `Showing ${visibleStories.length} automated live stories currently synced into Supabase.`}{' '}
+            This route remains available as a secondary intake view, but the homepage is the
+            actual reader-facing news surface.
           </p>
         </div>
         <div className="live-meta-card">
-          <span className="metric-label">Generated</span>
-          <strong>{formatTimestamp(liveFeed.generated_at)}</strong>
+          <span className="metric-label">Secondary queue</span>
+          <strong>{liveFeed ? formatTimestamp(liveFeed.generated_at) : 'Live DB state'}</strong>
           <Link href="/" className="secondary-link">
-            Back to homepage
+            Return to homepage
           </Link>
         </div>
       </header>
 
-      <section className="briefing-band panel">
-        <div>
-          <p className="panel-label">Source coverage</p>
-          <h2>Feeds currently feeding the prototype</h2>
-        </div>
-        <ul className="briefing-list">
-          {liveFeed.sources.map((source) => (
-            <li key={source.feed_url}>
-              {source.source} · <span className="muted-inline">{source.feed_url}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {liveFeed ? (
+        <section className="briefing-band panel">
+          <div>
+            <p className="panel-label">Source coverage</p>
+            <h2>Feeds currently powering the secondary intake queue</h2>
+          </div>
+          <ul className="briefing-list">
+            {liveFeed.sources.map((source) => (
+              <li key={source.feed_url}>
+                {source.source} · <span className="muted-inline">{source.feed_url}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : (
+        <section className="briefing-band panel">
+          <div>
+            <p className="panel-label">Automated intake</p>
+            <h2>This secondary queue is being read from the Supabase-backed intake layer.</h2>
+          </div>
+          <p className="hero-dek">
+            The visible cards below reflect the current automated story set stored in Prism,
+            even if the temporary JSON snapshot is not present on disk.
+          </p>
+        </section>
+      )}
 
-      {liveFeed.errors.length > 0 ? (
+      {liveFeed && liveFeed.errors.length > 0 ? (
         <section className="panel warning-panel">
           <p className="panel-label">Feed warnings</p>
           <ul className="simple-list">
@@ -86,79 +118,106 @@ export default async function LiveFeedPage() {
       ) : null}
 
       <section className="live-cluster-stack">
-        {liveFeed.clusters.map((cluster) => (
-          <article className="live-cluster panel" key={cluster.slug}>
+        {visibleStories.map((story) => (
+          <article className="live-cluster panel" key={story.slug}>
             <div className="live-cluster-hero">
               <div className="live-cluster-copy">
                 <div className="hero-meta-line">
-                  <span className="status-chip">Live prototype</span>
-                  <span>{formatTimestamp(cluster.latest_at)}</span>
-                  <span>{cluster.article_count} related articles</span>
+                  <span className="status-chip">{story.status}</span>
+                  <span>{story.updatedAt}</span>
+                  <span>{story.articles.length} related articles</span>
                 </div>
-                <p className="panel-label">{cluster.topic_label}</p>
-                <h2>{cluster.title}</h2>
-                <p className="hero-dek">{cluster.dek}</p>
+                <p className="panel-label">{story.topic}</p>
+                <h2>{story.title}</h2>
+                <p className="hero-dek">{story.dek}</p>
                 <div className="source-chip-row">
-                  {cluster.sources.map((source) => (
-                    <span className="source-chip" key={source}>
-                      {source}
-                    </span>
-                  ))}
+                  {Array.from(new Set(story.articles.map((article) => article.outlet))).map(
+                    (source) => (
+                      <span className="source-chip" key={`${story.slug}-${source}`}>
+                        {source}
+                      </span>
+                    ),
+                  )}
+                </div>
+                <div className="live-cluster-actions">
+                  <Link className="primary-link" href={`/stories/${story.slug}`}>
+                    Open story view
+                  </Link>
+                  <p className="live-cluster-note">
+                    This queue helps surface fast-moving intake, but the story page is still the
+                    full Prism view.
+                  </p>
                 </div>
               </div>
 
               <div className="live-cluster-media">
-                {cluster.hero_image ? (
+                {story.heroImage ? (
                   <>
-                    <img
-                      src={cluster.hero_image}
-                      alt={`${cluster.title} preview`}
-                      className="hero-image"
-                    />
-                    <span className="media-credit">{cluster.hero_credit}</span>
+                    <img src={story.heroImage} alt={story.heroAlt} className="hero-image" />
+                    <span className="media-credit">{story.heroCredit}</span>
                   </>
                 ) : (
                   <div className="generated-visual">
-                    <span>{cluster.topic_label}</span>
+                    <span>{story.topic}</span>
                   </div>
                 )}
               </div>
             </div>
 
             <div className="live-article-grid">
-              {cluster.articles.map((article) => (
-                <a
-                  className="live-article-card"
-                  key={`${article.source}-${article.url}`}
-                  href={article.url}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  {article.image ? (
-                    <img
-                      src={article.image}
-                      alt={`${article.source} preview`}
-                      className="live-article-image"
-                    />
-                  ) : (
-                    <div className="generated-visual small">
-                      <span>{article.source}</span>
+              {story.articles.map((article) => {
+                const cardContent = (
+                  <>
+                    {article.image ? (
+                      <img
+                        src={article.image}
+                        alt={`${article.outlet} preview`}
+                        className="live-article-image"
+                      />
+                    ) : (
+                      <div className="generated-visual small">
+                        <span>{article.outlet}</span>
+                      </div>
+                    )}
+                    <div className="live-article-copy">
+                      <div className="article-card-meta">
+                        <span>{article.outlet}</span>
+                        <span>{article.published}</span>
+                      </div>
+                      <h3>{article.title}</h3>
+                      <p>{article.summary}</p>
                     </div>
-                  )}
-                  <div className="live-article-copy">
-                    <div className="article-card-meta">
-                      <span>{article.source}</span>
-                      <span>{formatTimestamp(article.published_at)}</span>
+                  </>
+                )
+
+                if (!article.url) {
+                  return (
+                    <div
+                      className="live-article-card"
+                      key={`${story.slug}-${article.outlet}-${article.title}`}
+                    >
+                      {cardContent}
                     </div>
-                    <h3>{article.title}</h3>
-                    <p>{article.summary || article.domain}</p>
-                  </div>
-                </a>
-              ))}
+                  )
+                }
+
+                return (
+                  <a
+                    className="live-article-card"
+                    key={`${story.slug}-${article.outlet}-${article.url}`}
+                    href={article.url}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {cardContent}
+                  </a>
+                )
+              })}
             </div>
           </article>
         ))}
       </section>
+      <SiteFooter />
     </main>
   )
 }

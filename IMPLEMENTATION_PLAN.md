@@ -1,5 +1,5 @@
 # Prism Implementation Plan
-### Version 0.2 — Updated 2026-03-11: Harbor-style phase roadmap with checkbox tracking
+### Version 0.4 — Updated 2026-03-12: story-first reader surface and direct-source linking aligned
 
 ---
 
@@ -10,6 +10,7 @@
 3. **Corrections are product infrastructure.** Versioning and correction logs are part of the core system, not post-launch cleanup.
 4. **Reader-facing calm requires backend rigor.** The UI should feel simple because the data pipeline is explicit, not because complexity is hidden.
 5. **Subscriptions shape architecture.** Build for trust, institutional accounts, and continuity, not ad-ops complexity.
+6. **Prove the core loop before broadening the product.** If Prism does not help a reader understand, inspect, save, and return to a story more effectively than ordinary news browsing, the rest of the roadmap does not matter.
 
 ---
 
@@ -72,8 +73,8 @@ Responsibilities:
 
 Responsibilities:
 
-- create and update Story Clusters
-- compute canonical cluster titles and summaries
+- create and update Stories
+- compute canonical story titles and summaries
 - log merges, splits, and major updates
 
 ### 3.3 Perspective Service
@@ -90,9 +91,9 @@ Responsibilities:
 
 Responsibilities:
 
-- serve cluster stream and cluster detail
+- serve story stream and story detail
 - serve Perspective panels and Context Packs
-- handle subscriptions, saved clusters, and notifications
+- handle subscriptions, saved stories, and notifications
 
 ---
 
@@ -112,7 +113,7 @@ V1 schema should include:
 - correction_events
 - version_registry
 
-Institutional plans and saved clusters matter early because they align with the business model and the product loop.
+Institutional plans and saved stories matter early because they align with the business model and the product loop.
 
 ---
 
@@ -154,21 +155,25 @@ Institutional plans and saved clusters matter early because they align with the 
 #### Deliverables:
 - [x] Doctrine set and repo scaffold
 - [x] Local Next.js reader shell
-- [x] Homepage, cluster detail page, and live prototype surface
+- [x] Homepage, story detail page, and fast-moving intake surface
 - [x] Web-native preview APIs under `src/web/src/app/api`
 - [x] Temporary live feed generator with heuristic clustering
 - [x] Live snapshot output written into `src/web/public/data` for Vercel-safe deploys
+- [x] Fast-moving story cards route into the shared story-detail surface
+- [x] Story detail page includes a visible "what changed" timeline, not just static bullets
 - [x] `.env.example`, Node version pinning, and GitHub workflow baseline
 - [x] Doppler / Vercel / Supabase / Upstash assumptions documented
 - [x] Low-cost staging plan and Vercel bootstrap docs
+- [x] Core-loop acceptance checklist for manual user sessions
 - [ ] First hosted Vercel preview deployment
 - [ ] Doppler `staging` config wired into hosted preview
-- [ ] Supabase preview project created and connected
+- [x] Supabase preview project created and connected
 
 #### Success metrics:
-- Homepage, cluster detail, and `/live` all render locally without the Fastify API
+- Homepage, story detail, and the fast-moving intake route all render locally without the Fastify API
 - `npm run build:web` passes cleanly
 - `/api/health` and `/api/live` return healthy preview responses
+- A first-time reader can explain the story, inspect another angle, and find what changed in one session
 - First hosted preview URL is online
 
 #### Team: 1 engineer, 1 design/product lead
@@ -176,24 +181,35 @@ Institutional plans and saved clusters matter early because they align with the 
 ---
 
 ### Phase 2: Reader MVP (Months 3–5)
-**Goal: Turn the preview into a credible newsroom-grade cluster reader, not just a static mockup.**
+**Goal: Turn the preview into a credible newsroom-grade story reader, not just a static mockup.**
 
 #### Deliverables:
-- [x] Cluster detail prototype with evidence, corrections, and context modules
-- [x] Real-media cluster cards with fallback handling in the live prototype
-- [ ] Source registry admin seed tooling
-- [ ] Data-backed homepage and cluster list
+- [x] Story detail prototype with evidence, corrections, and context modules
+- [x] Real-media story cards with fallback handling in the live prototype
+- [x] Source registry admin seed tooling
+- [x] Data-backed homepage and story list
+- [x] Homepage repositioned as the single real front door
+- [x] Homepage story packages made fully clickable
+- [x] Story page refocused around a first-party Prism Brief before Perspective
+- [x] Perspective rail visually separated from the article column
+- [x] Direct source links in "Reporting to read next" and "Also in the mix"
+- [x] "Another angle" links rendered when source URLs are present
 - [ ] Perspective panel v1 backed by real outlet data
-- [ ] Methodology page shell
-- [ ] Saved clusters
+- [x] Methodology page shell
+- [x] Browser-local saved/followed story prototype
+- [ ] Saved stories
+- [ ] Follow story updates
 - [ ] Reader account scaffolding
-- [ ] Subscriber pricing and subscription shell
+- [x] Subscriber pricing and subscription shell
+- [ ] Core-loop user testing with a small serious-reader cohort
 
 #### Success metrics:
-- New users can explain the purpose of a Story Cluster within 2 minutes of landing
-- Cluster detail page is the clear hero surface in product feedback
-- Live prototype consistently surfaces enough fresh linked coverage to feel active
+- New users can explain the purpose of a Prism story within 2 minutes of landing
+- Story detail page is the clear hero surface in product feedback
+- The homepage consistently surfaces enough fresh linked coverage to feel active without splitting the product into two front doors
+- Story pages give readers enough narrative to stay on-site before deciding whether to open original reporting
 - Reader testing confirms the interface feels inspectable rather than overwhelming
+- At least some users choose to save or follow stories because they want to come back
 
 #### Team: 1–2 engineers, 1 designer
 
@@ -205,20 +221,24 @@ Institutional plans and saved clusters matter early because they align with the 
 #### Deliverables:
 - [x] Scheduled GitHub Actions live snapshot refresh
 - [x] Temporary URL deduplication and heuristic clustering pass
-- [ ] Feed ingestion adapters beyond the temporary snapshot script
+- [x] Feed ingestion adapters beyond the temporary snapshot script
 - [ ] News sitemap ingestion
 - [ ] Canonical URL normalization pipeline
-- [ ] Outlet registry seed import
-- [ ] Supabase-backed article, outlet, cluster, evidence, and version tables
-- [ ] Correction and version event persistence
+- [x] Outlet registry seed import
+- [x] Supabase-backed article, outlet, cluster, evidence, and version tables
+- [x] Correction and version event persistence
 - [ ] Media-rights policy enforcement in the ingestion pipeline
 - [ ] Scheduled enrichment jobs beyond the temporary live snapshot
+- [ ] Saved/followed story state backed by real persistence
+- [ ] Editorial seed stories backfilled with real source URLs instead of stand-in-only cards
 
 #### Success metrics:
 - Most surfaced stories arrive through automated ingestion rather than manual seeding
 - Duplicate story handling is acceptable under manual QA
 - Preview/staging content refreshes on a predictable cadence
 - Corrections and outlet mappings are stored, not just rendered
+- Returning users see meaningful "what changed" state on followed stories
+- All reader-facing source stacks link to real publisher URLs or clearly indicate that no source URL exists
 
 #### Team: 2 engineers, 1 designer
 
@@ -275,19 +295,33 @@ Institutional plans and saved clusters matter early because they align with the 
 
 Development should progress in commercial order, not just technical order.
 
-### Step 1: Prove the hero surface
+### Step 1: Prove the core loop
+
+Before expanding breadth, prove this sequence:
+
+- a reader opens a story
+- understands the story quickly
+- inspects another angle, evidence item, or change note
+- saves or follows the story
+- returns because Prism is the easiest place to see what changed
+
+If this loop is weak, stop broadening the product and fix it first.
+
+### Step 2: Prove the hero surface
 
 Build first:
 
-- cluster detail page
+- story detail page
+- story-first Prism Brief body
+- direct source-read stack
 - Perspective panel
 - evidence ledger
 - correction ribbon
-- real-media cluster cards with fallback states
+- real-media story cards with fallback states
 
 If this surface is not compelling, the rest of the system does not matter.
 
-### Step 2: Prove the cheap hosted loop
+### Step 3: Prove the cheap hosted loop
 
 Before standing up a real backend, prove that Prism can feel alive on cheap infrastructure.
 
@@ -300,7 +334,7 @@ Build:
 
 If this loop is too brittle, fix it before adding always-on services.
 
-### Step 3: Prove automated intake
+### Step 4: Prove automated intake
 
 Once the surface works, build:
 
@@ -312,18 +346,18 @@ Once the surface works, build:
 
 This gets Prism from mockup to a living product.
 
-### Step 4: Prove repeat-use value
+### Step 5: Prove repeat-use value
 
 Then build:
 
-- saved clusters
+- saved stories
 - follow-up alerts
 - morning and evening briefings
 - topic following
 
 This is the first true retention layer.
 
-### Step 5: Prove willingness to pay
+### Step 6: Prove willingness to pay
 
 Then ship:
 
@@ -334,7 +368,7 @@ Then ship:
 
 Revenue should come after the core value is visible, but before scaling ambition outruns proof.
 
-### Step 6: Prove institutional fit
+### Step 7: Prove institutional fit
 
 Then build:
 
@@ -353,8 +387,8 @@ Each commercial motion depends on a product milestone.
 
 | Motion | Product requirement |
 |---|---|
-| Individual launch | Cluster page + Perspective panel + enough live coverage to feel real |
-| Paid conversion | Saved clusters, follow alerts, strong daily briefing value |
+| Individual launch | Story page + Perspective panel + enough live coverage to feel real |
+| Paid conversion | Saved stories, follow alerts, strong daily briefing value |
 | Professional tier | Monitoring, exports, topic depth, audit history |
 | Institutional sales | Admin controls, seat provisioning, methodology documentation |
 
@@ -379,19 +413,28 @@ Local defaults should match the first hosted path:
 - `Upstash` for cache or queue primitives
 - `GitHub Actions` for scheduled refresh jobs
 
+Official local posture:
+
+- develop locally on the MacBook first
+- do not change the global Node installation for other repos
+- use project-level Node 22 isolation when needed
+- do not run the full stack locally by default
+- use remote managed services instead of local Postgres/Redis unless a task explicitly requires otherwise
+- deploy to Vercel only for reviewable preview checkpoints
+
 ---
 
 ## 10. Testing Plan
 
 ### API
 
-- health and cluster endpoint smoke tests
+- health and story endpoint smoke tests
 - schema validation tests
 - Perspective firewall assertion tests
 
 ### Web
 
-- cluster page rendering tests
+- story page rendering tests
 - Perspective panel interaction tests
 - correction ribbon visibility tests
 

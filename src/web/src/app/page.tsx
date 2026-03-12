@@ -1,136 +1,316 @@
 import Link from 'next/link'
 
-import { mockClusters } from '../lib/mock-clusters'
+import { SiteFooter } from '../components/site-footer'
+import { SiteNav } from '../components/site-nav'
+import type { ClusterSummary } from '../lib/cluster-api'
+import { getClusterSummaries } from '../lib/cluster-api'
+import { PRIMARY_NEWS_SECTIONS, getNewsSection, getNewsSectionKey } from '../lib/news-sections'
 
-const launchFeatures = [
-  'Morning and evening cluster briefings',
-  'Perspective panels with visible disagreement',
-  'Saved stories with correction-aware follow-up alerts',
-]
+function pickTopDeckStories(stories: ClusterSummary[]) {
+  const [featured, ...rest] = stories
+  if (!featured) {
+    return {
+      featured: null,
+      support: [],
+    }
+  }
 
-const featuredCluster = mockClusters[0]
+  const usedSectionCounts = new Map<string, number>([[getNewsSectionKey(featured.topic), 1]])
+  const support: ClusterSummary[] = []
 
-export default function HomePage() {
+  for (const story of rest) {
+    if (support.length >= 5) {
+      break
+    }
+
+    const sectionKey = getNewsSectionKey(story.topic)
+    const currentCount = usedSectionCounts.get(sectionKey) ?? 0
+    const limit = support.length < 3 ? 1 : 2
+
+    if (currentCount >= limit) {
+      continue
+    }
+
+    support.push(story)
+    usedSectionCounts.set(sectionKey, currentCount + 1)
+  }
+
+  if (support.length < 5) {
+    for (const story of rest) {
+      if (support.length >= 5) {
+        break
+      }
+      if (support.some((item) => item.slug === story.slug)) {
+        continue
+      }
+      support.push(story)
+    }
+  }
+
+  return {
+    featured,
+    support,
+  }
+}
+
+function buildHomepagePool(stories: ClusterSummary[]) {
+  const preferred = stories.filter(
+    (story) =>
+      story.homepageEligible ||
+      story.storyOrigin === 'editorial_seed' ||
+      (story.qualityScore >= 24 && story.outletCount >= 1),
+  )
+
+  if (preferred.length >= 10) {
+    return preferred
+  }
+
+  const supplemented = [...preferred]
+
+  for (const story of stories) {
+    if (supplemented.some((item) => item.slug === story.slug)) {
+      continue
+    }
+
+    supplemented.push(story)
+
+    if (supplemented.length >= 12) {
+      break
+    }
+  }
+
+  return supplemented
+}
+
+export default async function HomePage() {
+  const clusters = await getClusterSummaries()
+  const homepagePool = buildHomepagePool(clusters)
+  const { featured: featuredCluster, support } = pickTopDeckStories(homepagePool)
+  const homepageDate = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  }).format(new Date())
+
+  if (!featuredCluster) {
+    return (
+      <main className="page-shell home-page">
+        <SiteNav />
+        <header className="masthead">
+          <div>
+            <p className="eyebrow">The Prism Wire</p>
+            <h1>No stories are available yet.</h1>
+          </div>
+        </header>
+      </main>
+    )
+  }
+
+  const remainingClusters = clusters.filter((cluster) => cluster.slug !== featuredCluster.slug)
+  const leftColumnStories = support.slice(0, 2)
+  const centerLeadStory = support[2] ?? null
+  const centerColumnStories = support.slice(3, 5)
+  const pinnedStorySlugs = new Set([
+    featuredCluster.slug,
+    ...leftColumnStories.map((story) => story.slug),
+    ...(centerLeadStory ? [centerLeadStory.slug] : []),
+    ...centerColumnStories.map((story) => story.slug),
+  ])
+  const latestFeedStories = [...clusters]
+    .filter(
+      (cluster) => !pinnedStorySlugs.has(cluster.slug),
+    )
+    .sort(
+      (left, right) =>
+        new Date(right.latestEventAt).getTime() - new Date(left.latestEventAt).getTime(),
+    )
+    .slice(0, 8)
+  const groupedSections = PRIMARY_NEWS_SECTIONS.map((section) => ({
+    ...section,
+    stories: homepagePool
+      .concat(remainingClusters)
+      .filter(
+        (cluster, index, collection) =>
+          collection.findIndex((item) => item.slug === cluster.slug) === index,
+      )
+      .filter((cluster) => !pinnedStorySlugs.has(cluster.slug))
+      .filter((cluster) => getNewsSection(cluster.topic).key === section.key)
+      .slice(0, 4),
+  })).filter((section) => section.stories.length > 0)
+
   return (
     <main className="page-shell home-page">
-      <header className="masthead">
-        <div>
-          <p className="eyebrow">The Prism Wire</p>
-          <h1>Understand the shape of the story before you choose a side.</h1>
-        </div>
-        <nav className="masthead-nav">
-          <a href="#briefings">Briefings</a>
-          <a href="#clusters">Top clusters</a>
-          <a href="#value">Why subscribe</a>
-          <Link href="/live">Live prototype</Link>
-        </nav>
-      </header>
-
-      <section className="hero-cluster panel">
-        <div className="hero-media">
-          <img
-            src={featuredCluster.heroImage}
-            alt={featuredCluster.heroAlt}
-            className="hero-image"
-          />
-          <span className="media-credit">{featuredCluster.heroCredit}</span>
-        </div>
-
-        <div className="hero-copy-pane">
-          <div className="hero-meta-line">
-            <span className="status-chip">{featuredCluster.status}</span>
-            <span>{featuredCluster.updatedAt}</span>
-            <span>{featuredCluster.outletCount} outlets</span>
-          </div>
-          <p className="panel-label">{featuredCluster.topic}</p>
-          <h2>{featuredCluster.title}</h2>
-          <p className="hero-dek">{featuredCluster.dek}</p>
-
-          <div className="hero-proof-grid">
-            <div className="metric-tile">
-              <span className="metric-label">Reliability range</span>
-              <strong>{featuredCluster.reliabilityRange}</strong>
-            </div>
-            <div className="metric-tile">
-              <span className="metric-label">Coverage spread</span>
-              <strong>Left / Center / Right present</strong>
-            </div>
-            <div className="metric-tile">
-              <span className="metric-label">Context</span>
-              <strong>4 launch lenses available</strong>
-            </div>
-          </div>
-
-          <div className="hero-actions">
-            <Link className="primary-link" href={`/clusters/${featuredCluster.slug}`}>
-              Open live cluster
-            </Link>
-            <Link className="secondary-link" href="/live">
-              View temporary live feed
-            </Link>
-          </div>
-        </div>
+      <SiteNav />
+      <section className="front-page-intro">
+        <p className="eyebrow">Top stories</p>
+        <span className="front-page-date">{homepageDate}</span>
       </section>
 
-      <section className="briefing-band panel" id="briefings">
-        <div>
-          <p className="panel-label">Daily value</p>
-          <h2>Built for briefings, not bingeing.</h2>
+      <section className="home-news-grid">
+        <div className="home-news-column home-news-column-left">
+          <Link className="home-lead-story home-story-link-card" href={`/stories/${featuredCluster.slug}`}>
+            <div className="home-lead-media">
+              <img
+                src={featuredCluster.heroImage}
+                alt={featuredCluster.heroAlt}
+                className="hero-image"
+              />
+              <span className="media-credit">{featuredCluster.heroCredit}</span>
+            </div>
+            <div className="home-lead-copy">
+              <div className="hero-meta-line">
+                <span className="status-chip">{featuredCluster.status}</span>
+                <span>{featuredCluster.updatedAt}</span>
+                <span>{featuredCluster.outletCount} outlets</span>
+              </div>
+              <p className="panel-label">{featuredCluster.topic}</p>
+              <h1>{featuredCluster.title}</h1>
+              <p className="hero-dek">{featuredCluster.dek}</p>
+              <span className="inline-story-link">
+                Open story
+              </span>
+            </div>
+          </Link>
+
+          {leftColumnStories.length > 0 ? (
+            <div className="home-secondary-stack">
+              {leftColumnStories.map((story) => (
+                <Link className="home-secondary-story" href={`/stories/${story.slug}`} key={story.slug}>
+                  <span className="headline-link-kicker">
+                    {story.topic} · {story.updatedAt}
+                  </span>
+                  <strong>{story.title}</strong>
+                  <span className="headline-link-dek">{story.dek}</span>
+                </Link>
+              ))}
+            </div>
+          ) : null}
         </div>
-        <ul className="briefing-list">
-          {launchFeatures.map((feature) => (
-            <li key={feature}>{feature}</li>
-          ))}
-        </ul>
+
+        <div className="home-news-column home-news-column-center">
+          {centerLeadStory ? (
+            <Link className="home-center-feature home-story-link-card" href={`/stories/${centerLeadStory.slug}`}>
+              <img
+                src={centerLeadStory.heroImage}
+                alt={centerLeadStory.heroAlt}
+                className="home-center-feature-image"
+              />
+              <div className="home-center-feature-copy">
+                <span className="headline-link-kicker">
+                  {centerLeadStory.topic} · {centerLeadStory.updatedAt}
+                </span>
+                <h2>{centerLeadStory.title}</h2>
+                <p>{centerLeadStory.dek}</p>
+                <span className="inline-story-link">
+                  Open story
+                </span>
+              </div>
+            </Link>
+          ) : null}
+
+          {centerColumnStories.length > 0 ? (
+            <div className="home-center-stack">
+              {centerColumnStories.map((story) => (
+                <Link
+                  className="home-center-story home-story-link-card"
+                  href={`/stories/${story.slug}`}
+                  key={story.slug}
+                >
+                  <img
+                    src={story.heroImage}
+                    alt={story.heroAlt}
+                    className="home-center-story-image"
+                  />
+                  <div className="home-center-story-copy">
+                    <span className="headline-link-kicker">
+                      {story.topic} · {story.updatedAt}
+                    </span>
+                    <strong>{story.title}</strong>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <aside className="home-news-column home-news-column-right">
+          <div className="home-latest-feed">
+            <div className="home-latest-header">
+              <p className="panel-label">Latest news</p>
+              <h2>Developments</h2>
+            </div>
+            <div className="home-latest-list">
+              {latestFeedStories.map((story) => (
+                <Link className="home-latest-item" href={`/stories/${story.slug}`} key={story.slug}>
+                  <div className="home-latest-meta">
+                    <span>{story.updatedAt}</span>
+                    <span className="home-latest-topic">{story.topic}</span>
+                  </div>
+                  <strong>{story.title}</strong>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </aside>
       </section>
 
-      <section className="cluster-grid" id="clusters">
-        {mockClusters.map((cluster) => (
-          <article className="cluster-card panel" key={cluster.slug}>
-            <img
-              src={cluster.heroImage}
-              alt={cluster.heroAlt}
-              className="cluster-card-image"
-            />
-            <div className="cluster-card-body">
-              <div className="cluster-card-meta">
-                <span className="status-chip">{cluster.status}</span>
-                <span>{cluster.updatedAt}</span>
-              </div>
-              <p className="panel-label">{cluster.topic}</p>
-              <h3>{cluster.title}</h3>
-              <p>{cluster.dek}</p>
-              <div className="cluster-card-footer">
-                <span>{cluster.outletCount} outlets</span>
-                <Link href={`/clusters/${cluster.slug}`}>Open cluster</Link>
+      <section className="front-page-sections">
+        {groupedSections.map((section) => (
+          <section className="section-block" id={section.anchor} key={section.key}>
+            <div className="section-heading">
+              <div>
+                <p className="panel-label">Desk</p>
+                <h2>{section.title}</h2>
               </div>
             </div>
-          </article>
+            <div className={`section-story-grid${section.stories.length === 1 ? ' single-column' : ''}`}>
+              <Link
+                className="cluster-card home-section-feature home-story-link-card"
+                href={`/stories/${section.stories[0].slug}`}
+                key={section.stories[0].slug}
+              >
+                <img
+                  src={section.stories[0].heroImage}
+                  alt={section.stories[0].heroAlt}
+                  className="cluster-card-image"
+                />
+                <div className="cluster-card-body">
+                  <div className="cluster-card-meta">
+                    <span className="status-chip">{section.stories[0].status}</span>
+                    <span>{section.stories[0].updatedAt}</span>
+                  </div>
+                  <h3>{section.stories[0].title}</h3>
+                  <p>{section.stories[0].dek}</p>
+                  <div className="cluster-card-footer">
+                    <span>{section.stories[0].outletCount} outlets</span>
+                    <span>Open story</span>
+                  </div>
+                </div>
+              </Link>
+
+              {section.stories.length > 1 ? (
+                <div className="section-headline-stack">
+                  {section.stories.slice(1).map((cluster) => (
+                    <Link
+                      className="section-headline-link"
+                      href={`/stories/${cluster.slug}`}
+                      key={cluster.slug}
+                    >
+                      <span className="headline-link-kicker">
+                        {cluster.topic} · {cluster.updatedAt}
+                      </span>
+                      <strong>{cluster.title}</strong>
+                      <span className="headline-link-dek">{cluster.dek}</span>
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </section>
         ))}
       </section>
 
-      <section className="grid-section" id="value">
-        <article className="panel value-panel">
-          <p className="panel-label">Why it monetizes</p>
-          <h2>People pay for less noise when the understanding is obviously better.</h2>
-          <p>
-            Prism can charge for briefings, saved clusters, follow alerts, and premium
-            monitoring because the product removes work from understanding the news.
-          </p>
-        </article>
-
-        <article className="panel value-panel">
-          <p className="panel-label">What to build next</p>
-          <h2>One strong cluster page can prove the whole model.</h2>
-          <p>
-            The next milestone is not more homepage chrome. It is a live cluster page
-            that makes people feel instantly more informed than standard news apps do.
-          </p>
-          <Link className="secondary-link" href={`/clusters/${featuredCluster.slug}`}>
-            Review prototype cluster
-          </Link>
-        </article>
-      </section>
+      <SiteFooter />
     </main>
   )
 }

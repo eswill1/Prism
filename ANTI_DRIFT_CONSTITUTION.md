@@ -1,5 +1,5 @@
 # Prism Anti-Drift Constitution
-### Version 0.1
+### Version 0.2 — Updated 2026-03-12: story-first reader rules and direct-source-link policy
 
 ---
 
@@ -15,10 +15,16 @@ If a change would increase usage by making readers more anxious, tribal, compuls
 
 These rules apply across official Prism clients.
 
-### Story clusters are the primary object
+### Stories are the reader-facing primary object
 
-- the default product surface is cluster-first, not headline-river-first
-- individual article cards may exist, but they cannot replace the cluster model
+- the default reader surface is story-first, not headline-river-first
+- clustering may remain an internal system primitive, but reader language and navigation should stay story-based
+- individual article cards may exist, but they cannot replace the story model
+
+### The homepage is the definitive current-news front door
+
+- readers should not have to discover a second "real" news page
+- faster-moving queues may exist as secondary or internal surfaces, but not as the primary reader path
 
 ### The Perspective layer is informational only
 
@@ -41,6 +47,13 @@ These rules apply across official Prism clients.
 - users can inspect methodology
 - users can inspect rating-source attribution
 - users can change lenses without losing visibility into the unfiltered cluster
+- readers can move directly to original reporting when Prism presents it
+- Prism may not force a wrapper detour unless that detour adds clear editorial value
+
+### Story first, Perspective second
+
+- the story page must explain what happened before asking the reader to decode comparison structure
+- Perspective should clarify coverage, not displace the core story body
 
 ---
 

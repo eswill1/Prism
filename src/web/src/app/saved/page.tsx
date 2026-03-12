@@ -1,0 +1,61 @@
+import { SavedStoriesClient, type TrackedStoryCandidate } from '../../components/saved-stories-client'
+import { SiteFooter } from '../../components/site-footer'
+import { SiteNav } from '../../components/site-nav'
+import { getClusterSummaries } from '../../lib/cluster-api'
+import { clusterBySlug } from '../../lib/mock-clusters'
+import { loadLiveFeed, mapLiveClusterToStoryCluster } from '../../lib/live-feed'
+
+export default async function SavedStoriesPage() {
+  const summaries = await getClusterSummaries()
+  const liveFeed = await loadLiveFeed()
+
+  const summaryStories: TrackedStoryCandidate[] = summaries.map((story) => ({
+    slug: story.slug,
+    topic: story.topic,
+    title: story.title,
+    dek: story.dek,
+    updatedAt: story.updatedAt,
+    heroImage: story.heroImage,
+    heroAlt: story.heroAlt,
+    latestChange: clusterBySlug[story.slug]?.whatChanged[0],
+    changeCount: clusterBySlug[story.slug]?.whatChanged.length ?? 0,
+  }))
+
+  const liveStories: TrackedStoryCandidate[] = (liveFeed?.clusters ?? []).map((cluster) => {
+    const story = mapLiveClusterToStoryCluster(cluster)
+
+    return {
+      slug: story.slug,
+      topic: story.topic,
+      title: story.title,
+      dek: story.dek,
+      updatedAt: story.updatedAt,
+      heroImage: story.heroImage,
+      heroAlt: story.heroAlt,
+      latestChange: story.whatChanged[0],
+      changeCount: story.changeTimeline.length,
+    }
+  })
+
+  const stories = Array.from(
+    new Map([...summaryStories, ...liveStories].map((story) => [story.slug, story])).values(),
+  )
+
+  return (
+    <main className="page-shell saved-page">
+      <SiteNav />
+      <header className="masthead">
+        <div>
+          <p className="eyebrow">Saved stories</p>
+          <h1>Your local working set for follow-up reading.</h1>
+          <p className="hero-dek">
+            This prototype persists save and follow state in this browser until account sync
+            is wired through Supabase.
+          </p>
+        </div>
+      </header>
+      <SavedStoriesClient stories={stories} />
+      <SiteFooter />
+    </main>
+  )
+}
