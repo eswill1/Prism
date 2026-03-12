@@ -157,6 +157,22 @@ ENTITY_STOPWORDS = {
 ARTICLE_FETCH_CACHE: dict[str, dict[str, object]] = {}
 SEMANTIC_SIMILARITY_JOIN_THRESHOLD = float(os.getenv("PRISM_SEMANTIC_JOIN_THRESHOLD", "0.42"))
 SEMANTIC_SIMILARITY_SUPPORT_THRESHOLD = float(os.getenv("PRISM_SEMANTIC_SUPPORT_THRESHOLD", "0.32"))
+LIKELY_PAYWALLED_DOMAINS = {"ft.com", "bloomberg.com", "nytimes.com", "wsj.com"}
+OPEN_ACCESS_DOMAINS = {
+    "abcnews.com",
+    "apnews.com",
+    "bbc.com",
+    "cbsnews.com",
+    "cnn.com",
+    "foxnews.com",
+    "msnbc.com",
+    "nbcnews.com",
+    "npr.org",
+    "pbs.org",
+    "politico.com",
+    "reuters.com",
+    "thehill.com",
+}
 
 SITEMAP_RULES: dict[str, dict[str, tuple[str, ...]]] = {
     "Associated Press": {
@@ -553,11 +569,20 @@ def extract_source_specific_paragraphs(markup: str, url: str) -> list[str]:
 
 def detect_access_signal(markup: str, url: str) -> str:
     domain = infer_source_domain(url)
-    if domain in {"ft.com", "bloomberg.com", "nytimes.com", "wsj.com"}:
+    if domain in LIKELY_PAYWALLED_DOMAINS:
         return "likely_paywalled"
     if any(re.search(pattern, markup, re.IGNORECASE) for pattern in PAYWALL_HINT_PATTERNS):
         return "likely_paywalled"
     return "open"
+
+
+def infer_access_signal_from_url(url: str | None) -> str:
+    domain = infer_source_domain(url or "")
+    if domain in LIKELY_PAYWALLED_DOMAINS or any(domain.endswith(f".{candidate}") for candidate in LIKELY_PAYWALLED_DOMAINS):
+        return "likely_paywalled"
+    if domain in OPEN_ACCESS_DOMAINS or any(domain.endswith(f".{candidate}") for candidate in OPEN_ACCESS_DOMAINS):
+        return "open"
+    return "unknown"
 
 
 def extract_named_entities(text: str) -> list[str]:
@@ -579,14 +604,14 @@ def extract_named_entities(text: str) -> list[str]:
     return entities
 
 
-def default_enrichment(summary: str = "") -> dict[str, object]:
+def default_enrichment(summary: str = "", url: str = "") -> dict[str, object]:
     return {
         "image": None,
         "lede": clean_summary_snippet(summary, 320),
         "body_preview": "",
         "named_entities": [],
         "extraction_quality": "rss_only",
-        "access_signal": "unknown",
+        "access_signal": infer_access_signal_from_url(url),
     }
 
 
@@ -754,6 +779,10 @@ def choose_story_summary(
 ) -> tuple[str, int, int]:
     best_summary = ""
     best_score = -999
+    best_access_signal = "unknown"
+    best_is_open = False
+    best_open_summary = ""
+    best_open_score = -999
     substantive_sources: set[str] = set()
 
     for article in articles:
@@ -769,6 +798,11 @@ def choose_story_summary(
             getattr(article, "extraction_quality", None)
             or (article.get("extraction_quality") if isinstance(article, dict) else None)
             or "rss_only"
+        )
+        access_signal = (
+            getattr(article, "access_signal", None)
+            or (article.get("access_signal") if isinstance(article, dict) else None)
+            or "unknown"
         )
         body_text = (
             getattr(article, "body_preview", None)
@@ -799,9 +833,20 @@ def choose_story_summary(
         if cleaned_candidate and score > best_score:
             best_summary = cleaned_candidate
             best_score = score
+            best_access_signal = str(access_signal)
+            best_is_open = str(access_signal) == "open"
+        if cleaned_candidate and str(access_signal) == "open" and score > best_open_score:
+            best_open_summary = cleaned_candidate
+            best_open_score = score
 
-    if best_summary and best_score >= 6:
+    if best_is_open and best_summary and best_score >= 6:
         return best_summary, best_score, len(substantive_sources)
+    if best_summary and best_score >= 6:
+        if best_access_signal == "likely_paywalled" and best_open_summary and best_open_score >= max(6, best_score - 3):
+            return best_open_summary, best_open_score, len(substantive_sources)
+        return best_summary, best_score, len(substantive_sources)
+    if best_open_summary and best_open_score >= 4:
+        return best_open_summary, best_open_score, len(substantive_sources)
 
     fallback_sources = ", ".join(list(dict.fromkeys(sources))[:3]) if sources else "linked publishers"
     fallback = (
@@ -821,7 +866,7 @@ def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, 
         "body_preview": "",
         "named_entities": [],
         "extraction_quality": "rss_only",
-        "access_signal": "unknown",
+        "access_signal": infer_access_signal_from_url(url),
     }
 
     try:
@@ -917,7 +962,7 @@ def parse_rss_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> li
         enrichment = (
             fetch_article_enrichment(url, summary)
             if should_enrich
-            else default_enrichment(summary)
+            else default_enrichment(summary, url)
         )
         feed_summary = clean_summary_snippet(summary, 220)
         lede = clean_summary_snippet(str(enrichment.get("lede", "")) or summary, 320) or feed_summary
@@ -1020,7 +1065,7 @@ def parse_news_sitemap(feed: dict[str, str], *, enrich_articles: bool = False) -
             keyword_summary = keywords if should_use_sitemap_keywords(keywords, title) else ""
             summary = keyword_summary or title
             should_enrich = enrich_articles and len(items) < ARTICLE_ENRICHMENT_LIMIT_PER_FEED and depth == 0
-            enrichment = fetch_article_enrichment(url, summary) if should_enrich else default_enrichment(summary)
+            enrichment = fetch_article_enrichment(url, summary) if should_enrich else default_enrichment(summary, url)
             feed_summary = clean_summary_snippet(keyword_summary or title, 220) or title
             lede = clean_summary_snippet(str(enrichment.get("lede", "")) or keyword_summary or title, 320) or feed_summary
             body_preview = clamp_to_word_boundary(str(enrichment.get("body_preview", "")), 1200) if enrichment.get("body_preview") else ""

@@ -291,6 +291,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Add brief-depth rules so mature multi-source stories target fuller multi-paragraph Prism Briefs instead of minimum viable summary text
 - [x] Build paywall-aware alternate-source matching using existing discovery and clustering signals so inaccessible lead sources can point to credible open reporting
 - [x] Use `sources:health` plus `brief:readiness` as the tuning loop for this branch, with the explicit goal of raising full-brief-ready story count without lowering source quality
+- [x] Move paywall/open-alternate handling upstream so active story metadata stores lead-source and open-alternate options instead of leaving access logic entirely to the reader layer
 - [x] Add section-level support metadata plus `brief:grounding` so stored briefs can be audited for weak or unsupported language
 
 #### Success metrics:
@@ -298,6 +299,7 @@ Institutional plans and saved stories matter early because they align with the b
 - Methodology and correction surfaces are visible enough to build trust
 - Early subscribers demonstrate willingness to pay for clarity and monitoring value
 - Mature multi-source stories usually produce briefs that can stand on their own without forcing an immediate outbound click
+- Thin or gated source mixes should still leave the story with a usable open fallback path recorded in metadata when the cluster has one
 - Paywalled-source stories still retain usable reader value because Prism can surface a credible open alternative when available
 - No Perspective data leaks into ranking or recommendation logic
 

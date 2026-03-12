@@ -72,6 +72,61 @@ LOW_VALUE_PATTERNS: list[tuple[str, int]] = [
 HIGH_VALUE_TOPICS = {"US Politics", "World", "Business", "Technology", "Climate and Infrastructure", "Weather"}
 
 
+def infer_access_tier(article: dict[str, Any]) -> str:
+    signal = article.get("access_signal")
+    if isinstance(signal, str) and signal in {"open", "likely_paywalled"}:
+        return signal
+    domain = str(article.get("domain") or "")
+    if any(domain == candidate or domain.endswith(f".{candidate}") for candidate in ("apnews.com", "bbc.com", "cbsnews.com", "abcnews.com", "nbcnews.com", "npr.org", "pbs.org", "thehill.com", "foxnews.com", "reuters.com", "politico.com", "cnn.com", "msnbc.com")):
+        return "open"
+    if any(domain == candidate or domain.endswith(f".{candidate}") for candidate in ("ft.com", "bloomberg.com", "nytimes.com", "wsj.com")):
+        return "likely_paywalled"
+    return "unknown"
+
+
+def source_read_quality(article: dict[str, Any]) -> int:
+    score = summary_quality_score(
+        article["title"],
+        article.get("summary") or article.get("feed_summary") or "",
+        extraction_quality=article.get("extraction_quality") or "rss_only",
+        body_text=article.get("body_text") or "",
+    )
+    if article.get("access_tier") == "open":
+        score += 3
+    elif article.get("access_tier") == "likely_paywalled":
+        score -= 2
+    if article.get("body_text"):
+        score += 2
+    return score
+
+
+def choose_story_source_options(articles: list[dict[str, Any]]) -> dict[str, Any]:
+    if not articles:
+        return {}
+
+    ranked = sorted(articles, key=source_read_quality, reverse=True)
+    lead = ranked[0]
+    open_alternate = next(
+        (
+            article
+            for article in ranked
+            if article.get("access_tier") == "open" and article.get("url") and article.get("outlet") != lead.get("outlet")
+        ),
+        None,
+    )
+
+    return {
+        "lead_outlet": lead.get("outlet"),
+        "lead_url": lead.get("url"),
+        "lead_access_tier": lead.get("access_tier"),
+        "lead_quality_score": source_read_quality(lead),
+        "open_alternate_outlet": open_alternate.get("outlet") if open_alternate else None,
+        "open_alternate_url": open_alternate.get("url") if open_alternate else None,
+        "open_alternate_quality_score": source_read_quality(open_alternate) if open_alternate else None,
+        "open_alternate_available": bool(open_alternate),
+    }
+
+
 def item_quality_score(item: FeedItem) -> int:
     haystack = f"{item.title} {item.summary} {item.url}".lower()
     score = SOURCE_PRIORITY_BONUS.get(item.source, 1)
@@ -259,6 +314,7 @@ def build_story_from_cluster(
                 "reason": f"{canonical_outlet} adds a visible live reporting angle to the story stack.",
                 "url": article["url"],
                 "domain": domain,
+                "access_signal": article.get("access_signal") or "unknown",
             }
         )
 
@@ -266,6 +322,11 @@ def build_story_from_cluster(
     coverage_counts = {"left": 0, "center": 0, "right": 0}
     for source in unique_sources:
         coverage_counts[framing_for_outlet(source)] += 1
+
+    for article in articles:
+        article["access_tier"] = infer_access_tier(article)
+
+    source_options = choose_story_source_options(articles)
 
     latest_article = max(articles, key=lambda item: item["published_at"], default=None)
     timeline = [
@@ -330,6 +391,13 @@ def build_story_from_cluster(
                 if len(unique_sources) >= 2
                 else "The comparison set is still thin, so this story may move quickly as additional publishers enter the frame."
             ),
+            (
+                f"Prism found an open alternate read from {source_options['open_alternate_outlet']} to pair with the story."
+                if source_options.get("lead_access_tier") == "likely_paywalled" and source_options.get("open_alternate_available")
+                else "The strongest available source read is already open."
+                if source_options.get("lead_access_tier") == "open"
+                else "Some linked reporting may be gated, so Prism is watching for stronger open alternates."
+            ),
         ],
         "change_timeline": timeline,
         "articles": articles,
@@ -352,6 +420,7 @@ def build_story_from_cluster(
             "quality_score": priority_score,
             "homepage_eligible": homepage_eligible,
             "sync_source": "tooling/ingest_live_feeds_to_supabase.py",
+            "source_options": source_options,
         },
     }
 
