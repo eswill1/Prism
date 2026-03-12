@@ -217,7 +217,7 @@ export async function StoryPage({ slug }: StoryPageProps) {
             <div className="section-heading">
                 <div>
                   <p className="panel-label">{storyBrief.label}</p>
-                  <h2>{storyBrief.title}</h2>
+                  <h2 className="story-section-title">{storyBrief.title}</h2>
                 </div>
               </div>
 
@@ -263,7 +263,7 @@ export async function StoryPage({ slug }: StoryPageProps) {
               <div className="section-heading">
                 <div>
                   <p className="panel-label">Reporting to read next</p>
-                  <h2>{reportingHeading}</h2>
+                  <h2 className="reporting-section-title">{reportingHeading}</h2>
                 </div>
               </div>
 
