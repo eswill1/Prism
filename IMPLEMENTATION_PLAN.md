@@ -1,5 +1,5 @@
 # Prism Implementation Plan
-### Version 0.8 — Updated 2026-03-12: RSS plus sitemap discovery pass
+### Version 0.9 — Updated 2026-03-12: source-breadth and sitemap quality pass
 
 ---
 
@@ -225,6 +225,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Feed ingestion adapters beyond the temporary snapshot script
 - [x] Dedicated article-enrichment worker decoupled from feed polling
 - [x] News sitemap ingestion
+- [x] Source-specific sitemap handling for Reuters and AP
 - [x] Canonical URL normalization pipeline
 - [x] Semantic candidate-retrieval scaffold for story clustering
 - [x] Candidate-retrieval evaluation harness against current heuristic clusters
@@ -241,6 +242,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Correction and version event persistence
 - [ ] Media-rights policy enforcement in the ingestion pipeline
 - [ ] Scheduled enrichment jobs beyond the temporary live snapshot
+- [x] Source-health reporting for active discovery inputs
 - [ ] Saved/followed story state backed by real persistence
 - [x] Editorial seed stories removed from connected reader surfaces instead of shipping fake source-link affordances
 
@@ -248,10 +250,12 @@ Institutional plans and saved stories matter early because they align with the b
 - Most surfaced stories arrive through automated ingestion rather than manual seeding
 - Feed polling stays fast enough to feel live because article extraction is no longer inline in the polling loop
 - Active discovery is no longer RSS-only; verified sitemap feeds can contribute to the live story graph
+- Reuters and AP now contribute through source-specific sitemap handling instead of generic sitemap parsing alone
 - Duplicate story handling is acceptable under manual QA
 - Semantic candidate retrieval meaningfully narrows cluster choices before deterministic merge rules fire
 - Canonical URL cleanup reduces story fragmentation caused by tracking parameters and alias domains
 - Sitemap-derived story shells do not surface reader-facing one-line summaries just because a title was discoverable
+- Discovery sources can be ranked by recent substantive yield instead of only by anecdotal inspection
 - Preview/staging content refreshes on a predictable cadence
 - Corrections and outlet mappings are stored, not just rendered
 - Returning users see meaningful "what changed" state on followed stories
@@ -268,6 +272,8 @@ Institutional plans and saved stories matter early because they align with the b
 - [ ] Framing presence group generation
 - [ ] Context Pack generation for all four launch lenses
 - [ ] Grounded multi-source Prism Brief generation backed by extracted source text rather than feed snippets
+- [ ] Prism Brief expansion so mature story pages routinely deliver fuller multi-paragraph briefs rather than minimum viable summaries
+- [ ] Paywall-aware alternate-source matching when the strongest available source is too thin or inaccessible to the reader
 - [ ] Methodology pages and version registry
 - [ ] Perspective firewall tests
 - [ ] Morning and evening briefing generation
@@ -282,6 +288,8 @@ Institutional plans and saved stories matter early because they align with the b
 - Readers use alternate lenses and Context Packs repeatedly
 - Methodology and correction surfaces are visible enough to build trust
 - Early subscribers demonstrate willingness to pay for clarity and monitoring value
+- Mature multi-source stories usually produce briefs that can stand on their own without forcing an immediate outbound click
+- Paywalled-source stories still retain usable reader value because Prism can surface a credible open alternative when available
 - No Perspective data leaks into ranking or recommendation logic
 
 #### Team: 2–4 engineers, 1 data/ML engineer, 1 designer

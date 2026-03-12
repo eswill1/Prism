@@ -30,6 +30,7 @@ The system goal is maximum automation with narrow human-review points.
 - failure rule: retry with backoff, then source-health alert
 - current state: implemented inside the active discovery poller for verified sitemap sources
 - quality rule: sitemap-only items without substantive extracted text are allowed into discovery, but should not be promoted as homepage-ready story shells on title text alone
+- source-specific rule: Reuters and AP use source-specific filtering; Politico remains behind a strict allowlist because its public news sitemap is dominated by newsletters and house material
 
 #### `backfill_metadata_api`
 
@@ -64,6 +65,7 @@ The system goal is maximum automation with narrow human-review points.
 - output: lede, first paragraphs, named entities, extracted-body quality markers on `articles`
 - follow-on effect: refresh active `story_clusters.summary` so reader-facing story decks improve after enrichment rather than staying stuck on ingest-time snippets
 - failure rule: mark discovery row failed with retry cooldown; do not block feed polling
+- future follow-up: longer Prism Brief generation should consume these richer article bodies instead of settling for one-paragraph summaries when the source set is mature
 
 #### `classify_media_rights`
 
@@ -89,6 +91,13 @@ The system goal is maximum automation with narrow human-review points.
 - input: recent article corpus
 - output: relation records between source variants
 - failure rule: non-blocking
+
+#### `find_open_reporting_alternates`
+
+- cadence: queue-driven after article ingest for paywalled or thin-source stories
+- input: canonical URL, title, named entities, active story cluster
+- output: alternate linked article candidates with lower access friction
+- failure rule: keep the original story intact; do not substitute weak alternates just to avoid a paywall
 
 #### `score_article_quality`
 
@@ -178,6 +187,7 @@ The system goal is maximum automation with narrow human-review points.
 - input: fetch success rates, freshness lag, parse rates
 - output: source-health score
 - failure rule: alert only
+- current state: available locally and in staging as `npm run sources:health`
 
 ---
 

@@ -53,6 +53,25 @@ def fetch_active_story_slugs(client: SupabaseRestClient) -> set[str]:
     return active
 
 
+def fetch_active_story_metrics(client: SupabaseRestClient) -> dict[str, dict[str, int]]:
+    rows = client.get("/story_clusters?select=slug,outlet_count,metadata&order=latest_event_at.desc&limit=80") or []
+    metrics: dict[str, dict[str, int]] = {}
+    for row in rows:
+        slug = row.get("slug")
+        if not isinstance(slug, str) or not slug:
+            continue
+        metadata = row.get("metadata") or {}
+        story_origin = metadata.get("story_origin") if isinstance(metadata, dict) else None
+        if story_origin not in ("automated_feed_ingestion", "live_snapshot"):
+            continue
+        metrics[slug] = {
+            "outlet_count": int(row.get("outlet_count") or 0),
+            "substantive_source_count": int(metadata.get("substantive_source_count") or 0) if isinstance(metadata, dict) else 0,
+            "quality_score": int(metadata.get("quality_score") or 0) if isinstance(metadata, dict) else 0,
+        }
+    return metrics
+
+
 def fetch_discovery_status(client: SupabaseRestClient) -> dict[str, dict[str, Any]]:
     rows = client.get(
         "/raw_discovered_urls?select=id,discovered_url,canonical_url,fetch_status,discovered_at,last_attempted_at,error_message&order=discovered_at.desc&limit=1000"
@@ -184,6 +203,7 @@ def refresh_story_cluster_summary(client: SupabaseRestClient, story_slug: str) -
 def candidate_articles(client: SupabaseRestClient) -> list[tuple[dict[str, Any], dict[str, Any] | None]]:
     discoveries = fetch_discovery_status(client)
     active_story_slugs = fetch_active_story_slugs(client)
+    active_story_metrics = fetch_active_story_metrics(client)
     candidates: list[tuple[dict[str, Any], dict[str, Any] | None]] = []
 
     for article in fetch_recent_articles(client):
@@ -204,6 +224,9 @@ def candidate_articles(client: SupabaseRestClient) -> list[tuple[dict[str, Any],
         story_slug = metadata.get("story_slug") if isinstance(metadata, dict) else None
         body_text = article.get("body_text")
         needs_article_body = extraction_quality != "article_body" or not (isinstance(body_text, str) and body_text.strip())
+        story_metrics = active_story_metrics.get(story_slug) if isinstance(story_slug, str) else None
+        outlet_count = int((story_metrics or {}).get("outlet_count") or 0)
+        substantive_source_count = int((story_metrics or {}).get("substantive_source_count") or 0)
 
         status = (discovery or {}).get("fetch_status")
         status_priority = {
@@ -221,7 +244,17 @@ def candidate_articles(client: SupabaseRestClient) -> list[tuple[dict[str, Any],
         )
         published_at = parse_timestamp(article.get("published_at")) or datetime.now(timezone.utc)
         active_story_priority = 0 if isinstance(story_slug, str) and story_slug in active_story_slugs else 1
-        return (active_story_priority, 0 if needs_article_body else 1, status_priority, queue_timestamp, published_at)
+        one_source_story_priority = 0 if active_story_priority == 0 and outlet_count <= 1 else 1
+        thin_story_priority = 0 if active_story_priority == 0 and substantive_source_count <= 1 else 1
+        return (
+            active_story_priority,
+            one_source_story_priority,
+            thin_story_priority,
+            0 if needs_article_body else 1,
+            status_priority,
+            queue_timestamp,
+            published_at,
+        )
 
     candidates.sort(key=candidate_priority)
     return candidates[:MAX_ARTICLES_PER_RUN]

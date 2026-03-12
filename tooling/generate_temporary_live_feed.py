@@ -148,6 +148,48 @@ ARTICLE_FETCH_CACHE: dict[str, dict[str, object]] = {}
 SEMANTIC_SIMILARITY_JOIN_THRESHOLD = float(os.getenv("PRISM_SEMANTIC_JOIN_THRESHOLD", "0.42"))
 SEMANTIC_SIMILARITY_SUPPORT_THRESHOLD = float(os.getenv("PRISM_SEMANTIC_SUPPORT_THRESHOLD", "0.32"))
 
+SITEMAP_RULES: dict[str, dict[str, tuple[str, ...]]] = {
+    "Associated Press": {
+        "deny_url_patterns": (
+            r"/article/(winning-numbers|lottery|hotwins|pick-\d)",
+            r"/article/.*(?:nfl|nba|mlb|nhl|golf|tennis|soccer|sports?|basketball|football|baseball|hockey|champions)",
+            r"/photo-gallery/",
+        ),
+        "deny_title_patterns": (
+            r"\bwinning numbers\b",
+            r"\blottery\b",
+            r"\b(score|scores|beats|defeats|rallies past|career-high|tournament)\b",
+            r"\b(world cup|season ends|coach|goalkeeper|odi|triplete|big ten|sec play|concacaf)\b",
+        ),
+    },
+    "Reuters": {
+        "deny_url_patterns": (
+            r"/sports/",
+            r"/es/",
+            r"/commentary/",
+        ),
+        "deny_title_patterns": (
+            r"\b(score|scores|beats|rallies past|career-high|tournament)\b",
+        ),
+    },
+    "Politico": {
+        "allow_url_patterns": (
+            r"/news/",
+            r"/story/",
+        ),
+        "deny_url_patterns": (
+            r"/newsletters/",
+            r"/blogs/",
+            r"/politico-press/",
+            r"/podcasts?/",
+        ),
+        "deny_title_patterns": (
+            r"\bplaybook\b",
+            r"\bpodcast\b",
+        ),
+    },
+}
+
 
 @dataclass
 class FeedItem:
@@ -452,6 +494,17 @@ def derive_title_from_url(url: str) -> str:
     return " ".join(words).strip().capitalize()
 
 
+def normalize_feed_fetch_url(value: str | None) -> str:
+    raw = strip_html(value)
+    if not raw:
+        return ""
+    if raw.startswith("//"):
+        return f"https:{raw}"
+    if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", raw):
+        return f"https://{raw.lstrip('/')}"
+    return raw
+
+
 def should_use_sitemap_keywords(keywords: str, title: str) -> bool:
     normalized_keywords = strip_html(keywords)
     if not normalized_keywords:
@@ -460,8 +513,32 @@ def should_use_sitemap_keywords(keywords: str, title: str) -> bool:
         return False
     if len(normalized_keywords) < 40:
         return False
+    if any(marker in normalized_keywords.lower() for marker in ("guid:", "vguid:", "usn:", "newsml_")):
+        return False
+    if normalized_keywords.count(",") >= 5 and len(re.findall(r"[A-Za-z]{4,}", normalized_keywords)) <= 8:
+        return False
     if re.fullmatch(r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}", normalized_keywords):
         return False
+    return True
+
+
+def should_keep_sitemap_item(feed: dict[str, str], url: str, title: str) -> bool:
+    rules = SITEMAP_RULES.get(feed.get("source", ""))
+    if not rules:
+        return True
+
+    allow_patterns = rules.get("allow_url_patterns", ())
+    if allow_patterns and not any(re.search(pattern, url, re.IGNORECASE) for pattern in allow_patterns):
+        return False
+
+    deny_url_patterns = rules.get("deny_url_patterns", ())
+    if any(re.search(pattern, url, re.IGNORECASE) for pattern in deny_url_patterns):
+        return False
+
+    deny_title_patterns = rules.get("deny_title_patterns", ())
+    if any(re.search(pattern, title, re.IGNORECASE) for pattern in deny_title_patterns):
+        return False
+
     return True
 
 
@@ -760,7 +837,7 @@ def parse_news_sitemap(feed: dict[str, str], *, enrich_articles: bool = False) -
         if root_tag == "sitemapindex":
             child_urls = []
             for sitemap in root.findall(".//{*}sitemap"):
-                child_url = normalize_canonical_url(strip_html(sitemap.findtext("{*}loc")))
+                child_url = normalize_feed_fetch_url(sitemap.findtext("{*}loc"))
                 if child_url:
                     child_urls.append(child_url)
             prioritized = sorted(
@@ -795,16 +872,23 @@ def parse_news_sitemap(feed: dict[str, str], *, enrich_articles: bool = False) -
             publication_date = (
                 news_node.findtext("{*}publication_date") if news_node is not None else ""
             ) or url_node.findtext("{*}lastmod")
-            news_language = (news_node.findtext("{*}language") if news_node is not None else "") or ""
+            publication_node = news_node.find("{*}publication") if news_node is not None else None
+            news_language = (
+                (publication_node.findtext("{*}language") if publication_node is not None else "")
+                or (news_node.findtext("{*}language") if news_node is not None else "")
+                or ""
+            )
             keywords = strip_html(news_node.findtext("{*}keywords")) if news_node is not None else ""
             image = strip_html(url_node.findtext("{*}image/{*}loc")) or None
 
-            if news_language and news_language.lower() != "en":
+            if news_language and news_language.lower() not in {"en", "eng"}:
                 continue
 
             if not title:
                 title = derive_title_from_url(url)
             if not title:
+                continue
+            if not should_keep_sitemap_item(feed, url, title):
                 continue
 
             keyword_summary = keywords if should_use_sitemap_keywords(keywords, title) else ""

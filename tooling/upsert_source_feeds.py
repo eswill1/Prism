@@ -9,6 +9,63 @@ from sync_story_content import REST_BASE, SUPABASE_SERVICE_ROLE_KEY, SupabaseRes
 
 SOURCE_DEFINITIONS = [
     {
+        "canonical_name": "Associated Press",
+        "domain": "apnews.com",
+        "country_code": "US",
+        "language_code": "en",
+        "outlet_type": "wire",
+        "launch_tier": "launch_core",
+        "ingestion_status": "active",
+        "preferred_discovery_method": "news_sitemap",
+        "poll_interval_seconds": 600,
+        "notes": "AP news sitemap activated with source-specific filtering to exclude lottery, sports, and non-English items.",
+        "feeds": [
+            {
+                "feed_type": "news_sitemap",
+                "feed_url": "https://apnews.com/news-sitemap-content.xml",
+                "poll_interval_seconds": 600,
+            }
+        ],
+    },
+    {
+        "canonical_name": "Reuters",
+        "domain": "reuters.com",
+        "country_code": "GB",
+        "language_code": "en",
+        "outlet_type": "wire",
+        "launch_tier": "launch_core",
+        "ingestion_status": "active",
+        "preferred_discovery_method": "news_sitemap",
+        "poll_interval_seconds": 600,
+        "notes": "Reuters news sitemap index activated with source-specific keyword cleanup to avoid GUID-only summaries.",
+        "feeds": [
+            {
+                "feed_type": "news_sitemap",
+                "feed_url": "https://www.reuters.com/arc/outboundfeeds/news-sitemap-index/?outputType=xml",
+                "poll_interval_seconds": 600,
+            }
+        ],
+    },
+    {
+        "canonical_name": "Politico",
+        "domain": "politico.com",
+        "country_code": "US",
+        "language_code": "en",
+        "outlet_type": "publication",
+        "launch_tier": "launch_core",
+        "ingestion_status": "active",
+        "preferred_discovery_method": "news_sitemap",
+        "poll_interval_seconds": 900,
+        "notes": "Politico news sitemap activated behind strict URL filtering to avoid newsletters, blogs, and press releases.",
+        "feeds": [
+            {
+                "feed_type": "news_sitemap",
+                "feed_url": "https://www.politico.com/news-sitemap.xml",
+                "poll_interval_seconds": 900,
+            }
+        ],
+    },
+    {
         "canonical_name": "Bloomberg",
         "domain": "bloomberg.com",
         "country_code": "US",
