@@ -191,8 +191,7 @@ def insert_raw_discovered_urls(
                 "canonical_url": item.url,
                 "discovery_method": "rss",
                 "discovered_at": item.published_at,
-                "fetch_status": "fetched",
-                "last_attempted_at": now,
+                "fetch_status": "pending",
             }
         )
     if rows:
@@ -219,6 +218,10 @@ def build_story_from_cluster(
                 "site_name": article["source"],
                 "title": article["title"],
                 "summary": article.get("summary") or domain,
+                "feed_summary": article.get("feed_summary") or article.get("summary") or domain,
+                "body_text": article.get("body_preview") or "",
+                "named_entities": article.get("named_entities") or [],
+                "extraction_quality": article.get("extraction_quality") or "rss_only",
                 "published_at": article["published_at"],
                 "framing": framing_for_outlet(canonical_outlet),
                 "image": article.get("image") or cluster["hero_image"],
@@ -340,7 +343,10 @@ def main() -> int:
     for feed in feeds:
         now = datetime.now(timezone.utc).isoformat()
         try:
-            parsed = parse_feed({"source": feed["source"], "feed_url": feed["feed_url"]})
+            parsed = parse_feed(
+                {"source": feed["source"], "feed_url": feed["feed_url"]},
+                enrich_articles=False,
+            )
             all_items.extend(parsed)
             patch_feed_state(
                 client,

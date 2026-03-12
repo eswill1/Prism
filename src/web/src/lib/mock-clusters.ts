@@ -4,6 +4,10 @@ export type ClusterArticle = {
   outlet: string
   title: string
   summary: string
+  feedSummary?: string
+  bodyText?: string
+  namedEntities?: string[]
+  extractionQuality?: string
   published: string
   framing: FramingGroup
   image: string

@@ -1,5 +1,5 @@
 # Prism Design Bible
-### Version 0.2 — Updated 2026-03-12: homepage-first IA, story-first reading, distinct Perspective rail
+### Version 0.3 — Updated 2026-03-12: source-grounded brief rules and dedicated enrichment path
 
 ---
 
@@ -188,6 +188,17 @@ The current structural rule is:
 - right one-third: Perspective and supporting inspection surfaces
 
 The story must come before the comparison layer.
+
+Prism Brief rule:
+
+- the main brief must be grounded in extracted source text where available, not padded boilerplate
+- if Prism only has feed-snippet quality inputs, the page should remain visibly provisional
+- richer article extraction belongs in a separate enrichment pass, not in the homepage feed-polling loop
+- the visible brief structure should stay stable: what happened, why it matters, where sources agree, where coverage differs, and what to watch
+
+Single-source rule:
+
+- if Prism only has one substantive linked report, the page should present an explicit early brief rather than pretending to offer a mature multi-source synthesis
 
 The story page must also support the full Prism loop:
 
@@ -397,11 +408,16 @@ Visible correction discipline is part of the product identity. Silent cleanup is
 ## 7. First-Launch Pages
 
 - Home
-- Cluster detail
+- Story detail
 - Saved stories
 - Morning briefing
 - Methodology
 - Pricing
 - Correction log
+
+Tracked later surfaces:
+
+- major-story Live Tracker
+- saved-story history views with visible narrative and Perspective deltas
 
 If a page does not help a reader get oriented, inspect the method, or manage their account, it probably does not belong in the launch set.

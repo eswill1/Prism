@@ -1,5 +1,5 @@
 # Prism Implementation Plan
-### Version 0.4 — Updated 2026-03-12: story-first reader surface and direct-source linking aligned
+### Version 0.5 — Updated 2026-03-12: dedicated enrichment worker split from feed ingest
 
 ---
 
@@ -223,8 +223,14 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Scheduled GitHub Actions live snapshot refresh
 - [x] Temporary URL deduplication and heuristic clustering pass
 - [x] Feed ingestion adapters beyond the temporary snapshot script
+- [x] Dedicated article-enrichment worker decoupled from feed polling
 - [ ] News sitemap ingestion
 - [ ] Canonical URL normalization pipeline
+- [x] Article extraction beyond RSS summaries: ledes, first paragraphs, and named-entity capture
+- [ ] Source-grounded brief input records stored per story revision
+- [x] Early-brief gating for one-source stories so single-source pages do not pretend to be full Prism Briefs
+- [x] Brief-readiness evaluator for active live stories
+- [ ] Brief quality evaluation harness with sampled human review
 - [x] Outlet registry seed import
 - [x] Supabase-backed article, outlet, cluster, evidence, and version tables
 - [x] Correction and version event persistence
@@ -235,6 +241,7 @@ Institutional plans and saved stories matter early because they align with the b
 
 #### Success metrics:
 - Most surfaced stories arrive through automated ingestion rather than manual seeding
+- Feed polling stays fast enough to feel live because article extraction is no longer inline in the polling loop
 - Duplicate story handling is acceptable under manual QA
 - Preview/staging content refreshes on a predictable cadence
 - Corrections and outlet mappings are stored, not just rendered
@@ -251,10 +258,13 @@ Institutional plans and saved stories matter early because they align with the b
 #### Deliverables:
 - [ ] Framing presence group generation
 - [ ] Context Pack generation for all four launch lenses
+- [ ] Grounded multi-source Prism Brief generation backed by extracted source text rather than feed snippets
 - [ ] Methodology pages and version registry
 - [ ] Perspective firewall tests
 - [ ] Morning and evening briefing generation
 - [ ] Follow alerts and topic following
+- [ ] Saved-story history with visible narrative and Perspective deltas over time
+- [ ] Major-story Live Tracker surface with rolling source updates and a lighter-weight live Perspective treatment
 - [ ] Subscriber-only monitoring and briefing features
 - [ ] Payment and account workflows
 - [ ] Fly.io migration for always-on API or worker workloads
@@ -342,10 +352,24 @@ Once the surface works, build:
 - source registry
 - feed and sitemap ingestion
 - metadata extraction
+- article text extraction for brief generation
+- separate article enrichment so feed polling stays fast
 - deduplication
 - initial clustering
 
 This gets Prism from mockup to a living product.
+
+### Step 4.5: Prove brief quality
+
+Before shipping model-generated briefs broadly, build:
+
+- source-grounded brief inputs per story
+- one-source early-brief rules
+- multi-source brief generation
+- live-story readiness reporting so the team can see which stories qualify for full briefs versus early briefs
+- sampled human QA and regression checks
+
+If the brief is not materially better than a normal RSS summary, the feature is not ready.
 
 ### Step 5: Prove repeat-use value
 
@@ -453,5 +477,7 @@ Official local posture:
 - how much manual editorial review is needed for high-consequence clusters
 - what level of institutional admin tooling is required at launch
 - where Harbor should consume shared Perspective services versus shared data artifacts
+- what thresholds should promote a story into a dedicated Live Tracker surface
+- how saved-story history should show narrative change versus Perspective change without becoming noisy
 
 These are intentionally deferred. The current goal is to establish the framework cleanly.

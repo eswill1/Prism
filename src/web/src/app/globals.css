@@ -1247,24 +1247,27 @@ button {
   border-top: 1px solid var(--prism-deep-line);
 }
 
-.brief-note-grid {
+.brief-sections {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 20px;
+  gap: 0;
+  margin-top: 22px;
+  border-top: 1px solid var(--prism-deep-line);
 }
 
-.brief-note {
+.brief-section {
   display: grid;
   gap: 8px;
   padding: 16px 18px;
-  border-radius: 16px;
-  border: 1px solid rgba(16, 32, 48, 0.08);
+  border-bottom: 1px solid rgba(16, 32, 48, 0.08);
   background:
-    linear-gradient(180deg, rgba(247, 251, 252, 0.9), rgba(255, 255, 255, 0.72));
+    linear-gradient(180deg, rgba(247, 251, 252, 0.58), rgba(255, 255, 255, 0.72));
 }
 
-.brief-note p {
+.brief-section:last-child {
+  border-bottom: 0;
+}
+
+.brief-section p {
   margin: 0;
 }
 
@@ -1830,7 +1833,6 @@ button {
   .cluster-grid,
   .brand-direction-card,
   .cluster-shell,
-  .brief-note-grid,
   .home-news-grid,
   .hero-cluster,
   .cluster-hero,

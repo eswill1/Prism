@@ -24,6 +24,8 @@ OUTPUT_PATHS = [
     ROOT / "src" / "web" / "public" / "data" / "temporary-live-feed.json",
 ]
 USER_AGENT = "PrismWirePrototype/0.1 (+local preview)"
+ARTICLE_ENRICHMENT_LIMIT_PER_FEED = 2
+ARTICLE_ENRICHMENT_TIMEOUT_SECONDS = 6
 
 FEEDS = [
     {"source": "NPR", "feed_url": "https://feeds.npr.org/1001/rss.xml"},
@@ -70,6 +72,30 @@ STOPWORDS = {
     "who",
 }
 
+ENTITY_STOPWORDS = {
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+}
+
+ARTICLE_FETCH_CACHE: dict[str, dict[str, object]] = {}
+
 
 @dataclass
 class FeedItem:
@@ -79,11 +105,16 @@ class FeedItem:
     url: str
     published_at: str
     summary: str
+    feed_summary: str
+    lede: str
+    body_preview: str
+    named_entities: list[str]
+    extraction_quality: str
     image: str | None
     tokens: set[str]
 
 
-def fetch_text(url: str) -> str:
+def fetch_text(url: str, timeout: int = 20) -> str:
     request = Request(
         url,
         headers={
@@ -91,7 +122,7 @@ def fetch_text(url: str) -> str:
             "Accept": "application/rss+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.8",
         },
     )
-    with urlopen(request, timeout=20) as response:
+    with urlopen(request, timeout=timeout) as response:
         return response.read().decode("utf-8", errors="replace")
 
 
@@ -177,21 +208,175 @@ def image_from_description(raw: str | None) -> str | None:
     return html.unescape(match.group(1)) if match else None
 
 
-def image_from_article(url: str) -> str | None:
+def find_meta_content(markup: str, field_names: tuple[str, ...]) -> str:
+    for field_name in field_names:
+        patterns = [
+            rf'<meta[^>]+property=["\']{re.escape(field_name)}["\'][^>]+content=["\']([^"\']+)["\']',
+            rf'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']{re.escape(field_name)}["\']',
+            rf'<meta[^>]+name=["\']{re.escape(field_name)}["\'][^>]+content=["\']([^"\']+)["\']',
+            rf'<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']{re.escape(field_name)}["\']',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, markup, re.IGNORECASE)
+            if match:
+                return html.unescape(match.group(1)).strip()
+    return ""
+
+
+def extract_json_ld_text(markup: str) -> list[str]:
+    texts: list[str] = []
+    for match in re.finditer(
+        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+        markup,
+        re.IGNORECASE | re.DOTALL,
+    ):
+        raw = html.unescape(match.group(1)).strip()
+        if not raw:
+            continue
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+
+        stack: list[object] = payload if isinstance(payload, list) else [payload]
+        while stack:
+            current = stack.pop()
+            if isinstance(current, list):
+                stack.extend(current)
+                continue
+            if not isinstance(current, dict):
+                continue
+
+            for key in ("description", "articleBody"):
+                value = current.get(key)
+                if isinstance(value, str):
+                    cleaned = strip_html(value)
+                    if cleaned:
+                        texts.append(cleaned)
+
+            graph = current.get("@graph")
+            if isinstance(graph, list):
+                stack.extend(graph)
+
+    return texts
+
+
+def extract_article_paragraphs(markup: str) -> list[str]:
+    article_match = re.search(r"<article[^>]*>(.*?)</article>", markup, re.IGNORECASE | re.DOTALL)
+    candidate_markup = article_match.group(1) if article_match else markup
+    raw_paragraphs = re.findall(r"<p\b[^>]*>(.*?)</p>", candidate_markup, re.IGNORECASE | re.DOTALL)
+
+    paragraphs: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_paragraphs:
+        cleaned = strip_html(raw)
+        normalized = cleaned.lower()
+        if len(cleaned) < 60:
+            continue
+        if normalized in seen:
+            continue
+        if any(
+            phrase in normalized
+            for phrase in (
+                "all rights reserved",
+                "sign up for",
+                "newsletter",
+                "click here",
+                "watch:",
+                "read more:",
+                "advertisement",
+            )
+        ):
+            continue
+        seen.add(normalized)
+        paragraphs.append(cleaned)
+        if len(paragraphs) >= 5:
+            break
+
+    return paragraphs
+
+
+def extract_named_entities(text: str) -> list[str]:
+    seen: set[str] = set()
+    entities: list[str] = []
+    for match in re.finditer(
+        r"\b(?:[A-Z][a-z]+|[A-Z]{2,})(?:\s+(?:[A-Z][a-z]+|[A-Z]{2,})){0,3}\b",
+        text,
+    ):
+        entity = match.group(0).strip()
+        if entity in ENTITY_STOPWORDS or len(entity) < 4:
+            continue
+        if entity in seen:
+            continue
+        seen.add(entity)
+        entities.append(entity)
+        if len(entities) >= 8:
+            break
+    return entities
+
+
+def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, object]:
+    cached = ARTICLE_FETCH_CACHE.get(url)
+    if cached is not None:
+        return cached
+
+    default_payload: dict[str, object] = {
+        "image": None,
+        "lede": clean_summary_snippet(fallback_summary, 320),
+        "body_preview": "",
+        "named_entities": [],
+        "extraction_quality": "rss_only",
+    }
+
     try:
-        markup = fetch_text(url)
+        markup = fetch_text(url, timeout=ARTICLE_ENRICHMENT_TIMEOUT_SECONDS)
     except (HTTPError, URLError, TimeoutError, ValueError):
-        return None
+        ARTICLE_FETCH_CACHE[url] = default_payload
+        return default_payload
 
     match = re.search(
         r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
         markup,
         re.IGNORECASE,
     )
-    return html.unescape(match.group(1)) if match else None
+    image = html.unescape(match.group(1)) if match else None
+    image = image or find_meta_content(markup, ("twitter:image",))
+
+    meta_description = find_meta_content(markup, ("og:description", "description", "twitter:description"))
+    json_ld_text = extract_json_ld_text(markup)
+    paragraphs = extract_article_paragraphs(markup)
+
+    lede_candidates = [paragraphs[0] if paragraphs else "", meta_description, *(json_ld_text[:2]), fallback_summary]
+    lede = ""
+    for candidate in lede_candidates:
+        lede = clean_summary_snippet(candidate, 320)
+        if lede:
+            break
+
+    body_preview = ""
+    if paragraphs:
+        body_preview = clamp_to_word_boundary(" ".join(paragraphs[:3]), 1200)
+    elif json_ld_text:
+        body_preview = clamp_to_word_boundary(" ".join(json_ld_text[:2]), 1200)
+
+    extraction_quality = "rss_only"
+    if paragraphs:
+        extraction_quality = "article_body"
+    elif meta_description or json_ld_text:
+        extraction_quality = "metadata_description"
+
+    payload = {
+        "image": image,
+        "lede": lede,
+        "body_preview": body_preview,
+        "named_entities": extract_named_entities(" ".join(part for part in (lede, body_preview) if part)),
+        "extraction_quality": extraction_quality,
+    }
+    ARTICLE_FETCH_CACHE[url] = payload
+    return payload
 
 
-def parse_feed(feed: dict[str, str]) -> list[FeedItem]:
+def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[FeedItem]:
     xml = fetch_text(feed["feed_url"])
     root = ET.fromstring(xml)
     namespace_map = {"media": "http://search.yahoo.com/mrss/"}
@@ -219,6 +404,22 @@ def parse_feed(feed: dict[str, str]) -> list[FeedItem]:
         elif enclosure is not None and enclosure.attrib.get("type", "").startswith("image/"):
           media_image = enclosure.attrib.get("url")
 
+        should_enrich = enrich_articles and len(items) < ARTICLE_ENRICHMENT_LIMIT_PER_FEED
+        enrichment = (
+            fetch_article_enrichment(url, summary)
+            if should_enrich
+            else {
+                "image": None,
+                "lede": clean_summary_snippet(summary, 320),
+                "body_preview": "",
+                "named_entities": [],
+                "extraction_quality": "rss_only",
+            }
+        )
+        feed_summary = clean_summary_snippet(summary, 220)
+        lede = clean_summary_snippet(str(enrichment.get("lede", "")) or summary, 320) or feed_summary
+        body_preview = clamp_to_word_boundary(str(enrichment.get("body_preview", "")), 1200) if enrichment.get("body_preview") else ""
+
         items.append(
             FeedItem(
                 source=feed["source"],
@@ -228,8 +429,13 @@ def parse_feed(feed: dict[str, str]) -> list[FeedItem]:
                 published_at=parse_datetime(
                     item.findtext("pubDate") or item.findtext("published")
                 ).isoformat(),
-                summary=summary,
-                image=media_image or image_from_description(description_raw),
+                summary=lede or feed_summary,
+                feed_summary=feed_summary,
+                lede=lede or feed_summary,
+                body_preview=body_preview,
+                named_entities=list(enrichment.get("named_entities", [])),
+                extraction_quality=str(enrichment.get("extraction_quality", "rss_only")),
+                image=media_image or image_from_description(description_raw) or enrichment.get("image"),
                 tokens=tokenize(title),
             )
         )
@@ -293,10 +499,10 @@ def build_cluster_payload(
     ordered = sorted(items, key=lambda item: item.published_at, reverse=True)
     lead = ordered[0]
     hero_image = lead.image or (
-        image_from_article(lead.url) if allow_article_image_fetch else None
+        fetch_article_enrichment(lead.url, lead.summary).get("image") if allow_article_image_fetch else None
     )
     sources = sorted({item.source for item in ordered})
-    cleaned_dek = clean_summary_snippet(lead.summary, 280)
+    cleaned_dek = clean_summary_snippet(lead.lede or lead.summary, 280)
     dek = cleaned_dek or (
         f"{lead.title.rstrip('?')} is drawing live coverage from {', '.join(sources)} as Prism tracks what changes next."
     )
@@ -317,8 +523,12 @@ def build_cluster_payload(
                 "title": item.title,
                 "url": item.url,
                 "published_at": item.published_at,
-                "summary": clean_summary_snippet(item.summary, 220)
+                "summary": clean_summary_snippet(item.lede or item.summary, 220)
                 or f"{item.source} is covering this development from its own reporting angle.",
+                "feed_summary": item.feed_summary,
+                "body_preview": item.body_preview,
+                "named_entities": item.named_entities,
+                "extraction_quality": item.extraction_quality,
                 "image": item.image,
                 "domain": urlparse(item.url).netloc,
             }
@@ -333,7 +543,7 @@ def main() -> int:
 
     for feed in FEEDS:
         try:
-            all_items.extend(parse_feed(feed))
+            all_items.extend(parse_feed(feed, enrich_articles=True))
             time.sleep(0.25)
         except Exception as exc:  # noqa: BLE001
             source_errors.append(

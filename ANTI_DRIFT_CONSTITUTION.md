@@ -1,5 +1,5 @@
 # Prism Anti-Drift Constitution
-### Version 0.2 — Updated 2026-03-12: story-first reader rules and direct-source-link policy
+### Version 0.3 — Updated 2026-03-12: story-first brief grounding and direct-source-link policy
 
 ---
 
@@ -55,6 +55,12 @@ These rules apply across official Prism clients.
 
 - the story page must explain what happened before asking the reader to decode comparison structure
 - Perspective should clarify coverage, not displace the core story body
+
+### Prism Briefs must stay source-grounded
+
+- Prism may summarize reporting, but it may not present boilerplate or feed-only filler as if it were a mature multi-source brief
+- single-source stories must remain explicitly provisional until additional substantive reporting arrives
+- slower article extraction and enrichment are allowed, but they may not degrade the freshness of the main feed-polling loop
 
 ---
 

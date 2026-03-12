@@ -55,6 +55,13 @@ The system goal is maximum automation with narrow human-review points.
 - extracted fields: title, description, published time, author, site name, Open Graph data
 - failure rule: retry 3 times, then mark fetch failed
 
+#### `enrich_article_content`
+
+- cadence: queue-driven after `poll_feeds`, or scheduled in short batches during early staging
+- input: recent linked articles with `fetch_status = pending|normalized`
+- output: lede, first paragraphs, named entities, extracted-body quality markers on `articles`
+- failure rule: mark discovery row failed with retry cooldown; do not block feed polling
+
 #### `classify_media_rights`
 
 - cadence: immediately after metadata fetch
@@ -202,13 +209,13 @@ The pipeline is healthy when:
 Build these jobs in order:
 
 1. `poll_feeds`
-2. `poll_news_sitemaps`
-3. `normalize_discovered_url`
-4. `fetch_article_metadata`
-5. `dedupe_articles`
-6. `cluster_recent_articles`
-7. `map_outlets`
-8. `generate_context_pack_candidates`
-9. `emit_correction_events`
+2. `normalize_discovered_url`
+3. `enrich_article_content`
+4. `dedupe_articles`
+5. `cluster_recent_articles`
+6. `map_outlets`
+7. `generate_context_pack_candidates`
+8. `emit_correction_events`
+9. `poll_news_sitemaps`
 
 That sequence gets Prism from a static mockup to a living cluster product with the fewest moving parts.

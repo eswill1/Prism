@@ -443,7 +443,7 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
         client
           .from('cluster_articles')
           .select(
-            'rank_in_cluster, is_primary, framing_group, selection_reason, articles!inner(headline, dek, summary, published_at, preview_image_url, original_url, canonical_url, outlets(canonical_name))',
+            'rank_in_cluster, is_primary, framing_group, selection_reason, articles!inner(headline, dek, summary, body_text, published_at, preview_image_url, original_url, canonical_url, metadata, outlets(canonical_name))',
           )
           .eq('cluster_id', clusterRow.id)
           .order('rank_in_cluster', { ascending: true }),
@@ -480,13 +480,21 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
           headline?: string | null
           dek?: string | null
           summary?: string | null
+          body_text?: string | null
           published_at?: string | null
           preview_image_url?: string | null
           original_url?: string | null
           canonical_url?: string | null
+          metadata?: JsonObject | null
           outlets?: { canonical_name?: string | null } | null
         } | null
-      }> | null)?.map((item, index) => ({
+      }> | null)?.map((item, index) => {
+        const articleMetadata = item.articles?.metadata || {}
+        const namedEntities = Array.isArray(articleMetadata.named_entities)
+          ? articleMetadata.named_entities.filter((value): value is string => typeof value === 'string')
+          : []
+
+        return {
         outlet: item.articles?.outlets?.canonical_name || 'Unknown outlet',
         title: item.articles?.headline || 'Untitled article',
         summary: normalizeSnippet(item.articles?.summary || item.articles?.dek, {
@@ -504,7 +512,16 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
           item.selection_reason ||
           'Included because it materially adds reporting or framing context to the story.',
         url: publicArticleUrl(item.articles?.original_url || item.articles?.canonical_url),
-      })) ?? []
+        feedSummary:
+          typeof articleMetadata.feed_summary === 'string' ? articleMetadata.feed_summary : undefined,
+        bodyText: item.articles?.body_text || undefined,
+        namedEntities,
+        extractionQuality:
+          typeof articleMetadata.extraction_quality === 'string'
+            ? articleMetadata.extraction_quality
+            : undefined,
+      }
+      }) ?? []
 
     const contextPacks = Object.fromEntries(
       ((contextPackItems as Array<{

@@ -8,6 +8,7 @@ Prism exists to help people understand what is happening without turning disagre
 Current build priority:
 
 - prove the core loop before broadening the product surface
+- improve source-grounded Prism Brief quality by separating fast feed polling from slower article enrichment
 
 Prism's core loop is:
 
@@ -42,6 +43,7 @@ Current product decisions locked in:
 - source reads go directly to original reporting when a real source URL exists
 - Prism should not force source-wrapper detours unless they add clear reader value
 - when Supabase-backed live data is available, connected Prism should surface real sourced stories only, not synthetic editorial stand-ins
+- feed polling stays fast; article-page extraction runs in a dedicated enrichment worker instead of blocking ingest
 
 ## Core Concepts
 
@@ -97,14 +99,18 @@ Core commands:
 - `npm run sync:stories`
 - `npm run sources:upsert`
 - `npm run ingest:feeds`
+- `npm run enrich:articles`
+- `npm run brief:readiness`
 
 Environment baseline:
 
 - copy `.env.example` into your local secret system or Doppler project
 - this repo is now scoped locally to Doppler project `prism-wire` config `dev`
-- `npm run sync:stories` upserts the current editorial seed stories plus the live snapshot into Supabase
+- `npm run sync:stories` is now for explicit snapshot or manual sync work only; connected Prism should rely on real sourced stories
 - `npm run sources:upsert` activates the current launch feed registry in Supabase
-- `npm run ingest:feeds` polls the active RSS feeds in Supabase and refreshes the automated live story set
+- `npm run ingest:feeds` polls the active RSS feeds in Supabase, writes pending discovery rows, and refreshes the automated live story set without article-page extraction inline
+- `npm run enrich:articles` performs the slower article-page extraction pass for recent linked articles and upgrades Prism Brief inputs beyond feed snippets
+- `npm run brief:readiness` reports which active live stories are still limited to early briefs and which now have enough substantive sourcing for full Prism Briefs
 - keep the initial hosted path aligned to `Vercel + Supabase + Upstash + GitHub Actions`
 - keep local development aligned to [LOCAL_DEVELOPMENT_MODEL.md](./LOCAL_DEVELOPMENT_MODEL.md)
 - when you create the Vercel project, set the root directory to `src/web`

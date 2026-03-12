@@ -681,6 +681,10 @@ def live_snapshot_stories() -> list[dict[str, Any]]:
                     "site_name": source_name,
                     "title": article["title"],
                     "summary": article.get("summary") or domain,
+                    "feed_summary": article.get("feed_summary") or article.get("summary") or domain,
+                    "body_text": article.get("body_preview") or "",
+                    "named_entities": article.get("named_entities") or [],
+                    "extraction_quality": article.get("extraction_quality") or "rss_only",
                     "published_at": article["published_at"],
                     "framing": framing_for_outlet(display_outlet),
                     "image": article.get("image") or cluster.get("hero_image") or f"https://picsum.photos/seed/{cluster['slug']}-article/640/420",
@@ -853,6 +857,9 @@ class SupabaseRestClient:
     def post(self, path: str, body: Any, prefer: str | None = None) -> Any:
         return self._request("POST", path, body=body, prefer=prefer)
 
+    def patch(self, path: str, body: Any, prefer: str | None = None) -> Any:
+        return self._request("PATCH", path, body=body, prefer=prefer)
+
     def delete(self, path: str) -> Any:
         return self._request("DELETE", path)
 
@@ -938,8 +945,9 @@ def article_payloads(story: dict[str, Any], outlet_rows: dict[str, dict[str, Any
             "canonical_url": canonical_url,
             "original_url": url,
             "headline": article["title"],
-            "dek": article["summary"],
+            "dek": article.get("feed_summary") or article["summary"],
             "summary": article["summary"],
+            "body_text": article.get("body_text") or None,
             "authors": [],
             "site_name": article["site_name"],
             "language_code": "en",
@@ -950,6 +958,9 @@ def article_payloads(story: dict[str, Any], outlet_rows: dict[str, dict[str, Any
             "metadata": {
                 "story_slug": story["slug"],
                 "context_only": bool(article.get("context_only")),
+                "feed_summary": article.get("feed_summary") or article["summary"],
+                "named_entities": article.get("named_entities") or [],
+                "extraction_quality": article.get("extraction_quality") or "rss_only",
                 "sync_source": "tooling/sync_story_content.py",
             },
         }

@@ -120,6 +120,7 @@ Run:
 
 - local targeted scripts only
 - remote managed services where needed
+- preferred command path: `npm run sources:upsert`, `npm run ingest:feeds`, then `npm run enrich:articles`
 
 This is still not full-stack local development.
 

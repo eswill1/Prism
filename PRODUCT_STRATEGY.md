@@ -67,6 +67,8 @@ The correct order is:
 
 That is the clearest practical distinction between Prism and products that mainly optimize for cross-source comparison.
 
+To make that credible, Prism Briefs cannot be built from thin feed snippets alone. The product needs extracted article text, explicit early-brief rules for one-source stories, and source-grounded synthesis once a story has real breadth.
+
 ---
 
 ## Why This Can Work
@@ -221,6 +223,8 @@ After trust is earned, Prism can expand from "tool you use when something matter
 - a morning briefing
 - an evening catch-up
 - saved-story follow-up alerts
+- saved-story history for readers who want to track narrative and Perspective change over time
+- a dedicated Live Tracker for major stories with enough update velocity to justify a continuous view
 - topic briefings for specific domains
 
 The habit must form around orientation and decision utility, not compulsive checking.
