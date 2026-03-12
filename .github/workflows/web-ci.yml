@@ -1,4 +1,4 @@
-name: Web CI
+name: CI
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 
 jobs:
   build-web:
+    name: build-web
     runs-on: ubuntu-latest
 
     steps:
@@ -25,3 +26,22 @@ jobs:
 
       - name: Build web app
         run: npm run build:web
+
+  python-pipeline:
+    name: python-pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Python tooling
+        run: python3 -m py_compile tooling/*.py
+
+      - name: Run Python smoke checks
+        run: python3 tooling/ci_smoke_checks.py

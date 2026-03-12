@@ -9,6 +9,7 @@ Current build priority:
 
 - prove the core loop before broadening the product surface
 - improve source-grounded Prism Brief quality by separating fast feed polling from slower article enrichment
+- move story formation toward hybrid semantic clustering while keeping deterministic merge guardrails
 
 Prism's core loop is:
 
@@ -44,6 +45,7 @@ Current product decisions locked in:
 - Prism should not force source-wrapper detours unless they add clear reader value
 - when Supabase-backed live data is available, connected Prism should surface real sourced stories only, not synthetic editorial stand-ins
 - feed polling stays fast; article-page extraction runs in a dedicated enrichment worker instead of blocking ingest
+- clustering is transitioning to a hybrid model: semantic candidate retrieval first, explicit merge guardrails second
 
 ## Core Concepts
 
@@ -77,6 +79,7 @@ Current product decisions locked in:
 | [VERCEL_BOOTSTRAP.md](./VERCEL_BOOTSTRAP.md) | Exact setup path for the initial Vercel-based preview deployment |
 | [UI_UX_DIRECTION.md](./UI_UX_DIRECTION.md) | Visual direction derived from current mainstream product patterns |
 | [AGENT_DEVELOPMENT_STRATEGY.md](./AGENT_DEVELOPMENT_STRATEGY.md) | Multi-agent build strategy for this repo |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | Feature-branch, PR, and validation workflow for Prism development |
 
 ## Repository Shape
 
@@ -101,6 +104,7 @@ Core commands:
 - `npm run ingest:feeds`
 - `npm run enrich:articles`
 - `npm run brief:readiness`
+- `npm run cluster:candidates`
 
 Environment baseline:
 
@@ -111,6 +115,7 @@ Environment baseline:
 - `npm run ingest:feeds` polls the active RSS feeds in Supabase, writes pending discovery rows, and refreshes the automated live story set without article-page extraction inline
 - `npm run enrich:articles` performs the slower article-page extraction pass for recent linked articles and upgrades Prism Brief inputs beyond feed snippets
 - `npm run brief:readiness` reports which active live stories are still limited to early briefs and which now have enough substantive sourcing for full Prism Briefs
+- `npm run cluster:candidates` reports how well semantic candidate retrieval covers the current heuristic clusters before Prism gives learned inference more authority
 - keep the initial hosted path aligned to `Vercel + Supabase + Upstash + GitHub Actions`
 - keep local development aligned to [LOCAL_DEVELOPMENT_MODEL.md](./LOCAL_DEVELOPMENT_MODEL.md)
 - when you create the Vercel project, set the root directory to `src/web`

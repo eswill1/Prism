@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import re
 import sys
 import time
@@ -17,6 +18,10 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
 
+try:
+    from tooling.semantic_story_candidates import build_similarity_lookup
+except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
+    from semantic_story_candidates import build_similarity_lookup
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_PATHS = [
@@ -585,11 +590,27 @@ def should_join_cluster(item: FeedItem, cluster: list[FeedItem]) -> bool:
 
 
 def cluster_items(items: Iterable[FeedItem]) -> list[list[FeedItem]]:
+    ordered_items = sorted(items, key=lambda entry: entry.published_at, reverse=True)
+    candidate_strategy = os.getenv("PRISM_CLUSTERING_CANDIDATE_STRATEGY", "semantic").strip().lower()
+    neighbor_lookup: dict[str, list[str]] = {}
+    if candidate_strategy == "semantic" and len(ordered_items) > 1:
+        neighbor_lookup, _similarity_lookup = build_similarity_lookup(ordered_items)
+
     clusters: list[list[FeedItem]] = []
-    for item in sorted(items, key=lambda entry: entry.published_at, reverse=True):
+    for item in ordered_items:
         target = None
         best_score = 0.0
-        for cluster in clusters:
+        candidate_urls = set(neighbor_lookup.get(item.url, []))
+        candidate_clusters = (
+            [
+                cluster
+                for cluster in clusters
+                if any(entry.url in candidate_urls for entry in cluster)
+            ]
+            if candidate_urls
+            else clusters
+        )
+        for cluster in candidate_clusters or clusters:
             score = cluster_match_score(item, cluster)
             if score > best_score and should_join_cluster(item, cluster):
                 target = cluster

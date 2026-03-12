@@ -1,5 +1,5 @@
 # Prism Implementation Plan
-### Version 0.5 — Updated 2026-03-12: dedicated enrichment worker split from feed ingest
+### Version 0.6 — Updated 2026-03-12: hybrid clustering transition baseline
 
 ---
 
@@ -39,7 +39,7 @@
 | Component | Choice | Rationale |
 |---|---|---|
 | Language | Python 3.12 | Best fit for clustering and NLP tooling |
-| Similarity + clustering | Sentence Transformers + rule-based merge logic | Good balance of quality and inspectability |
+| Similarity + clustering | Embedding-based candidate retrieval + rule-based merge guardrails | Good balance of quality and inspectability |
 | Labeling helpers | Lightweight classifiers with audit output | Explanations stay inspectable |
 | Data orchestration | Scheduled workers and CLI jobs | Simpler than introducing a heavy orchestrator in v1 |
 
@@ -226,6 +226,9 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Dedicated article-enrichment worker decoupled from feed polling
 - [ ] News sitemap ingestion
 - [ ] Canonical URL normalization pipeline
+- [x] Semantic candidate-retrieval scaffold for story clustering
+- [x] Candidate-retrieval evaluation harness against current heuristic clusters
+- [ ] Embedding-backed clustering provider beyond local hashing fallback
 - [x] Article extraction beyond RSS summaries: ledes, first paragraphs, and named-entity capture
 - [ ] Source-grounded brief input records stored per story revision
 - [x] Early-brief gating for one-source stories so single-source pages do not pretend to be full Prism Briefs
@@ -243,6 +246,7 @@ Institutional plans and saved stories matter early because they align with the b
 - Most surfaced stories arrive through automated ingestion rather than manual seeding
 - Feed polling stays fast enough to feel live because article extraction is no longer inline in the polling loop
 - Duplicate story handling is acceptable under manual QA
+- Semantic candidate retrieval meaningfully narrows cluster choices before deterministic merge rules fire
 - Preview/staging content refreshes on a predictable cadence
 - Corrections and outlet mappings are stored, not just rendered
 - Returning users see meaningful "what changed" state on followed stories
@@ -317,6 +321,19 @@ Before expanding breadth, prove this sequence:
 - returns because Prism is the easiest place to see what changed
 
 If this loop is weak, stop broadening the product and fix it first.
+
+### Step 2: Upgrade clustering without losing auditability
+
+Prism should not keep accreting hand-written merge rules forever.
+
+The intended progression is:
+
+- deterministic normalization and URL hygiene
+- semantic candidate retrieval over enriched article text
+- explicit merge and split guardrails
+- audited versioning for material clustering changes
+
+The system should prefer ML for inference and rules for boundaries.
 
 ### Step 2: Prove the hero surface
 

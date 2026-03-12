@@ -1,5 +1,5 @@
 # Prism Anti-Drift Constitution
-### Version 0.3 — Updated 2026-03-12: story-first brief grounding and direct-source-link policy
+### Version 0.4 — Updated 2026-03-12: hybrid clustering and inference policy
 
 ---
 
@@ -61,6 +61,12 @@ These rules apply across official Prism clients.
 - Prism may summarize reporting, but it may not present boilerplate or feed-only filler as if it were a mature multi-source brief
 - single-source stories must remain explicitly provisional until additional substantive reporting arrives
 - slower article extraction and enrichment are allowed, but they may not degrade the freshness of the main feed-polling loop
+
+### Inference should not calcify into hard-coded folklore
+
+- deterministic rules are allowed for normalization, source policy, safety rails, and explicit merge exclusions
+- learned inference should carry more of the load for story similarity, candidate retrieval, and topic formation as the system matures
+- Prism may not replace one opaque black box with another; any learned clustering path must preserve audit hooks and rollback options
 
 ---
 
