@@ -8,6 +8,13 @@ type ContextPackPanelProps = {
   packs: StoryCluster['contextPacks']
 }
 
+const launchLensOrder = [
+  'Balanced Framing',
+  'Evidence-First',
+  'Local Impact',
+  'International Comparison',
+] as const
+
 const lensDescriptions: Record<string, string> = {
   'Balanced Framing':
     'A compact alternate-read set chosen to widen the frame without flattening disagreement.',
@@ -20,14 +27,20 @@ const lensDescriptions: Record<string, string> = {
 }
 
 export function ContextPackPanel({ packs }: ContextPackPanelProps) {
-  const lenses = Object.keys(packs)
+  const lenses = [
+    ...launchLensOrder,
+    ...Object.keys(packs).filter((lens) => !launchLensOrder.includes(lens as (typeof launchLensOrder)[number])),
+  ]
+  const normalizedPacks = Object.fromEntries(
+    lenses.map((lens) => [lens, packs[lens] ?? []]),
+  ) as StoryCluster['contextPacks']
   const [activeLens, setActiveLens] = useState(lenses[0] ?? 'Balanced Framing')
 
   useEffect(() => {
-    setActiveLens((current) => (packs[current] ? current : Object.keys(packs)[0] ?? 'Balanced Framing'))
+    setActiveLens((current) => (normalizedPacks[current] ? current : launchLensOrder[0]))
   }, [packs])
 
-  const activeItems = packs[activeLens] ?? []
+  const activeItems = normalizedPacks[activeLens] ?? []
 
   return (
     <article className="panel content-panel">
@@ -61,17 +74,37 @@ export function ContextPackPanel({ packs }: ContextPackPanelProps) {
       {activeItems.length > 0 ? (
         <div className="context-grid">
           {activeItems.map((item, index) => (
-            <article className="context-card" key={`${activeLens}-${item.outlet}-${item.title}`}>
-              <div className="context-card-top">
-                <span className="context-outlet">{item.outlet}</span>
-                <span className="context-count">{`0${index + 1}`}</span>
-              </div>
-              <h3>{item.title}</h3>
-              <div className="context-why">
-                <span className="context-why-label">Why this read</span>
-                <p>{item.why}</p>
-              </div>
-            </article>
+            item.url ? (
+              <a
+                className="context-card context-card-link"
+                href={item.url}
+                key={`${activeLens}-${item.outlet}-${item.title}`}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <div className="context-card-top">
+                  <span className="context-outlet">{item.outlet}</span>
+                  <span className="context-count">{`0${index + 1}`}</span>
+                </div>
+                <h3>{item.title}</h3>
+                <div className="context-why">
+                  <span className="context-why-label">Why this read</span>
+                  <p>{item.why}</p>
+                </div>
+              </a>
+            ) : (
+              <article className="context-card" key={`${activeLens}-${item.outlet}-${item.title}`}>
+                <div className="context-card-top">
+                  <span className="context-outlet">{item.outlet}</span>
+                  <span className="context-count">{`0${index + 1}`}</span>
+                </div>
+                <h3>{item.title}</h3>
+                <div className="context-why">
+                  <span className="context-why-label">Why this read</span>
+                  <p>{item.why}</p>
+                </div>
+              </article>
+            )
           ))}
         </div>
       ) : (

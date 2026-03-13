@@ -72,6 +72,7 @@ LOW_VALUE_PATTERNS: list[tuple[str, int]] = [
 HIGH_VALUE_TOPICS = {"US Politics", "World", "Business", "Technology", "Climate and Infrastructure", "Weather"}
 MIN_CONFIDENT_LEAD_QUALITY = 6
 MIN_CONFIDENT_OPEN_ALTERNATE_QUALITY = 7
+MIN_SHIPPABLE_SINGLE_SOURCE_SUMMARY_QUALITY = 6
 
 
 def infer_access_tier(article: dict[str, Any]) -> str:
@@ -448,6 +449,23 @@ def build_story_from_cluster(
     }
 
 
+def is_shippable_story(story: dict[str, Any]) -> bool:
+    metadata = story.get("metadata") or {}
+    source_count = int(metadata.get("source_count") or story.get("outlet_count") or 0)
+    substantive_source_count = int(metadata.get("substantive_source_count") or 0)
+    summary_quality = int(metadata.get("summary_quality_score") or 0)
+    source_options = metadata.get("source_options") or {}
+    lead_quality_confident = bool(source_options.get("lead_quality_confident"))
+
+    if source_count <= 1 and substantive_source_count == 0 and summary_quality < MIN_SHIPPABLE_SINGLE_SOURCE_SUMMARY_QUALITY:
+        return False
+
+    if source_count <= 1 and substantive_source_count == 0 and not lead_quality_confident:
+        return False
+
+    return True
+
+
 def cleanup_stale_live_clusters(client: SupabaseRestClient, current_slugs: set[str]) -> int:
     rows = client.get("/story_clusters?select=id,slug,metadata&limit=200") or []
     removed = 0
@@ -547,17 +565,23 @@ def main() -> int:
     else:
         primary_clusters = primary_clusters[:14]
 
-    stories = [
-        build_story_from_cluster(
+    stories: list[dict[str, Any]] = []
+    dropped_low_quality = 0
+    for priority, homepage_eligible, cluster in primary_clusters:
+        story = build_story_from_cluster(
             {
                 **cluster,
-                "slug": f"live-{index}-{cluster['slug'].split('-', 2)[-1]}",
+                "slug": f"live-{len(stories) + 1}-{cluster['slug'].split('-', 2)[-1]}",
             },
             priority_score=priority,
             homepage_eligible=homepage_eligible,
         )
-        for index, (priority, homepage_eligible, cluster) in enumerate(primary_clusters, start=1)
-    ]
+        if not is_shippable_story(story):
+            dropped_low_quality += 1
+            continue
+        stories.append(story)
+        if len(stories) >= 14:
+            break
 
     if not stories:
         print(
@@ -567,6 +591,7 @@ def main() -> int:
                     "feed_errors": len(feed_errors),
                     "raw_discovered_inserted": raw_discovered_count,
                     "live_stories_synced": 0,
+                    "low_quality_live_clusters_dropped": dropped_low_quality,
                     "stale_live_clusters_removed": 0,
                     "story_cluster_count": fetch_story_cluster_count(client),
                 },
@@ -592,6 +617,7 @@ def main() -> int:
                 "feed_errors": len(feed_errors),
                 "raw_discovered_inserted": raw_discovered_count,
                 "live_stories_synced": len(stories),
+                "low_quality_live_clusters_dropped": dropped_low_quality,
                 "stale_live_clusters_removed": removed,
                 "story_cluster_count": fetch_story_cluster_count(client),
             },

@@ -78,6 +78,23 @@ The system goal is maximum automation with narrow human-review points.
 - failure rule: keep the previous current brief revision in place; do not blank out story pages
 - current state: `npm run ingest:feeds` now runs brief generation after enrichment, and `npm run brief:generate` can be run directly for brief-only refreshes
 
+#### `generate_perspective`
+
+- cadence: queue-driven after `generate_story_briefs`, or chained directly after the brief pass during early staging
+- input: active `story_clusters`, linked article metadata, stored outlet mappings, and current story coverage
+- output: `story_perspective_revisions`, regenerated `context_pack_items`, and `version_registry` events for Perspective changes
+- audit rule: Perspective must describe presence and structure, not imply truth, ranking, or verdicts
+- failure rule: keep the previous current Perspective revision in place; do not blank out the Perspective rail
+- current state: `npm run ingest:feeds` now runs Perspective generation after brief generation, and `npm run perspective:generate` can be run directly for Perspective-only refreshes
+
+#### `evaluate_perspective_readiness`
+
+- cadence: after `generate_perspective` during tuning, and before shipping major Context Pack or Perspective-rule changes
+- input: current `story_perspective_revisions`, active `context_pack_items`, and live story set
+- output: readiness report showing which stories have current Perspective revisions, which lenses are quality-gated into availability, and which live stories still need manual Perspective review
+- failure rule: no automatic rollback, but missing or stale Perspective revisions should block shipping major Perspective changes
+- current state: available locally and in staging as `npm run perspective:readiness`
+
 #### `evaluate_brief_grounding`
 
 - cadence: after `generate_story_briefs` during tuning, and before shipping major brief-generator changes
@@ -182,6 +199,7 @@ The system goal is maximum automation with narrow human-review points.
 - input: cluster membership + outlet mapping + lens rules
 - output: candidate sets for each launch lens
 - failure rule: cluster stays live; pack falls back to minimal set
+- current state: implemented inside the stored Perspective generation pass, with lens-specific ranking for Balanced Framing, Evidence-First, Local Impact, and International Comparison
 
 ---
 

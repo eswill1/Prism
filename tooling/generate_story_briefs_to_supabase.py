@@ -71,6 +71,64 @@ GENERIC_FOCUS_TOKENS = {
     "updates",
 }
 
+STOPWORD_TOKENS = {
+    "about",
+    "after",
+    "again",
+    "amid",
+    "around",
+    "because",
+    "before",
+    "being",
+    "between",
+    "could",
+    "despite",
+    "during",
+    "first",
+    "from",
+    "have",
+    "into",
+    "its",
+    "just",
+    "like",
+    "more",
+    "most",
+    "over",
+    "says",
+    "saying",
+    "than",
+    "that",
+    "their",
+    "them",
+    "there",
+    "these",
+    "they",
+    "this",
+    "those",
+    "through",
+    "today",
+    "under",
+    "while",
+    "with",
+}
+
+ABBREVIATION_PATTERNS = (
+    r"\bU\.S\.",
+    r"\bU\.K\.",
+    r"\bE\.U\.",
+    r"\bMr\.",
+    r"\bMrs\.",
+    r"\bMs\.",
+    r"\bDr\.",
+    r"\bSen\.",
+    r"\bRep\.",
+    r"\bGov\.",
+    r"\bGen\.",
+    r"\bLt\.",
+    r"\bCol\.",
+    r"\bSt\.",
+)
+
 
 def normalize_whitespace(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
@@ -124,9 +182,109 @@ def sentence_similarity(left: str, right: str) -> float:
     return overlap / max(len(left_tokens), len(right_tokens))
 
 
+def comparable_tokens(value: str) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]{4,}", normalize_whitespace(value).lower().replace("u.s.", "us").replace("u.s", "us"))
+        if token not in STOPWORD_TOKENS
+    }
+
+
+def alignment_score(reference: str, candidate: str) -> float:
+    reference_tokens = comparable_tokens(reference)
+    candidate_tokens = comparable_tokens(candidate)
+    if len(reference_tokens) < 4 or len(candidate_tokens) < 4:
+        return 1.0
+    overlap = reference_tokens & candidate_tokens
+    return len(overlap) / max(1, min(len(reference_tokens), len(candidate_tokens)))
+
+
+def split_narrative_sentences(text: str) -> list[str]:
+    cleaned = normalize_whitespace(text)
+    if not cleaned:
+        return []
+
+    protected = cleaned
+    replacements: dict[str, str] = {}
+    for index, pattern in enumerate(ABBREVIATION_PATTERNS):
+        def repl(match: re.Match[str], token_index: int = index) -> str:
+            token = f"__ABBR_{token_index}_{len(replacements)}__"
+            replacements[token] = match.group(0)
+            return token
+
+        protected = re.sub(pattern, repl, protected, flags=re.IGNORECASE)
+
+    matches = re.findall(r"[^.!?]+[.!?]+", protected)
+    if not matches:
+        restored = protected
+        for token, original in replacements.items():
+            restored = restored.replace(token, original)
+        return [restored]
+
+    sentences = []
+    for segment in matches:
+        restored = segment
+        for token, original in replacements.items():
+            restored = restored.replace(token, original)
+        restored = normalize_whitespace(restored)
+        if restored:
+            sentences.append(restored)
+    return sentences
+
+
+def has_body_mismatch(article: dict[str, Any]) -> bool:
+    metadata = article.get("metadata") or {}
+    if isinstance(metadata, dict) and metadata.get("body_mismatch_detected") is True:
+        return True
+
+    reference_text = " ".join(
+        filter(
+            None,
+            [
+                article.get("headline") or "",
+                (metadata.get("feed_summary") if isinstance(metadata, dict) else "") or "",
+            ],
+        )
+    )
+    candidate_text = first_narrative_sentences(
+        str(article.get("body_text") or article.get("summary") or ""),
+        2,
+    )
+    if not reference_text.strip() or not candidate_text.strip():
+        return False
+    return alignment_score(reference_text, candidate_text) < 0.16
+
+
+def detail_text_for_article(article: dict[str, Any]) -> str:
+    body_text = str(article.get("body_text") or "").strip()
+    if not body_text:
+        return ""
+
+    if not has_body_mismatch(article):
+        return ensure_period(later_narrative_sentences(body_text, skip_count=2, sentence_count=2))
+
+    metadata = article.get("metadata") or {}
+    reference_text = " ".join(
+        filter(
+            None,
+            [
+                article.get("headline") or "",
+                (metadata.get("feed_summary") if isinstance(metadata, dict) else "") or "",
+            ],
+        )
+    )
+    sentences = split_narrative_sentences(body_text)
+    aligned = [
+        sentence
+        for sentence in sentences[2:]
+        if len(sentence) >= 60 and alignment_score(reference_text, sentence) >= 0.12
+    ]
+    return ensure_period(" ".join(aligned[:2])) if aligned else ""
+
+
 def first_narrative_sentences(text: str, sentence_count: int) -> str:
     cleaned = normalize_whitespace(text)
-    sentences = [segment.strip() for segment in re.findall(r"[^.!?]+[.!?]+", cleaned) if segment.strip()]
+    sentences = split_narrative_sentences(cleaned)
     if not sentences:
         return cleaned
     return " ".join(sentences[:sentence_count]).strip()
@@ -134,7 +292,7 @@ def first_narrative_sentences(text: str, sentence_count: int) -> str:
 
 def later_narrative_sentences(text: str, *, skip_count: int, sentence_count: int) -> str:
     cleaned = normalize_whitespace(text)
-    sentences = [segment.strip() for segment in re.findall(r"[^.!?]+[.!?]+", cleaned) if segment.strip()]
+    sentences = split_narrative_sentences(cleaned)
     if len(sentences) <= skip_count:
         return ""
     return " ".join(sentences[skip_count : skip_count + sentence_count]).strip()
@@ -166,17 +324,19 @@ def infer_access_tier(outlet: str, signal: str | None = None) -> str:
 
 
 def substantive_text_for_article(article: dict[str, Any]) -> str:
+    metadata = article.get("metadata") or {}
+    feed_summary = str((metadata or {}).get("feed_summary") or "").strip()
+    mismatch = has_body_mismatch(article)
     body_text = str(article.get("body_text") or "").strip()
-    if body_text:
+    if body_text and not mismatch:
         body_candidate = first_narrative_sentences(body_text, 3)
         if len(body_candidate) >= 120:
             return body_candidate
 
     summary = str(article.get("summary") or "").strip()
-    if summary:
+    if summary and (not mismatch or not feed_summary):
         return normalize_whitespace(summary)
 
-    feed_summary = str((article.get("metadata") or {}).get("feed_summary") or "").strip()
     if feed_summary:
         return normalize_whitespace(feed_summary)
 
@@ -187,7 +347,7 @@ def is_substantive_article(article: dict[str, Any]) -> bool:
     metadata = article.get("metadata") or {}
     extraction_quality = metadata.get("extraction_quality") if isinstance(metadata, dict) else None
     body_text = str(article.get("body_text") or "").strip()
-    if extraction_quality == "article_body" and len(body_text) >= 180:
+    if extraction_quality == "article_body" and len(body_text) >= 180 and not has_body_mismatch(article):
         return True
     return len(substantive_text_for_article(article)) >= 110
 
@@ -258,7 +418,7 @@ def build_brief_sources(cluster: dict[str, Any]) -> list[dict[str, Any]]:
                 "framing": relation.get("framing_group") or "center",
                 "snippet": ensure_period(snippet),
                 "focus": article_focus(article),
-                "detail": ensure_period(later_narrative_sentences(str(article.get("body_text") or ""), skip_count=2, sentence_count=2)),
+                "detail": detail_text_for_article(article),
                 "extraction_quality": metadata.get("extraction_quality") if isinstance(metadata, dict) else None,
                 "access_tier": infer_access_tier(
                     outlet,
@@ -427,6 +587,45 @@ def watch_next_copy(cluster: dict[str, Any], family: str) -> str:
     )
 
 
+def early_brief_opening(cluster: dict[str, Any], central: dict[str, Any] | None) -> str:
+    summary = ensure_period(cluster["summary"])
+    if not central:
+        return summary
+
+    snippet = str(central.get("snippet") or "").strip()
+    detail = str(central.get("detail") or "").strip()
+    if detail and sentence_similarity(detail, cluster["summary"]) < 0.72:
+        return f"{summary} {detail}".strip()
+    if snippet and sentence_similarity(snippet, cluster["summary"]) < 0.72:
+        return f"{summary} {snippet}".strip()
+    return summary
+
+
+def early_brief_detail_followup(
+    cluster: dict[str, Any],
+    central: dict[str, Any] | None,
+    opening: str,
+) -> str:
+    if not central:
+        return ""
+
+    detail = ensure_period(str(central.get("detail") or "").strip())
+    if detail and normalize_whitespace(detail).lower() not in normalize_whitespace(opening).lower() and sentence_similarity(detail, opening) < 0.72:
+        return detail
+
+    snippet = ensure_period(str(central.get("snippet") or "").strip())
+    summary = ensure_period(cluster["summary"])
+    if (
+        snippet
+        and normalize_whitespace(snippet).lower() not in normalize_whitespace(opening).lower()
+        and sentence_similarity(snippet, summary) < 0.72
+        and sentence_similarity(snippet, opening) < 0.72
+    ):
+        return snippet
+
+    return ""
+
+
 def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
     family = topic_family_for_story(cluster["topic_label"])
     sources = build_brief_sources(cluster)
@@ -456,9 +655,8 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
-    add_paragraph(ensure_period(cluster["summary"]), *(sources[:2] or ([central] if central else [])))
-
     if full_brief:
+        add_paragraph(ensure_period(cluster["summary"]), *(sources[:2] or ([central] if central else [])))
         add_paragraph(
             (
                 f"Across {outlet_text(cluster)}, the baseline is consistent. {central['snippet']}"
@@ -496,44 +694,42 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
             *(support_payload(central, divergent) if central and divergent else support_payload(*(secondary_sources[:2] or ([central] if central else [])))),
         )
     else:
+        opening = early_brief_opening(cluster, central)
+        add_paragraph(opening, *(sources[:2] or ([central] if central else [])))
+        detail_followup = early_brief_detail_followup(cluster, central, opening)
+        if detail_followup:
+            add_paragraph(detail_followup, *(support_payload(central) if central else []))
         if central:
-            central_focus = clean_focus_phrase(central["focus"], family)
-            central_detail = str(central.get("detail") or "").strip()
-            if central_detail and (
-                cluster["summary"] in central["snippet"] or sentence_similarity(central["snippet"], cluster["summary"]) >= 0.72
-            ):
+            if open_alternate:
                 add_paragraph(
-                    f"The clearest detailed reporting so far comes from {central['outlet']}. {central_detail}",
-                    central,
-                )
-            elif sentence_similarity(central["snippet"], cluster["summary"]) < 0.72:
-                add_paragraph(
-                    f"The clearest detailed reporting so far comes from {central['outlet']}. {central['snippet']}",
-                    central,
+                    (
+                        f"Prism has also linked an open follow-on read from {open_alternate['outlet']}. "
+                        "It broadly tracks the same story, but the source mix is still too thin to treat differences in emphasis as a meaningful split in coverage."
+                    ),
+                    central or open_alternate,
+                    open_alternate,
                 )
             else:
                 add_paragraph(
                     (
-                        f"The clearest detailed reporting so far comes from {central['outlet']}, "
-                        "and it supports the same overall picture while adding detail beyond the first headline."
+                        f"Right now Prism has one detailed source on this story, from {central['outlet']}. "
+                        "That gives readers a useful first account, but not yet enough reporting to show where coverage really starts to diverge."
                     ),
-                    central,
+                    *(support_payload(central) if central else []),
                 )
-
-        if open_alternate:
+        elif open_alternate:
             add_paragraph(
                 (
                     f"Prism has also linked an open follow-on read from {open_alternate['outlet']}. "
                     "It broadly tracks the same story, but the source mix is still too thin to treat differences in emphasis as a meaningful split in coverage."
                 ),
-                central or open_alternate,
                 open_alternate,
             )
         else:
             add_paragraph(
                 (
                     "Prism is still working with a thin source set here. "
-                    "This early brief will become more useful once another detailed report arrives and the comparison layer has more than one substantive account to work with."
+                    "This is a useful first read, but it will become more complete once another detailed report arrives."
                 ),
                 *(support_payload(central) if central else []),
             )
@@ -664,12 +860,68 @@ def fetch_current_revisions(client: SupabaseRestClient) -> dict[str, dict[str, A
     return {row["cluster_id"]: row for row in rows if row.get("cluster_id")}
 
 
-def patch_current_revisions_off(client: SupabaseRestClient, cluster_id: str) -> None:
+def patch_revision_current_state(client: SupabaseRestClient, revision_id: str, *, is_current: bool) -> None:
     client.patch(
-        f"/story_brief_revisions?cluster_id=eq.{cluster_id}&is_current=eq.true",
-        {"is_current": False},
+        f"/story_brief_revisions?id=eq.{revision_id}",
+        {"is_current": is_current},
         prefer="return=minimal",
     )
+
+
+def insert_brief_revision_draft(
+    client: SupabaseRestClient,
+    cluster_id: str,
+    revision_tag: str,
+    brief_payload: dict[str, Any],
+) -> str:
+    rows = client.post(
+        "/story_brief_revisions?select=id",
+        [
+            {
+                "cluster_id": cluster_id,
+                "revision_tag": revision_tag,
+                "status": brief_payload["status"],
+                "is_current": False,
+                "label": brief_payload["label"],
+                "title": brief_payload["title"],
+                "generation_method": "deterministic_grounded_v1",
+                "input_signature": brief_payload["input_signature"],
+                "source_snapshot": brief_payload["source_snapshot"],
+                "paragraphs": brief_payload["paragraphs"],
+                "why_it_matters": brief_payload["why_it_matters"],
+                "where_sources_agree": brief_payload["where_sources_agree"],
+                "where_coverage_differs": brief_payload["where_coverage_differs"],
+                "what_to_watch": brief_payload["what_to_watch"],
+                "supporting_points": brief_payload["supporting_points"],
+                "metadata": brief_payload["metadata"],
+            }
+        ],
+        prefer="return=representation",
+    ) or []
+    revision_id = rows[0].get("id") if rows else None
+    if not isinstance(revision_id, str) or not revision_id:
+        raise RuntimeError(f"Brief draft insert for cluster {cluster_id} did not return a revision id")
+    return revision_id
+
+
+def promote_revision_current_state(
+    client: SupabaseRestClient,
+    current_revision_id: str | None,
+    new_revision_id: str,
+) -> None:
+    if current_revision_id:
+        patch_revision_current_state(client, current_revision_id, is_current=False)
+    try:
+        patch_revision_current_state(client, new_revision_id, is_current=True)
+    except Exception as exc:
+        if current_revision_id:
+            try:
+                patch_revision_current_state(client, current_revision_id, is_current=True)
+            except Exception as restore_exc:  # noqa: BLE001
+                raise RuntimeError(
+                    f"Failed to promote brief revision {new_revision_id} and failed to restore previous current revision {current_revision_id}: {restore_exc}"
+                ) from exc
+        raise
 
 
 def patch_cluster_metadata(client: SupabaseRestClient, cluster: dict[str, Any], revision_tag: str, brief_payload: dict[str, Any]) -> None:
@@ -728,31 +980,12 @@ def main() -> int:
             unchanged += 1
             continue
 
-        patch_current_revisions_off(client, cluster["id"])
         revision_tag = f"brief-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-        client.post(
-            "/story_brief_revisions",
-            [
-                {
-                    "cluster_id": cluster["id"],
-                    "revision_tag": revision_tag,
-                    "status": brief_payload["status"],
-                    "is_current": True,
-                    "label": brief_payload["label"],
-                    "title": brief_payload["title"],
-                    "generation_method": "deterministic_grounded_v1",
-                    "input_signature": brief_payload["input_signature"],
-                    "source_snapshot": brief_payload["source_snapshot"],
-                    "paragraphs": brief_payload["paragraphs"],
-                    "why_it_matters": brief_payload["why_it_matters"],
-                    "where_sources_agree": brief_payload["where_sources_agree"],
-                    "where_coverage_differs": brief_payload["where_coverage_differs"],
-                    "what_to_watch": brief_payload["what_to_watch"],
-                    "supporting_points": brief_payload["supporting_points"],
-                    "metadata": brief_payload["metadata"],
-                }
-            ],
-            prefer="return=minimal",
+        inserted_revision_id = insert_brief_revision_draft(client, cluster["id"], revision_tag, brief_payload)
+        promote_revision_current_state(
+            client,
+            current.get("id") if isinstance(current.get("id"), str) else None,
+            inserted_revision_id,
         )
         patch_cluster_metadata(client, cluster, revision_tag, brief_payload)
         insert_version_event(

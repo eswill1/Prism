@@ -3,6 +3,7 @@ import { loadLiveStoryBySlug } from './live-feed'
 import { getNewsSectionKey } from './news-sections'
 import { inferSourceAccessTier } from './source-access'
 import type { StoryBrief } from './story-brief-types'
+import type { StoryPerspective } from './story-perspective-types'
 import { getSupabaseServerClient, hasSupabaseServerConfig, type JsonObject } from './supabase/server'
 
 export type ClusterSummary = {
@@ -254,6 +255,16 @@ type StoryBriefRevisionRow = {
   metadata: JsonObject | null
 }
 
+type StoryPerspectiveRevisionRow = {
+  status: string
+  summary: string
+  takeaways: string[] | null
+  framing_presence: Array<{ label?: string | null; count?: number | null; note?: string | null }> | null
+  source_family_presence: Array<{ label?: string | null; count?: number | null; note?: string | null }> | null
+  scope_presence: Array<{ label?: string | null; count?: number | null; note?: string | null }> | null
+  methodology_note: string
+}
+
 function mapStoredBrief(row: StoryBriefRevisionRow | null | undefined): StoryBrief | undefined {
   if (!row) {
     return undefined
@@ -281,6 +292,41 @@ function mapStoredBrief(row: StoryBriefRevisionRow | null | undefined): StoryBri
         ? metadata.substantive_source_count
         : Number(metadata.substantive_source_count ?? 0),
     isEarlyBrief: row.status !== 'full',
+  }
+}
+
+function mapPresenceItems(
+  rows:
+    | Array<{ label?: string | null; count?: number | null; note?: string | null }>
+    | null
+    | undefined,
+): StoryPerspective['framingPresence'] {
+  return (rows ?? [])
+    .map((row) => ({
+      label: typeof row?.label === 'string' ? row.label : '',
+      count: typeof row?.count === 'number' ? row.count : Number(row?.count ?? 0),
+      note: typeof row?.note === 'string' ? row.note : '',
+    }))
+    .filter((row) => row.label.trim().length > 0 && Number.isFinite(row.count) && row.count > 0)
+}
+
+function mapStoredPerspective(row: StoryPerspectiveRevisionRow | null | undefined): StoryPerspective | undefined {
+  if (!row) {
+    return undefined
+  }
+
+  const takeaways = Array.isArray(row.takeaways)
+    ? row.takeaways.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    : []
+
+  return {
+    status: row.status === 'ready' ? 'ready' : 'early',
+    summary: row.summary,
+    takeaways,
+    framingPresence: mapPresenceItems(row.framing_presence),
+    sourceFamilyPresence: mapPresenceItems(row.source_family_presence),
+    scopePresence: mapPresenceItems(row.scope_presence),
+    methodologyNote: row.methodology_note,
   }
 }
 
@@ -413,6 +459,13 @@ function mapLensName(lens: string) {
   }
 }
 
+const launchLensOrder = [
+  'Balanced Framing',
+  'Evidence-First',
+  'Local Impact',
+  'International Comparison',
+] as const
+
 export function isSupabaseConfigured() {
   return hasSupabaseServerConfig()
 }
@@ -485,6 +538,7 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
       { data: evidenceItems },
       { data: correctionEvents },
       { data: briefRevision },
+      { data: perspectiveRevision },
     ] =
       await Promise.all([
         client
@@ -521,6 +575,14 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
           .from('story_brief_revisions')
           .select(
             'label, title, status, paragraphs, why_it_matters, where_sources_agree, where_coverage_differs, what_to_watch, supporting_points, metadata',
+          )
+          .eq('cluster_id', clusterRow.id)
+          .eq('is_current', true)
+          .maybeSingle(),
+        client
+          .from('story_perspective_revisions')
+          .select(
+            'status, summary, takeaways, framing_presence, source_family_presence, scope_presence, methodology_note',
           )
           .eq('cluster_id', clusterRow.id)
           .eq('is_current', true)
@@ -633,6 +695,12 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
       ),
     ) as StoryCluster['contextPacks']
 
+    for (const lens of launchLensOrder) {
+      if (!contextPacks[lens]) {
+        contextPacks[lens] = []
+      }
+    }
+
     const corrections =
       (correctionEvents as Array<{
         event_type: string
@@ -700,6 +768,9 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
       corrections,
       contextPacks,
       generatedBrief: mapStoredBrief(briefRevision as StoryBriefRevisionRow | null | undefined),
+      generatedPerspective: mapStoredPerspective(
+        perspectiveRevision as StoryPerspectiveRevisionRow | null | undefined,
+      ),
     }
   } catch (error) {
     console.error(`Unable to load Supabase cluster detail for ${slug}`, error)

@@ -1,4 +1,5 @@
 import type { StoryBrief } from './story-brief-types'
+import type { StoryPerspective } from './story-perspective-types'
 
 export type FramingGroup = 'left' | 'center' | 'right'
 
@@ -67,6 +68,7 @@ export type StoryCluster = {
   corrections: CorrectionItem[]
   contextPacks: Record<string, ContextItem[]>
   generatedBrief?: StoryBrief
+  generatedPerspective?: StoryPerspective
 }
 
 export const mockClusters: StoryCluster[] = [
