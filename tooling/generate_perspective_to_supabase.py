@@ -9,7 +9,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
-from sync_story_content import REST_BASE, SUPABASE_SERVICE_ROLE_KEY, SupabaseRestClient, delete_where
+from sync_story_content import REST_BASE, SUPABASE_SERVICE_ROLE_KEY, SupabaseRestClient, delete_where, upsert_rows
 
 
 MAX_STORIES = 24
@@ -63,6 +63,48 @@ INTERNATIONAL_SCOPE_PATTERN = re.compile(
     r"\b(global|international|foreign|europe|european|china|iran|ukraine|gaza|israel|britain|british|london|beijing|tehran|parliament|strait of hormuz)\b",
     re.IGNORECASE,
 )
+PLACEHOLDER_FOCUS_PATTERN = re.compile(
+    r"^(Prism has |Prism only has |Prism found |The latest linked reporting came from |The comparison set |The strongest available source read |Linked source reads are still thin|Some linked reporting may be gated)",
+    re.IGNORECASE,
+)
+FOCUS_STOPWORDS = {
+    "across",
+    "added",
+    "alternate",
+    "available",
+    "broad",
+    "broader",
+    "came",
+    "comparison",
+    "coverage",
+    "current",
+    "differences",
+    "early",
+    "framing",
+    "inspect",
+    "latest",
+    "lead",
+    "linked",
+    "open",
+    "outlet",
+    "outlets",
+    "pair",
+    "present",
+    "publisher",
+    "publishers",
+    "prism",
+    "read",
+    "reads",
+    "report",
+    "reporting",
+    "reports",
+    "set",
+    "source",
+    "sources",
+    "story",
+    "strongest",
+    "visible",
+}
 
 
 def normalize_whitespace(value: str | None) -> str:
@@ -219,20 +261,49 @@ def topic_family(cluster: dict[str, Any]) -> str:
     return "general"
 
 
+def extract_focus_phrase(value: str | None) -> str:
+    cleaned = normalize_whitespace(value)
+    if not cleaned:
+        return ""
+
+    tokens: list[str] = []
+    for token in re.findall(r"[A-Za-z0-9']+", cleaned.lower().replace("u.s.", "us")):
+        normalized = token.strip("'")
+        if len(normalized) < 3 or normalized in FOCUS_STOPWORDS:
+            continue
+        tokens.append(normalized)
+        if len(tokens) >= 3:
+            break
+
+    return " ".join(tokens)
+
+
 def short_focus(cluster: dict[str, Any], articles: list[dict[str, Any]]) -> str:
-    key_facts = cluster.get("cluster_key_facts") or []
-    if key_facts:
-        first_fact = normalize_whitespace(key_facts[0].get("fact_text"))
-        if first_fact:
-            lowered = first_fact[0].lower() + first_fact[1:] if len(first_fact) > 1 else first_fact.lower()
-            return lowered.rstrip(".")
+    for item in sorted(cluster.get("cluster_key_facts") or [], key=lambda row: row.get("sort_order") or 0):
+        fact_text = normalize_whitespace(item.get("fact_text"))
+        if not fact_text or PLACEHOLDER_FOCUS_PATTERN.match(fact_text):
+            continue
+        focus = extract_focus_phrase(fact_text)
+        if focus:
+            return focus
+
+    for value in (
+        cluster.get("summary"),
+        cluster.get("canonical_headline"),
+    ):
+        focus = extract_focus_phrase(str(value or ""))
+        if focus:
+            return focus
 
     for article in articles:
-        snippet = substantive_text(article)
-        if snippet:
-            first_sentence = first_sentences(snippet, 1)
-            lowered = first_sentence[0].lower() + first_sentence[1:] if len(first_sentence) > 1 else first_sentence.lower()
-            return lowered.rstrip(".")
+        for value in (
+            article.get("summary"),
+            article.get("headline"),
+            substantive_text(article),
+        ):
+            focus = extract_focus_phrase(str(value or ""))
+            if focus:
+                return focus
 
     family = topic_family(cluster)
     fallback = {
@@ -340,7 +411,7 @@ def lens_candidate_pool(
         }
 
     if lens == "Local Impact":
-        if len(substantive_articles) < 2:
+        if len(substantive_articles) < 2 or len(substantive_outlets) < 2:
             return [], {
                 "status": "unavailable",
                 "reason": "Needs a broader source mix before a local-impact pack is meaningful.",
@@ -356,7 +427,7 @@ def lens_candidate_pool(
         }
 
     if lens == "International Comparison":
-        if len(substantive_articles) < 2:
+        if len(substantive_articles) < 2 or len(substantive_outlets) < 2:
             return [], {
                 "status": "unavailable",
                 "reason": "Needs a broader source mix before an international comparison is meaningful.",
@@ -496,8 +567,8 @@ def build_perspective(cluster: dict[str, Any]) -> tuple[dict[str, Any], dict[str
         )
 
     substantive_articles = [article for article in article_rows if article["substantive"]]
-    comparison_count = len(substantive_articles) if substantive_articles else len(article_rows)
-    status = "ready" if len(substantive_articles) >= 2 else "early"
+    substantive_outlets = {article["outlet"] for article in substantive_articles}
+    status = "ready" if len(substantive_articles) >= 2 and len(substantive_outlets) >= 2 else "early"
 
     framing_counter = Counter(article["framing_group"] for article in article_rows)
     family_counter = Counter(article["source_family"] for article in article_rows)
@@ -574,7 +645,7 @@ def build_perspective(cluster: dict[str, Any]) -> tuple[dict[str, Any], dict[str
         context_packs[lens] = items
 
     review_reasons: list[str] = []
-    reviewable_story = len(substantive_articles) >= 2
+    reviewable_story = len(substantive_articles) >= 2 and len(substantive_outlets) >= 2
     if status == "ready" and lens_statuses["balanced_framing"]["status"] != "ready":
         review_reasons.append("Balanced Framing is not yet justified on a story that otherwise looks multi-source.")
     if reviewable_story and lens_statuses["evidence_first"]["status"] != "ready":
@@ -586,6 +657,7 @@ def build_perspective(cluster: dict[str, Any]) -> tuple[dict[str, Any], dict[str
 
     metadata = {
         "substantive_source_count": len(substantive_articles),
+        "substantive_outlet_count": len(substantive_outlets),
         "article_count": len(article_rows),
         "lens_counts": {lens: len(items) for lens, items in context_packs.items()},
         "lens_statuses": lens_statuses,
@@ -645,12 +717,66 @@ def fetch_current_revisions(client: SupabaseRestClient) -> dict[str, dict[str, A
     return {row["cluster_id"]: row for row in rows if row.get("cluster_id")}
 
 
-def patch_current_revisions_off(client: SupabaseRestClient, cluster_id: str) -> None:
+def patch_revision_current_state(client: SupabaseRestClient, revision_id: str, *, is_current: bool) -> None:
     client.patch(
-        f"/story_perspective_revisions?cluster_id=eq.{cluster_id}&is_current=eq.true",
-        {"is_current": False},
+        f"/story_perspective_revisions?id=eq.{revision_id}",
+        {"is_current": is_current},
         prefer="return=minimal",
     )
+
+
+def insert_perspective_revision_draft(
+    client: SupabaseRestClient,
+    cluster_id: str,
+    revision_tag: str,
+    payload: dict[str, Any],
+) -> str:
+    rows = client.post(
+        "/story_perspective_revisions?select=id",
+        [
+            {
+                "cluster_id": cluster_id,
+                "revision_tag": revision_tag,
+                "status": payload["status"],
+                "is_current": False,
+                "generation_method": GENERATION_METHOD,
+                "input_signature": payload["input_signature"],
+                "source_snapshot": payload["source_snapshot"],
+                "summary": payload["summary"],
+                "takeaways": payload["takeaways"],
+                "framing_presence": payload["framing_presence"],
+                "source_family_presence": payload["source_family_presence"],
+                "scope_presence": payload["scope_presence"],
+                "methodology_note": payload["methodology_note"],
+                "metadata": payload["metadata"],
+            }
+        ],
+        prefer="return=representation",
+    ) or []
+    revision_id = rows[0].get("id") if rows else None
+    if not isinstance(revision_id, str) or not revision_id:
+        raise RuntimeError(f"Perspective draft insert for cluster {cluster_id} did not return a revision id")
+    return revision_id
+
+
+def promote_revision_current_state(
+    client: SupabaseRestClient,
+    current_revision_id: str | None,
+    new_revision_id: str,
+) -> None:
+    if current_revision_id:
+        patch_revision_current_state(client, current_revision_id, is_current=False)
+    try:
+        patch_revision_current_state(client, new_revision_id, is_current=True)
+    except Exception as exc:
+        if current_revision_id:
+            try:
+                patch_revision_current_state(client, current_revision_id, is_current=True)
+            except Exception as restore_exc:  # noqa: BLE001
+                raise RuntimeError(
+                    f"Failed to promote perspective revision {new_revision_id} and failed to restore previous current revision {current_revision_id}: {restore_exc}"
+                ) from exc
+        raise
 
 
 def patch_cluster_metadata(client: SupabaseRestClient, cluster: dict[str, Any], revision_tag: str, payload: dict[str, Any]) -> None:
@@ -667,18 +793,17 @@ def patch_cluster_metadata(client: SupabaseRestClient, cluster: dict[str, Any], 
     )
 
 
-def replace_context_pack_items(
+def sync_context_pack_items(
     client: SupabaseRestClient,
     cluster_id: str,
     context_packs: dict[str, list[dict[str, Any]]],
 ) -> None:
-    delete_where(client, "context_pack_items", "cluster_id", cluster_id)
-    rows: list[dict[str, Any]] = []
+    desired_rows: list[dict[str, Any]] = []
     for lens, items in context_packs.items():
         for index, item in enumerate(items, start=1):
             if not item.get("article_id"):
                 continue
-            rows.append(
+            desired_rows.append(
                 {
                     "cluster_id": cluster_id,
                     "lens": LENS_TO_DB[lens],
@@ -690,8 +815,26 @@ def replace_context_pack_items(
                     "rule_version": "0.2.0",
                 }
             )
-    if rows:
-        client.post("/context_pack_items", rows, prefer="return=minimal")
+    if desired_rows:
+        upsert_rows(
+            client,
+            "context_pack_items",
+            desired_rows,
+            on_conflict="cluster_id,lens,article_id",
+            select="id,cluster_id,lens,article_id",
+        )
+
+    existing_rows = client.get(
+        f"/context_pack_items?select=id,lens,article_id&cluster_id=eq.{cluster_id}&limit=200"
+    ) or []
+    desired_keys = {(row["lens"], row["article_id"]) for row in desired_rows}
+    stale_ids = [
+        row["id"]
+        for row in existing_rows
+        if row.get("id") and (row.get("lens"), row.get("article_id")) not in desired_keys
+    ]
+    for row_id in stale_ids:
+        delete_where(client, "context_pack_items", "id", str(row_id))
 
 
 def insert_version_event(
@@ -742,31 +885,13 @@ def main() -> int:
             unchanged += 1
             continue
 
-        patch_current_revisions_off(client, cluster["id"])
-        replace_context_pack_items(client, cluster["id"], context_packs)
-
         revision_tag = f"perspective-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-        client.post(
-            "/story_perspective_revisions",
-            [
-                {
-                    "cluster_id": cluster["id"],
-                    "revision_tag": revision_tag,
-                    "status": payload["status"],
-                    "is_current": True,
-                    "generation_method": GENERATION_METHOD,
-                    "input_signature": payload["input_signature"],
-                    "source_snapshot": payload["source_snapshot"],
-                    "summary": payload["summary"],
-                    "takeaways": payload["takeaways"],
-                    "framing_presence": payload["framing_presence"],
-                    "source_family_presence": payload["source_family_presence"],
-                    "scope_presence": payload["scope_presence"],
-                    "methodology_note": payload["methodology_note"],
-                    "metadata": payload["metadata"],
-                }
-            ],
-            prefer="return=minimal",
+        inserted_revision_id = insert_perspective_revision_draft(client, cluster["id"], revision_tag, payload)
+        sync_context_pack_items(client, cluster["id"], context_packs)
+        promote_revision_current_state(
+            client,
+            current.get("id") if isinstance(current.get("id"), str) else None,
+            inserted_revision_id,
         )
         patch_cluster_metadata(client, cluster, revision_tag, payload)
         insert_version_event(client, cluster["id"], revision_tag, payload, "update" if current else "create")

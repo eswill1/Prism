@@ -860,12 +860,68 @@ def fetch_current_revisions(client: SupabaseRestClient) -> dict[str, dict[str, A
     return {row["cluster_id"]: row for row in rows if row.get("cluster_id")}
 
 
-def patch_current_revisions_off(client: SupabaseRestClient, cluster_id: str) -> None:
+def patch_revision_current_state(client: SupabaseRestClient, revision_id: str, *, is_current: bool) -> None:
     client.patch(
-        f"/story_brief_revisions?cluster_id=eq.{cluster_id}&is_current=eq.true",
-        {"is_current": False},
+        f"/story_brief_revisions?id=eq.{revision_id}",
+        {"is_current": is_current},
         prefer="return=minimal",
     )
+
+
+def insert_brief_revision_draft(
+    client: SupabaseRestClient,
+    cluster_id: str,
+    revision_tag: str,
+    brief_payload: dict[str, Any],
+) -> str:
+    rows = client.post(
+        "/story_brief_revisions?select=id",
+        [
+            {
+                "cluster_id": cluster_id,
+                "revision_tag": revision_tag,
+                "status": brief_payload["status"],
+                "is_current": False,
+                "label": brief_payload["label"],
+                "title": brief_payload["title"],
+                "generation_method": "deterministic_grounded_v1",
+                "input_signature": brief_payload["input_signature"],
+                "source_snapshot": brief_payload["source_snapshot"],
+                "paragraphs": brief_payload["paragraphs"],
+                "why_it_matters": brief_payload["why_it_matters"],
+                "where_sources_agree": brief_payload["where_sources_agree"],
+                "where_coverage_differs": brief_payload["where_coverage_differs"],
+                "what_to_watch": brief_payload["what_to_watch"],
+                "supporting_points": brief_payload["supporting_points"],
+                "metadata": brief_payload["metadata"],
+            }
+        ],
+        prefer="return=representation",
+    ) or []
+    revision_id = rows[0].get("id") if rows else None
+    if not isinstance(revision_id, str) or not revision_id:
+        raise RuntimeError(f"Brief draft insert for cluster {cluster_id} did not return a revision id")
+    return revision_id
+
+
+def promote_revision_current_state(
+    client: SupabaseRestClient,
+    current_revision_id: str | None,
+    new_revision_id: str,
+) -> None:
+    if current_revision_id:
+        patch_revision_current_state(client, current_revision_id, is_current=False)
+    try:
+        patch_revision_current_state(client, new_revision_id, is_current=True)
+    except Exception as exc:
+        if current_revision_id:
+            try:
+                patch_revision_current_state(client, current_revision_id, is_current=True)
+            except Exception as restore_exc:  # noqa: BLE001
+                raise RuntimeError(
+                    f"Failed to promote brief revision {new_revision_id} and failed to restore previous current revision {current_revision_id}: {restore_exc}"
+                ) from exc
+        raise
 
 
 def patch_cluster_metadata(client: SupabaseRestClient, cluster: dict[str, Any], revision_tag: str, brief_payload: dict[str, Any]) -> None:
@@ -924,31 +980,12 @@ def main() -> int:
             unchanged += 1
             continue
 
-        patch_current_revisions_off(client, cluster["id"])
         revision_tag = f"brief-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-        client.post(
-            "/story_brief_revisions",
-            [
-                {
-                    "cluster_id": cluster["id"],
-                    "revision_tag": revision_tag,
-                    "status": brief_payload["status"],
-                    "is_current": True,
-                    "label": brief_payload["label"],
-                    "title": brief_payload["title"],
-                    "generation_method": "deterministic_grounded_v1",
-                    "input_signature": brief_payload["input_signature"],
-                    "source_snapshot": brief_payload["source_snapshot"],
-                    "paragraphs": brief_payload["paragraphs"],
-                    "why_it_matters": brief_payload["why_it_matters"],
-                    "where_sources_agree": brief_payload["where_sources_agree"],
-                    "where_coverage_differs": brief_payload["where_coverage_differs"],
-                    "what_to_watch": brief_payload["what_to_watch"],
-                    "supporting_points": brief_payload["supporting_points"],
-                    "metadata": brief_payload["metadata"],
-                }
-            ],
-            prefer="return=minimal",
+        inserted_revision_id = insert_brief_revision_draft(client, cluster["id"], revision_tag, brief_payload)
+        promote_revision_current_state(
+            client,
+            current.get("id") if isinstance(current.get("id"), str) else None,
+            inserted_revision_id,
         )
         patch_cluster_metadata(client, cluster, revision_tag, brief_payload)
         insert_version_event(

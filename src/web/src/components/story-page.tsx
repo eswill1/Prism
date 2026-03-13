@@ -291,9 +291,7 @@ export async function StoryPage({ slug }: StoryPageProps) {
           </article>
           ) : null}
 
-          {Object.values(cluster.contextPacks).some((items) => items.length > 0) ? (
-            <ContextPackPanel packs={cluster.contextPacks} />
-          ) : null}
+          <ContextPackPanel packs={cluster.contextPacks} />
 
           <details className="panel content-panel disclosure-panel">
             <summary>Source notes and corrections</summary>

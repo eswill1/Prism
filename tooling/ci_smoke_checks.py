@@ -3,9 +3,21 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
+
+os.environ.setdefault("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co")
+os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key")
+
 try:
+    from tooling.generate_perspective_to_supabase import (
+        build_perspective,
+        promote_revision_current_state as promote_perspective_revision_current_state,
+    )
+    from tooling.generate_story_briefs_to_supabase import (
+        promote_revision_current_state as promote_brief_revision_current_state,
+    )
     from tooling.generate_temporary_live_feed import (
         FeedItem,
         choose_story_summary,
@@ -16,6 +28,8 @@ try:
     from tooling.semantic_story_candidates import build_similarity_lookup
     from tooling.url_normalization import normalize_canonical_url
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
+    from generate_perspective_to_supabase import build_perspective, promote_revision_current_state as promote_perspective_revision_current_state
+    from generate_story_briefs_to_supabase import promote_revision_current_state as promote_brief_revision_current_state
     from generate_temporary_live_feed import FeedItem, choose_story_summary, cluster_items, normalize_feed_fetch_url, summary_quality_score
     from semantic_story_candidates import build_similarity_lookup
     from url_normalization import normalize_canonical_url
@@ -50,6 +64,16 @@ def build_item(
         tokens=tokens,
         event_tags=event_tags,
     )
+
+
+class PromotionClient:
+    def __init__(self):
+        self.patches: list[tuple[str, bool]] = []
+
+    def patch(self, path: str, body: dict[str, bool], prefer: str | None = None) -> None:  # noqa: ARG002
+        self.patches.append((path, bool(body.get("is_current"))))
+        if "id=eq.new-revision" in path and body.get("is_current") is True:
+            raise RuntimeError("simulated promotion failure")
 
 
 def main() -> int:
@@ -146,6 +170,76 @@ def main() -> int:
         raise SystemExit(
             f"unexpected story summary quality metrics: score={selected_score}, substantive_sources={substantive_sources}"
         )
+
+    perspective_payload, _context_packs = build_perspective(
+        {
+            "topic_label": "Business",
+            "canonical_headline": "Emergency reserve release aims to steady oil prices",
+            "summary": "Oil reserve release aims to steady prices while markets watch shipping routes.",
+            "cluster_key_facts": [
+                {"fact_text": "Prism has 2 linked reports across 1 publishers in this story so far.", "sort_order": 0},
+                {"fact_text": "Officials are using reserve releases to steady oil prices.", "sort_order": 1},
+            ],
+            "cluster_articles": [
+                {
+                    "article_id": "article-1",
+                    "rank_in_cluster": 1,
+                    "framing_group": "center",
+                    "articles": {
+                        "headline": "Emergency reserve release aims to steady oil prices",
+                        "summary": "Oil reserve release aims to steady prices while markets watch shipping routes.",
+                        "body_text": (
+                            "Officials said the emergency reserve release could steady oil prices in the near term while traders watched shipping routes for new disruption signals. "
+                            "Analysts said the intervention was designed to calm markets without suggesting the underlying shipping risk had faded. "
+                            "Energy desks were also watching whether reserve policy would shift again if the disruption worsened."
+                        ),
+                        "metadata": {"extraction_quality": "article_body", "access_signal": "open"},
+                        "outlets": {"canonical_name": "Reuters", "outlet_type": "wire"},
+                    },
+                },
+                {
+                    "article_id": "article-2",
+                    "rank_in_cluster": 2,
+                    "framing_group": "center",
+                    "articles": {
+                        "headline": "Oil prices ease after reserve move",
+                        "summary": "Oil reserve release aims to steady prices while markets watch shipping routes.",
+                        "body_text": (
+                            "Traders said the reserve move briefly eased oil prices, though shipping markets remained sensitive to any signal of broader disruption. "
+                            "Officials framed the step as a stabilizing move rather than a long-term answer to the supply shock. "
+                            "Market watchers said the next useful signal would be whether the shipping disruption widened."
+                        ),
+                        "metadata": {"extraction_quality": "article_body", "access_signal": "open"},
+                        "outlets": {"canonical_name": "Reuters", "outlet_type": "wire"},
+                    },
+                },
+            ],
+        }
+    )
+    if perspective_payload["status"] != "early":
+        raise SystemExit(f"expected same-outlet perspective to stay early, got {perspective_payload['status']}")
+    if "Prism has" in perspective_payload["summary"] or "linked reports" in perspective_payload["summary"]:
+        raise SystemExit(f"expected perspective summary to avoid boilerplate focus, got {perspective_payload['summary']}")
+
+    for promote_revision in (promote_brief_revision_current_state, promote_perspective_revision_current_state):
+        promotion_client = PromotionClient()
+        try:
+            promote_revision(promotion_client, "old-revision", "new-revision")
+        except RuntimeError:
+            pass
+        else:
+            raise SystemExit("expected promotion helper to raise on simulated promotion failure")
+
+        if promotion_client.patches != [
+            (promotion_client.patches[0][0], False),
+            (promotion_client.patches[1][0], True),
+            (promotion_client.patches[2][0], True),
+        ]:
+            raise SystemExit(f"unexpected promotion patch sequence: {promotion_client.patches}")
+        if "id=eq.old-revision" not in promotion_client.patches[0][0]:
+            raise SystemExit(f"expected first patch to clear old revision, got {promotion_client.patches}")
+        if "id=eq.old-revision" not in promotion_client.patches[2][0]:
+            raise SystemExit(f"expected failed promotion to restore old revision, got {promotion_client.patches}")
 
     fixture_cases = json.loads(FIXTURES_PATH.read_text())
     if len(fixture_cases) < 2:
