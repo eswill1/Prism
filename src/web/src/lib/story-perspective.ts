@@ -1,4 +1,5 @@
 import type { StoryCluster } from './mock-clusters'
+import { buildFallbackPerspectiveRevision } from './perspective-versioning'
 import type { StoryPerspective } from './story-perspective-types'
 
 function articleSourceFamily(outlet: string) {
@@ -123,5 +124,6 @@ export function buildFallbackPerspective(cluster: StoryCluster): StoryPerspectiv
     }),
     methodologyNote:
       'Perspective shows what kinds of coverage are present in the linked reporting. It does not decide who is right.',
+    revision: buildFallbackPerspectiveRevision(),
   }
 }

@@ -220,7 +220,7 @@ Institutional plans and saved stories matter early because they align with the b
 **Goal: Replace temporary feeds and mock records with a durable, automated content substrate that still fits cheap staging.**
 
 #### Deliverables:
-- [x] Scheduled GitHub Actions live snapshot refresh
+- [x] Temporary live snapshot refresh path for fallback/UI mode
 - [x] Temporary URL deduplication and heuristic clustering pass
 - [x] Feed ingestion adapters beyond the temporary snapshot script
 - [x] Dedicated article-enrichment worker decoupled from feed polling
@@ -244,7 +244,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Supabase-backed article, outlet, cluster, evidence, and version tables
 - [x] Correction and version event persistence
 - [ ] Media-rights policy enforcement in the ingestion pipeline
-- [ ] Scheduled enrichment jobs beyond the temporary live snapshot
+- [ ] Scheduled connected ingest jobs beyond the local development loop
 - [x] Source-health reporting for active discovery inputs
 - [ ] Saved/followed story state backed by real persistence
 - [x] Editorial seed stories removed from connected reader surfaces instead of shipping fake source-link affordances
@@ -292,7 +292,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Persist current Perspective revisions and generated Context Packs instead of computing the Perspective rail entirely in the page layer
 - [x] Wire the story page to stored Perspective summaries, presence groups, and lens-based Context Packs
 - [x] Add operator commands so `ingest:feeds` now advances Perspective revisions after brief generation
-- [ ] Add Perspective methodology/version surfacing so readers can inspect what changed in the current Perspective revision
+- [x] Add Perspective methodology/version surfacing so readers can inspect what changed in the current Perspective revision
 - [ ] Add Perspective firewall tests and regression fixtures so presence/context data cannot leak into ranking or become implicit truth scoring
 - [x] Tune Context Pack selection with `perspective:readiness`, `sources:health`, and manual review on live stories before broadening the feature surface
 

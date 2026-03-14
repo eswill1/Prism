@@ -21,6 +21,7 @@ The system goal is maximum automation with narrow human-review points.
 - input: `source_registry`, `source_feeds`
 - output: `raw_discovered_urls`
 - failure rule: source marked degraded after 3 consecutive failures
+- current local-dev helper: `npm run dev:web:connected` keeps the full ingest pipeline running on a repeating local interval while the connected server is alive; tune with `PRISM_LOCAL_INGEST_INTERVAL_SECONDS` when needed
 
 #### `poll_news_sitemaps`
 

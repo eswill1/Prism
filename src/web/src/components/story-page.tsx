@@ -101,6 +101,7 @@ export async function StoryPage({ slug }: StoryPageProps) {
   const entryLabel = 'Back to homepage'
   const storyBrief = cluster.generatedBrief ?? buildStoryBrief(cluster)
   const perspective = cluster.generatedPerspective ?? buildFallbackPerspective(cluster)
+  const perspectiveRevision = perspective.revision
   const linkedArticles = cluster.articles.filter((article) => Boolean(article.url))
   const primaryReads = selectPrimaryReads(linkedArticles)
   const moreReads = selectMoreReads(linkedArticles, primaryReads)
@@ -114,6 +115,11 @@ export async function StoryPage({ slug }: StoryPageProps) {
   const reportingHeading = leadNeedsOpenAlternate
     ? 'Start with Prism’s strongest available reads, including an open alternate when the lead source may be gated.'
     : 'Start with these source reads if you want the original reporting behind the brief.'
+  const perspectiveRevisionLabel =
+    perspectiveRevision.stage === 'stored' ? perspectiveRevision.revisionTag : 'Stored revision pending'
+  const perspectiveComparisonLabel =
+    perspectiveRevision.comparedToTag ??
+    (perspectiveRevision.stage === 'stored' ? 'Initial published revision' : 'Waiting for first stored revision')
 
   return (
     <main className="page-shell cluster-page">
@@ -350,6 +356,39 @@ export async function StoryPage({ slug }: StoryPageProps) {
                   <li key={item}>{item}</li>
                 ))}
               </ul>
+            </div>
+            <div className="perspective-version-block">
+              <div className="perspective-version-header">
+                <div>
+                  <p className="panel-label">Perspective version</p>
+                  <p className="perspective-version-tag">{perspectiveRevisionLabel}</p>
+                </div>
+                <p className="perspective-version-stamp">{perspectiveRevision.generatedAtLabel}</p>
+              </div>
+              <dl className="perspective-version-meta">
+                <div>
+                  <dt>Method</dt>
+                  <dd>
+                    <span>{perspectiveRevision.generationMethodLabel}</span>
+                    <span className="perspective-version-code">{perspectiveRevision.generationMethod}</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Compared with</dt>
+                  <dd className="perspective-version-code">{perspectiveComparisonLabel}</dd>
+                </div>
+              </dl>
+              <div className="perspective-version-changes">
+                <p className="panel-label">What changed in this revision</p>
+                <ul className="simple-list perspective-list">
+                  {perspectiveRevision.changeSummary.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <Link className="secondary-link perspective-methodology-link" href="/methodology#perspective-versioning">
+                How Perspective versioning works
+              </Link>
             </div>
             <div className="perspective-meter-block">
               <p className="panel-label">Coverage mix</p>

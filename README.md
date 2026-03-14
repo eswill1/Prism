@@ -105,6 +105,7 @@ Core commands:
 
 - `npm run dev`
 - `npm run dev:web:connected`
+- `npm run dev:web:connected:web-only`
 - `npm run refresh:live-feed`
 - `npm run sync:stories`
 - `npm run sources:upsert`
@@ -123,6 +124,8 @@ Environment baseline:
 
 - copy `.env.example` into your local secret system or Doppler project
 - this repo is now scoped locally to Doppler project `prism-wire` config `dev`
+- `npm run dev:web:connected` is now the preferred local real-news loop: it starts the connected app on `127.0.0.1:3002` and reruns `npm run ingest:feeds` on a fixed interval while the server is alive; tune the cadence with `PRISM_LOCAL_INGEST_INTERVAL_SECONDS` if needed
+- `npm run dev:web:connected:web-only` keeps the older server-only behavior when you explicitly do not want the ingest loop
 - `npm run sync:stories` is now for explicit snapshot or manual sync work only; connected Prism should rely on real sourced stories
 - `npm run sources:upsert` activates the current launch feed registry in Supabase
 - `npm run ingest:feeds` is the default operator path: it polls the active RSS and sitemap feeds in Supabase, refreshes the automated live story set, runs the slower article enrichment pass, generates stored grounded brief revisions, and then generates stored Perspective revisions plus Context Packs for active stories
@@ -147,7 +150,7 @@ Environment baseline:
 - keep the initial hosted path aligned to `Vercel + Supabase + Upstash + GitHub Actions`
 - keep local development aligned to [LOCAL_DEVELOPMENT_MODEL.md](./LOCAL_DEVELOPMENT_MODEL.md)
 - when you create the Vercel project, set the root directory to `src/web`
-- the scheduled refresh workflow writes the live snapshot into `src/web/public/data/temporary-live-feed.json`
+- `npm run refresh:live-feed` remains a manual fallback-only snapshot generator for UI mode; the old scheduled GitHub snapshot refresher has been retired
 
 ## Why Prism Exists
 
