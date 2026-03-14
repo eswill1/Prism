@@ -130,10 +130,19 @@ STOPWORDS = {
 }
 
 BROAD_MATCH_TOKENS = {
+    "country",
+    "countries",
     "trump",
     "iran",
     "war",
+    "attack",
+    "attacks",
+    "bomb",
+    "bombing",
     "china",
+    "drone",
+    "fire",
+    "fires",
     "price",
     "prices",
     "us",
@@ -143,7 +152,50 @@ BROAD_MATCH_TOKENS = {
     "global",
 }
 
+LOW_SIGNAL_CLUSTER_TOKENS = {
+    "attack",
+    "attacks",
+    "bomb",
+    "bombing",
+    "country",
+    "countries",
+    "drone",
+    "fire",
+    "fires",
+    "hub",
+    "hubs",
+    "key",
+    "keys",
+    "live",
+    "oil",
+    "shipping",
+    "story",
+    "strike",
+    "strikes",
+    "update",
+    "updates",
+}
+GENERIC_EVENT_TAGS = {"iran_shipping_attacks"}
+LOW_SIGNAL_ENTITY_NAMES = {
+    "donald trump",
+    "iran",
+    "israel",
+    "middle east",
+    "president donald trump",
+    "president trump",
+    "strait of hormuz",
+    "tehran",
+    "trump",
+    "u s",
+    "united states",
+    "us",
+}
+
 PHRASE_NORMALIZATIONS: list[tuple[str, str]] = [
+    (r"\bstrait of hormuz\b", "straithormuz"),
+    (r"\bkharg island\b", "khargisland"),
+    (r"\bnuclear stockpile\b", "nuclearstockpile"),
+    (r"\bmiddle east\b", "middleeast"),
     (r"\bstrategic petroleum reserve\b", "oil reserve"),
     (r"\boil reserves\b", "oil reserve"),
     (r"\bemergency oil reserves\b", "oil reserve"),
@@ -333,6 +385,123 @@ def strip_html(raw: str | None) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+PHOTO_CREDIT_FRAGMENT_PATTERN = re.compile(
+    r"(?:\|\s*[^|]{0,120}?/(?:AP|Reuters|Getty|AFP|EPA)\b|\([^)]{0,120}?(?:via AP|via Reuters|Getty Images|AP Photo|Reuters|AFP|EPA|ISNA)[^)]*\))",
+    re.IGNORECASE,
+)
+NOTE_FRAGMENT_PATTERN = re.compile(
+    r"^(?:notes?:|notice:\s*transcripts?\s+are\s+machine\s+and\s+human\s+generated|they may contain errors\.?$|data delayed at least|data shows future contract prices|chart:|graphic:|read more:)",
+    re.IGNORECASE,
+)
+SCRIPT_ARTIFACT_PATTERN = re.compile(
+    r"(?:\bfunction\s*\(|\bvar\s+[a-z_$]+\s*=|\bwindow\.[A-Za-z_$]+|\bdocument\.[A-Za-z_$]+|\be\.exports\b|\bt\[\d+\]|\b__INITIAL_STATE__\b|Ajax/DataUrl/Excluded|NREUM|&&|\|\|)",
+    re.IGNORECASE,
+)
+BYLINE_FRAGMENT_PATTERN = re.compile(
+    r"(?:^|[\s.])-?[A-Z][A-Za-z]+ News['’]?\s+[A-Z][A-Za-z'’.-]+(?:\s+(?:and|&)\s+[A-Z][A-Za-z'’.-]+){0,3}",
+    re.IGNORECASE,
+)
+TRAILING_BYLINE_FRAGMENT_PATTERN = re.compile(
+    r"([.?!])\s+(?:[A-Z][A-Za-z'’.-]+(?:,\s*)?)(?:\s+(?:and\s+)?[A-Z][A-Za-z'’.-]+){0,5}$"
+)
+CAPTION_PARAGRAPH_PATTERN = re.compile(
+    r"^(?:a man|a woman|people|residents|supporters|children|protesters|smoke|flames|vehicles|ships|boats)\b",
+    re.IGNORECASE,
+)
+CAPTION_SCENE_FRAGMENT_PATTERN = re.compile(
+    r"\b(?:shore|street|road|rubble|ruins|square|market|port|harbor|dock|coast|coastline|border|outside|inside|near|amid|tankers?|boats?|ships?)\b",
+    re.IGNORECASE,
+)
+REPORTING_VERB_FRAGMENT_PATTERN = re.compile(
+    r"\b(?:said|says|told|warned|announced|reported|according|officials|authorities|police)\b",
+    re.IGNORECASE,
+)
+DATE_OR_DAY_FRAGMENT_PATTERN = re.compile(
+    r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b",
+    re.IGNORECASE,
+)
+
+
+def sanitize_extracted_text(text: str) -> str:
+    cleaned = strip_html(text)
+    if not cleaned:
+        return ""
+    cleaned = PHOTO_CREDIT_FRAGMENT_PATTERN.sub(". ", cleaned)
+    cleaned = BYLINE_FRAGMENT_PATTERN.sub(" ", cleaned)
+    cleaned = TRAILING_BYLINE_FRAGMENT_PATTERN.sub(r"\1", cleaned)
+    cleaned = re.sub(r"(?<=\d)\.\s+(?=\d)", ".", cleaned)
+    cleaned = re.sub(r"\s+([,.;:!?])", r"\1", cleaned)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def extracted_text_alignment_score(reference: str, candidate: str) -> float:
+    reference_tokens = {
+        token
+        for token in re.findall(r"[a-z0-9]{4,}", sanitize_extracted_text(reference).lower().replace("u.s.", "us").replace("u.s", "us"))
+        if token not in {
+            "that",
+            "with",
+            "from",
+            "this",
+            "have",
+            "said",
+            "says",
+            "into",
+            "after",
+            "about",
+            "their",
+            "they",
+            "were",
+            "will",
+            "would",
+        }
+    }
+    candidate_tokens = {
+        token
+        for token in re.findall(r"[a-z0-9]{4,}", sanitize_extracted_text(candidate).lower().replace("u.s.", "us").replace("u.s", "us"))
+        if token not in {
+            "that",
+            "with",
+            "from",
+            "this",
+            "have",
+            "said",
+            "says",
+            "into",
+            "after",
+            "about",
+            "their",
+            "they",
+            "were",
+            "will",
+            "would",
+        }
+    }
+    if len(reference_tokens) < 4 or len(candidate_tokens) < 4:
+        return 0.0
+    overlap = reference_tokens & candidate_tokens
+    return len(overlap) / max(1, min(len(reference_tokens), len(candidate_tokens)))
+
+
+def extracted_text_looks_non_narrative(text: str) -> bool:
+    normalized = sanitize_extracted_text(text)
+    lowered = normalized.lower()
+    if len(normalized) < 60:
+        return True
+    if SCRIPT_ARTIFACT_PATTERN.search(normalized):
+        return True
+    if NOTE_FRAGMENT_PATTERN.search(normalized):
+        return True
+    if PHOTO_CREDIT_FRAGMENT_PATTERN.search(text):
+        return True
+    if CAPTION_PARAGRAPH_PATTERN.match(normalized):
+        if DATE_OR_DAY_FRAGMENT_PATTERN.search(normalized):
+            return True
+        if CAPTION_SCENE_FRAGMENT_PATTERN.search(normalized) and not REPORTING_VERB_FRAGMENT_PATTERN.search(normalized):
+            return True
+    return False
+
+
 def looks_clipped(text: str) -> bool:
     trimmed = text.strip()
     if len(trimmed) < 80:
@@ -461,6 +630,14 @@ def normalize_entity(entity: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", entity.lower()).strip()
 
 
+def strong_named_entities(entities: Iterable[str]) -> set[str]:
+    return {
+        normalized
+        for entity in entities
+        if (normalized := normalize_entity(entity)) and normalized not in LOW_SIGNAL_ENTITY_NAMES
+    }
+
+
 def image_from_description(raw: str | None) -> str | None:
     if not raw:
         return None
@@ -515,14 +692,123 @@ def extract_json_ld_text(markup: str) -> list[str]:
                 value = current.get(key)
                 if isinstance(value, str):
                     cleaned = strip_html(value)
-                    if cleaned:
+                    if cleaned and not extracted_text_looks_non_narrative(cleaned):
                         texts.append(cleaned)
 
             graph = current.get("@graph")
             if isinstance(graph, list):
                 stack.extend(graph)
+            for value in current.values():
+                if isinstance(value, (dict, list)):
+                    stack.append(value)
 
     return texts
+
+
+def extract_abc_liveblog_paragraphs(markup: str) -> list[str]:
+    def append_candidate(paragraphs: list[str], seen: set[str], text: str) -> bool:
+        normalized = text.lower()
+        if len(text) < 80 or normalized in seen or extracted_text_looks_non_narrative(text):
+            return False
+        seen.add(normalized)
+        paragraphs.append(text)
+        return len(paragraphs) >= 2
+
+    paragraphs: list[str] = []
+    seen: set[str] = set()
+    for match in re.finditer(
+        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+        markup,
+        re.IGNORECASE | re.DOTALL,
+    ):
+        raw = html.unescape(match.group(1)).strip()
+        if not raw:
+            continue
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+
+        stack: list[object] = payload if isinstance(payload, list) else [payload]
+        while stack:
+            current = stack.pop()
+            if isinstance(current, list):
+                stack.extend(current)
+                continue
+            if not isinstance(current, dict):
+                continue
+
+            article_type = str(current.get("@type") or "")
+            if article_type == "LiveBlogPosting":
+                anchor_text = " ".join(
+                    str(current.get(key) or "").strip()
+                    for key in ("headline", "name", "description", "alternateName")
+                ).strip()
+                updates = current.get("liveBlogUpdate")
+                if isinstance(updates, list):
+                    candidates: list[tuple[float, int, str]] = []
+                    for update in updates:
+                        if not isinstance(update, dict):
+                            continue
+                        body = update.get("articleBody")
+                        if not isinstance(body, str):
+                            continue
+                        cleaned = sanitize_extracted_text(body)
+                        if not cleaned or extracted_text_looks_non_narrative(cleaned):
+                            continue
+                        update_anchor = " ".join(
+                            str(update.get(key) or "").strip()
+                            for key in ("headline", "name", "articleSection")
+                        ).strip()
+                        body_score = extracted_text_alignment_score(anchor_text, cleaned) if anchor_text else 0.0
+                        headline_score = extracted_text_alignment_score(anchor_text, update_anchor) if anchor_text and update_anchor else 0.0
+                        score = body_score + (headline_score * 0.6)
+                        candidates.append((score, len(candidates), cleaned))
+                    if candidates:
+                        best_score = max(score for score, _index, _text in candidates)
+                        if best_score < 0.12:
+                            for _score, _index, cleaned in sorted(
+                                candidates,
+                                key=lambda item: (item[0], -item[1]),
+                                reverse=True,
+                            )[:1]:
+                                if append_candidate(paragraphs, seen, cleaned):
+                                    return paragraphs
+                            if paragraphs:
+                                return paragraphs
+
+                        threshold = max(0.12, best_score * 0.45)
+                        selected_indexes = {
+                            index
+                            for _score, index, _cleaned in sorted(
+                                candidates,
+                                key=lambda item: (item[0], -item[1]),
+                                reverse=True,
+                            )[:2]
+                            if _score >= threshold
+                        }
+                        for score, _index, cleaned in candidates:
+                            if best_score >= 0.12 and score < threshold:
+                                continue
+                            if _index not in selected_indexes:
+                                continue
+                            if append_candidate(paragraphs, seen, cleaned):
+                                return paragraphs
+                        if not paragraphs:
+                            for _score, _index, cleaned in candidates[:2]:
+                                if append_candidate(paragraphs, seen, cleaned):
+                                    return paragraphs
+            body = current.get("articleBody")
+            if article_type in {"BlogPosting", "LiveBlogPosting"} and isinstance(body, str):
+                cleaned = sanitize_extracted_text(body)
+                if append_candidate(paragraphs, seen, cleaned):
+                    return paragraphs
+
+            for value in current.values():
+                if isinstance(value, (dict, list)):
+                    stack.append(value)
+
+    return paragraphs
 
 
 def extract_embedded_json_text(markup: str) -> list[str]:
@@ -537,9 +823,9 @@ def extract_embedded_json_text(markup: str) -> list[str]:
                 decoded = json.loads(f'"{raw}"')
             except json.JSONDecodeError:
                 decoded = raw.encode("utf-8").decode("unicode_escape", errors="ignore")
-            cleaned = strip_html(decoded)
+            cleaned = sanitize_extracted_text(decoded)
             normalized = cleaned.lower()
-            if len(cleaned) < 80 or normalized in seen:
+            if len(cleaned) < 80 or normalized in seen or extracted_text_looks_non_narrative(cleaned):
                 continue
             seen.add(normalized)
             texts.append(cleaned)
@@ -556,11 +842,13 @@ def extract_paragraphs_from_marker_windows(markup: str, markers: tuple[str, ...]
         for match in re.finditer(marker, markup, re.IGNORECASE):
             window = markup[match.start() : min(len(markup), match.start() + 18000)]
             for raw in re.findall(r"<p\b[^>]*>(.*?)</p>", window, re.IGNORECASE | re.DOTALL):
-                cleaned = strip_html(raw)
+                cleaned = sanitize_extracted_text(raw)
                 cleaned = re.sub(r"\s+hide caption$", "", cleaned, flags=re.IGNORECASE).strip()
                 cleaned = re.sub(r"\s+toggle caption$", "", cleaned, flags=re.IGNORECASE).strip()
                 normalized = cleaned.lower()
                 if len(cleaned) < 60 or normalized in seen:
+                    continue
+                if extracted_text_looks_non_narrative(cleaned):
                     continue
                 if any(
                     phrase in normalized
@@ -593,13 +881,15 @@ def extract_article_paragraphs(markup: str) -> list[str]:
     paragraphs: list[str] = []
     seen: set[str] = set()
     for raw in raw_paragraphs:
-        cleaned = strip_html(raw)
+        cleaned = sanitize_extracted_text(raw)
         cleaned = re.sub(r"\s+hide caption$", "", cleaned, flags=re.IGNORECASE).strip()
         cleaned = re.sub(r"\s+toggle caption$", "", cleaned, flags=re.IGNORECASE).strip()
         normalized = cleaned.lower()
         if len(cleaned) < 60:
             continue
         if normalized in seen:
+            continue
+        if extracted_text_looks_non_narrative(cleaned):
             continue
         if any(
             phrase in normalized
@@ -649,10 +939,19 @@ def filter_source_boilerplate_texts(texts: list[str], *, url: str) -> list[str]:
 
 def extract_source_specific_paragraphs(markup: str, url: str) -> list[str]:
     domain = infer_source_domain(url)
+    if domain == "abcnews.com" or domain.endswith(".abcnews.com"):
+        paragraphs = extract_abc_liveblog_paragraphs(markup)
+        if paragraphs:
+            return paragraphs
+
     marker_map: dict[str, tuple[str, ...]] = {
         "reuters.com": (
             r'data-testid=["\']paragraph',
             r'class=["\'][^"\']*(article-body|articleBody|body__content|paywall-article)[^"\']*["\']',
+        ),
+        "pbs.org": (
+            r'itemprop=["\']articleBody["\']',
+            r'class=["\'][^"\']*body-text[^"\']*["\']',
         ),
         "ft.com": (
             r'class=["\'][^"\']*(article-body|story-body|n-content-body|o-teaser__content)[^"\']*["\']',
@@ -924,6 +1223,17 @@ def summary_looks_title_like(title: str, summary: str) -> bool:
     return overlap_ratio >= 0.85 and len(summary_tokens) <= len(title_tokens) + 2
 
 
+def summary_title_alignment_score(title: str, summary: str) -> float:
+    normalized_title = normalize_matching_text(title)
+    normalized_summary = normalize_matching_text(summary)
+    title_tokens = set(re.findall(r"[a-z0-9]{4,}", normalized_title))
+    summary_tokens = set(re.findall(r"[a-z0-9]{4,}", normalized_summary))
+    if not title_tokens or not summary_tokens:
+        return 0.0
+    overlap = title_tokens & summary_tokens
+    return len(overlap) / max(1, min(len(title_tokens), len(summary_tokens)))
+
+
 def first_narrative_sentences(text: str, sentence_count: int = 2) -> str:
     cleaned = split_narrative_sentences(text)
     if not cleaned:
@@ -1008,7 +1318,15 @@ def choose_story_summary(
     best_is_open = False
     best_open_summary = ""
     best_open_score = -999
+    best_alignment = 0.0
+    best_aligned_summary = ""
+    best_aligned_score = -999
+    best_aligned_alignment = 0.0
+    lead_summary = ""
+    lead_score = -999
+    lead_alignment = 0.0
     substantive_sources: set[str] = set()
+    normalized_title = normalize_matching_text(title)
 
     for article in articles:
         article_title = getattr(article, "title", None) or (article.get("title") if isinstance(article, dict) else "") or title
@@ -1044,7 +1362,14 @@ def choose_story_summary(
             or ""
         )
         if extraction_quality == "article_body" and body_text:
-            summary_candidate = first_narrative_sentences(body_text, sentence_count=2) or summary_candidate
+            body_excerpt = first_narrative_sentences(body_text, sentence_count=2)
+            body_reference = " ".join(filter(None, [article_title, summary_candidate]))
+            if (
+                body_excerpt
+                and not extracted_text_looks_non_narrative(body_excerpt)
+                and extracted_text_alignment_score(body_reference, body_excerpt) >= 0.18
+            ):
+                summary_candidate = body_excerpt
 
         cleaned_candidate = clean_summary_snippet(summary_candidate, 320)
         score = summary_quality_score(
@@ -1053,6 +1378,7 @@ def choose_story_summary(
             extraction_quality=extraction_quality,
             body_text=body_text,
         )
+        alignment = summary_title_alignment_score(title, cleaned_candidate)
         if score >= 6:
             substantive_sources.add(str(source_name))
         if cleaned_candidate and score > best_score:
@@ -1060,9 +1386,44 @@ def choose_story_summary(
             best_score = score
             best_access_signal = str(access_signal)
             best_is_open = str(access_signal) == "open"
+            best_alignment = alignment
+        if cleaned_candidate and alignment >= 0.28 and (
+            alignment > best_aligned_alignment
+            or (abs(alignment - best_aligned_alignment) < 1e-9 and score > best_aligned_score)
+        ):
+            best_aligned_summary = cleaned_candidate
+            best_aligned_score = score
+            best_aligned_alignment = alignment
         if cleaned_candidate and str(access_signal) == "open" and score > best_open_score:
             best_open_summary = cleaned_candidate
             best_open_score = score
+        if normalize_matching_text(article_title) == normalized_title and cleaned_candidate and score > lead_score:
+            lead_summary = cleaned_candidate
+            lead_score = score
+            lead_alignment = alignment
+
+    if (
+        best_aligned_summary
+        and best_aligned_score >= 6
+        and (
+            not best_summary
+            or best_alignment < best_aligned_alignment - 0.12
+            or best_aligned_score >= best_score - 3
+        )
+    ):
+        return best_aligned_summary, best_aligned_score, len(substantive_sources)
+
+    if (
+        lead_summary
+        and lead_score >= 6
+        and lead_alignment >= 0.28
+        and (
+            not best_summary
+            or best_alignment < lead_alignment
+            or lead_score >= best_score - 2
+        )
+    ):
+        return lead_summary, lead_score, len(substantive_sources)
 
     if best_is_open and best_summary and best_score >= 6:
         return best_summary, best_score, len(substantive_sources)
@@ -1109,11 +1470,14 @@ def build_enrichment_from_markup(
     meta_description = find_meta_content(markup, ("og:description", "description", "twitter:description"))
     if source_text_looks_boilerplate(meta_description, url=url):
         meta_description = ""
+    domain = infer_source_domain(url)
     json_ld_text = extract_json_ld_text(markup)
     embedded_json_text = extract_embedded_json_text(markup)
     paragraphs = filter_source_boilerplate_texts(extract_article_paragraphs(markup), url=url)
     source_specific_paragraphs = filter_source_boilerplate_texts(extract_source_specific_paragraphs(markup, url), url=url)
-    if source_specific_paragraphs and len(" ".join(source_specific_paragraphs)) > len(" ".join(paragraphs)):
+    if source_specific_paragraphs and (domain == "abcnews.com" or domain.endswith(".abcnews.com")):
+        paragraphs = source_specific_paragraphs
+    elif source_specific_paragraphs and len(" ".join(source_specific_paragraphs)) > len(" ".join(paragraphs)):
         paragraphs = source_specific_paragraphs
 
     lede_candidates = [
@@ -1426,13 +1790,13 @@ def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, 
     return payload
 
 
-def parse_rss_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[FeedItem]:
+def parse_rss_feed(feed: dict[str, str], *, enrich_articles: bool = False, item_limit: int = 10) -> list[FeedItem]:
     xml = fetch_text(feed["feed_url"])
     root = ET.fromstring(xml)
     namespace_map = {"media": "http://search.yahoo.com/mrss/"}
 
     items: list[FeedItem] = []
-    for item in root.findall(".//item")[:10]:
+    for item in root.findall(".//item")[:item_limit]:
         title = strip_html(item.findtext("title"))
         url = normalize_canonical_url(strip_html(item.findtext("link")))
         if not title or not url:
@@ -1489,7 +1853,7 @@ def parse_rss_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> li
     return items
 
 
-def parse_news_sitemap(feed: dict[str, str], *, enrich_articles: bool = False) -> list[FeedItem]:
+def parse_news_sitemap(feed: dict[str, str], *, enrich_articles: bool = False, item_limit: int = SITEMAP_URL_LIMIT) -> list[FeedItem]:
     def parse_sitemap_url(target_url: str, *, depth: int, remaining: int) -> list[FeedItem]:
         if remaining <= 0:
             return []
@@ -1589,14 +1953,18 @@ def parse_news_sitemap(feed: dict[str, str], *, enrich_articles: bool = False) -
 
         return items
 
-    return parse_sitemap_url(feed["feed_url"], depth=0, remaining=SITEMAP_URL_LIMIT)
+    return parse_sitemap_url(feed["feed_url"], depth=0, remaining=item_limit)
 
 
-def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False) -> list[FeedItem]:
+def parse_feed(feed: dict[str, str], *, enrich_articles: bool = False, item_limit: int | None = None) -> list[FeedItem]:
     feed_type = feed.get("feed_type", "rss").lower()
     if feed_type in {"news_sitemap", "sitemap"}:
-        return parse_news_sitemap(feed, enrich_articles=enrich_articles)
-    return parse_rss_feed(feed, enrich_articles=enrich_articles)
+        return parse_news_sitemap(feed, enrich_articles=enrich_articles, item_limit=item_limit or SITEMAP_URL_LIMIT)
+    return parse_rss_feed(feed, enrich_articles=enrich_articles, item_limit=item_limit or 10)
+
+
+def anchored_cluster_overlap(tokens: set[str]) -> set[str]:
+    return {token for token in tokens if token not in LOW_SIGNAL_CLUSTER_TOKENS}
 
 
 def cluster_match_score(
@@ -1623,29 +1991,36 @@ def cluster_match_score(
     token_ratio = len(overlap) / len(union) if union else 0.0
     specific_ratio = len(specific_overlap) / smaller if smaller else 0.0
     tag_overlap = item.event_tags & cluster_tags
-    cluster_entities = {
-        normalize_entity(entity)
-        for entry in cluster
-        for entity in entry.named_entities
-        if normalize_entity(entity)
-    }
-    item_entities = {normalize_entity(entity) for entity in item.named_entities if normalize_entity(entity)}
+    strong_tag_overlap = {tag for tag in tag_overlap if tag not in GENERIC_EVENT_TAGS}
+    generic_tag_overlap = tag_overlap & GENERIC_EVENT_TAGS
+    cluster_entities = {entity for entry in cluster for entity in strong_named_entities(entry.named_entities)}
+    item_entities = strong_named_entities(item.named_entities)
     entity_overlap = item_entities & cluster_entities
     semantic_similarity = 0.0
     if similarity_lookup:
         semantic_similarity = max(similarity_lookup.get((item.url, entry.url), 0.0) for entry in cluster)
 
-    score = len(tag_overlap) * 8.0
+    anchored_specific_overlap = anchored_cluster_overlap(specific_overlap)
+    if generic_tag_overlap and not strong_tag_overlap and not entity_overlap and len(anchored_specific_overlap) < 2:
+        return 0.0
+    if not tag_overlap and not entity_overlap and not anchored_specific_overlap and semantic_similarity < SEMANTIC_SIMILARITY_JOIN_THRESHOLD:
+        return 0.0
+
+    score = len(strong_tag_overlap) * 8.0
+    score += len(generic_tag_overlap) * 3.0
     score += len(specific_overlap) * 2.5
+    score += len(anchored_specific_overlap) * 3.0
     score += len(overlap) * 1.25
     score += token_ratio * 4.0
     score += specific_ratio * 5.0
     score += len(entity_overlap) * 2.0
     score += semantic_similarity * 12.0
 
-    if tag_overlap and len(specific_overlap) >= 1:
+    if strong_tag_overlap and len(specific_overlap) >= 1:
         score += 3.0
-    if semantic_similarity >= SEMANTIC_SIMILARITY_JOIN_THRESHOLD and (tag_overlap or specific_overlap or entity_overlap):
+    if generic_tag_overlap and len(anchored_specific_overlap) >= 2:
+        score += 1.5
+    if semantic_similarity >= SEMANTIC_SIMILARITY_JOIN_THRESHOLD and (strong_tag_overlap or anchored_specific_overlap or entity_overlap):
         score += 3.0
 
     return score
@@ -1665,32 +2040,38 @@ def should_join_cluster(
     cluster_tags = set().union(*(entry.event_tags for entry in cluster))
     overlap = item.tokens & cluster_tokens
     specific_overlap = {token for token in overlap if token not in BROAD_MATCH_TOKENS}
-    cluster_entities = {
-        normalize_entity(entity)
-        for entry in cluster
-        for entity in entry.named_entities
-        if normalize_entity(entity)
-    }
-    item_entities = {normalize_entity(entity) for entity in item.named_entities if normalize_entity(entity)}
+    tag_overlap = item.event_tags & cluster_tags
+    strong_tag_overlap = {tag for tag in tag_overlap if tag not in GENERIC_EVENT_TAGS}
+    generic_tag_overlap = tag_overlap & GENERIC_EVENT_TAGS
+    cluster_entities = {entity for entry in cluster for entity in strong_named_entities(entry.named_entities)}
+    item_entities = strong_named_entities(item.named_entities)
     entity_overlap = item_entities & cluster_entities
     semantic_similarity = 0.0
     if similarity_lookup:
         semantic_similarity = max(similarity_lookup.get((item.url, entry.url), 0.0) for entry in cluster)
 
+    anchored_specific_overlap = anchored_cluster_overlap(specific_overlap)
+    if generic_tag_overlap and not strong_tag_overlap and not entity_overlap and len(anchored_specific_overlap) < 2:
+        return False
+    if not tag_overlap and not entity_overlap and not anchored_specific_overlap:
+        return semantic_similarity >= SEMANTIC_SIMILARITY_JOIN_THRESHOLD
+
     if semantic_similarity >= SEMANTIC_SIMILARITY_JOIN_THRESHOLD and (
-        len(specific_overlap) >= 1 or entity_overlap or item.event_tags & cluster_tags
+        anchored_specific_overlap or entity_overlap or strong_tag_overlap
     ):
         return True
     if semantic_similarity >= SEMANTIC_SIMILARITY_SUPPORT_THRESHOLD and (
-        len(specific_overlap) >= 2 or len(entity_overlap) >= 1
+        len(anchored_specific_overlap) >= 2 or len(entity_overlap) >= 1
     ):
         return True
 
-    if item.event_tags & cluster_tags and len(specific_overlap) >= 2:
+    if strong_tag_overlap and len(anchored_specific_overlap) >= 1:
         return True
-    if len(specific_overlap) >= 4:
+    if generic_tag_overlap and len(anchored_specific_overlap) >= 2:
         return True
-    return len(specific_overlap) >= 3 and len(overlap) >= 4
+    if len(anchored_specific_overlap) >= 4:
+        return True
+    return len(anchored_specific_overlap) >= 3 and len(overlap) >= 4
 
 
 def cluster_items(items: Iterable[FeedItem]) -> list[list[FeedItem]]:
@@ -1740,6 +2121,32 @@ def slugify(value: str) -> str:
     return slug[:60] or "story"
 
 
+def representative_cluster_item(items: list[FeedItem]) -> FeedItem:
+    if not items:
+        raise ValueError("representative_cluster_item requires at least one item")
+    if len(items) == 1:
+        return items[0]
+
+    freshest = max(parse_datetime(item.published_at) for item in items)
+
+    def representative_score(item: FeedItem) -> tuple[float, float]:
+        content_score = summary_quality_score(
+            item.title,
+            item.summary,
+            extraction_quality=item.extraction_quality,
+            body_text=item.body_preview,
+        )
+        centrality = sum(cluster_match_score(item, [other]) for other in items if other.url != item.url)
+        extraction_bonus = 6 if item.extraction_quality == "article_body" else 2 if item.extraction_quality == "metadata_description" else 0
+        recency_penalty_hours = max(0.0, (freshest - parse_datetime(item.published_at)).total_seconds() / 3600.0)
+        return (
+            (content_score * 2.0) + centrality + extraction_bonus - min(recency_penalty_hours, 12.0),
+            parse_datetime(item.published_at).timestamp(),
+        )
+
+    return max(items, key=representative_score)
+
+
 def build_cluster_payload(
     index: int,
     items: list[FeedItem],
@@ -1747,8 +2154,9 @@ def build_cluster_payload(
     allow_article_image_fetch: bool = False,
 ) -> dict[str, object]:
     ordered = sorted(items, key=lambda item: item.published_at, reverse=True)
-    lead = ordered[0]
-    hero_image = lead.image or (
+    latest_item = ordered[0]
+    lead = representative_cluster_item(ordered)
+    hero_image = lead.image or latest_item.image or (
         fetch_article_enrichment(lead.url, lead.summary).get("image") if allow_article_image_fetch else None
     )
     sources = sorted({item.source for item in ordered})
@@ -1777,7 +2185,7 @@ def build_cluster_payload(
         "topic_label": pick_cluster_label(ordered),
         "title": lead.title,
         "dek": dek,
-        "latest_at": lead.published_at,
+        "latest_at": latest_item.published_at,
         "article_count": len(ordered),
         "sources": sources,
         "summary_quality_score": summary_score,

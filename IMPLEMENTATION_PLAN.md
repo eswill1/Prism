@@ -239,7 +239,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Brief-readiness evaluator for active live stories
 - [x] Stored grounded brief revisions wired into the story read path
 - [x] Automated brief-grounding evaluator for stored brief sections
-- [ ] Brief quality evaluation harness with sampled human review
+- [x] Brief quality evaluation harness with sampled human review
 - [x] Outlet registry seed import
 - [x] Supabase-backed article, outlet, cluster, evidence, and version tables
 - [x] Correction and version event persistence

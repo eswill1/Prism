@@ -120,6 +120,7 @@ Core commands:
 - `npm run brief:generate`
 - `npm run brief:readiness`
 - `npm run brief:grounding`
+- `npm run brief:quality`
 - `npm run perspective:generate`
 - `npm run perspective:readiness`
 - `npm run sources:health`
@@ -144,6 +145,7 @@ Environment baseline:
 - `npm run brief:generate` builds grounded story-brief revisions from enriched article inputs and advances the current brief revision for each active story when the input signature changes
 - `npm run brief:readiness` reports which active live stories are still limited to early briefs, which have enough substantive sourcing for full Prism Briefs, and whether they already have a usable open alternate
 - `npm run brief:grounding` audits current stored brief sections against their recorded support references so weak or unsupported brief language is visible before it ships
+- `npm run brief:quality` combines readiness, grounding, support concentration, and text-quality heuristics into a sampled review report for active live stories; pass `--format markdown` after `--` when you want a human-review document instead of JSON
 - `npm run perspective:generate` builds stored Perspective revisions plus Context Pack selections from current linked coverage and advances the current Perspective revision when the input signature changes
 - `npm run perspective:readiness` reports which active live stories already have current Perspective revisions, which lenses are actually justified by the current source mix, and which stories still need manual Perspective review
 - `npm run sources:health` reports which discovery sources are contributing recent articles, substantive extraction, and active story coverage versus just generating queue noise

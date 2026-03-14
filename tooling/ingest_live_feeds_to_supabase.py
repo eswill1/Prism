@@ -10,10 +10,15 @@ from datetime import datetime, timezone
 from typing import Any
 
 from generate_temporary_live_feed import (
+    BROAD_MATCH_TOKENS,
     FeedItem,
+    LOW_SIGNAL_CLUSTER_TOKENS,
     build_cluster_payload,
+    cluster_match_score,
     cluster_items,
+    normalize_entity,
     parse_feed,
+    should_join_cluster,
     summary_quality_score,
 )
 from sync_story_content import (
@@ -73,6 +78,23 @@ HIGH_VALUE_TOPICS = {"US Politics", "World", "Business", "Technology", "Climate 
 MIN_CONFIDENT_LEAD_QUALITY = 6
 MIN_CONFIDENT_OPEN_ALTERNATE_QUALITY = 7
 MIN_SHIPPABLE_SINGLE_SOURCE_SUMMARY_QUALITY = 6
+AUGMENTATION_CLUSTER_LIMIT = 4
+AUGMENTATION_FEED_ITEM_LIMIT = 25
+AUGMENTATION_ITEMS_PER_CLUSTER = 2
+AUGMENTATION_TOTAL_ITEM_LIMIT = 8
+LOW_SIGNAL_QUERY_ENTITIES = {
+    "donald trump",
+    "iran",
+    "israel",
+    "middle east",
+    "president donald trump",
+    "president trump",
+    "tehran",
+    "trump",
+    "u s",
+    "united states",
+    "us",
+}
 
 
 def infer_access_tier(article: dict[str, Any]) -> str:
@@ -201,6 +223,227 @@ def filter_candidate_items(items: list[FeedItem]) -> list[FeedItem]:
         item
         for item, _score in sorted(scored, key=lambda pair: pair[1], reverse=True)[: max(18, len(scored) // 2)]
     ]
+
+
+def substantive_feed_item(item: FeedItem) -> bool:
+    if item.extraction_quality == "article_body" and len(item.body_preview.strip()) >= 180:
+        return True
+    return summary_quality_score(
+        item.title,
+        item.summary,
+        extraction_quality=item.extraction_quality,
+        body_text=item.body_preview,
+    ) >= 6
+
+
+def actionable_entity(entity: str) -> str:
+    normalized = normalize_entity(entity)
+    if len(normalized) < 4:
+        return ""
+    if normalized in LOW_SIGNAL_QUERY_ENTITIES:
+        return ""
+    if any(token in {"reporting", "editing", "standards", "trust", "reported", "reports"} for token in normalized.split()):
+        return ""
+    return normalized
+
+
+def story_query_from_cluster(cluster: list[FeedItem]) -> tuple[set[str], set[str]]:
+    anchor_items = [item for item in cluster if substantive_feed_item(item)] or cluster
+    token_counts = {}
+    for item in anchor_items:
+        for token in item.tokens:
+            if token in BROAD_MATCH_TOKENS or token in LOW_SIGNAL_CLUSTER_TOKENS:
+                continue
+            token_counts[token] = token_counts.get(token, 0) + 1
+    query_tokens = {
+        token
+        for token, _count in sorted(token_counts.items(), key=lambda item: (-item[1], item[0]))[:6]
+    }
+    if not query_tokens:
+        query_tokens = {
+            token
+            for item in anchor_items
+            for token in item.tokens
+            if token not in BROAD_MATCH_TOKENS
+        }
+
+    entity_counts = {}
+    for item in anchor_items:
+        for entity in item.named_entities:
+            normalized = actionable_entity(entity)
+            if not normalized:
+                continue
+            entity_counts[normalized] = entity_counts.get(normalized, 0) + 1
+    query_entities = {
+        entity
+        for entity, _count in sorted(entity_counts.items(), key=lambda item: (-item[1], item[0]))[:6]
+    }
+    return query_tokens, query_entities
+
+
+def item_matches_story_query(item: FeedItem, query_tokens: set[str], query_entities: set[str]) -> bool:
+    token_overlap = item.tokens & query_tokens
+    strong_overlap = {
+        token
+        for token in token_overlap
+        if token not in BROAD_MATCH_TOKENS and token not in LOW_SIGNAL_CLUSTER_TOKENS
+    }
+    entity_overlap = {
+        actionable_entity(entity)
+        for entity in item.named_entities
+        if actionable_entity(entity)
+    } & query_entities
+    if entity_overlap:
+        return True
+    if len(strong_overlap) >= 2:
+        return True
+    return len(strong_overlap) >= 1 and len(token_overlap) >= 2
+
+
+def should_augment_cluster(cluster: list[FeedItem]) -> bool:
+    source_count = len({item.source for item in cluster})
+    substantive_items = [item for item in cluster if substantive_feed_item(item)]
+    open_substantive = [item for item in substantive_items if item.access_signal == "open"]
+    likely_paywalled = [item for item in cluster if item.access_signal == "likely_paywalled"]
+    return source_count <= 1 or len(substantive_items) <= 1 or (len(open_substantive) == 0 and len(likely_paywalled) >= 1)
+
+
+def augmentation_priority(cluster: list[FeedItem]) -> tuple[int, int, int]:
+    substantive_items = [item for item in cluster if substantive_feed_item(item)]
+    public_interest = max((item_quality_score(item) for item in cluster), default=0)
+    return (
+        1 if should_augment_cluster(cluster) else 0,
+        len(substantive_items),
+        public_interest,
+    )
+
+
+def select_story_augmentation_candidates(
+    cluster: list[FeedItem],
+    candidates: list[FeedItem],
+    *,
+    limit: int,
+) -> list[FeedItem]:
+    existing_urls = {item.url for item in cluster}
+    existing_sources = {item.source for item in cluster}
+    query_tokens, query_entities = story_query_from_cluster(cluster)
+    ranked: list[tuple[float, FeedItem]] = []
+    for item in candidates:
+        if item.url in existing_urls or item.source in existing_sources:
+            continue
+        if not item_matches_story_query(item, query_tokens, query_entities):
+            continue
+        query_token_overlap = item.tokens & query_tokens
+        strong_query_overlap = {
+            token
+            for token in query_token_overlap
+            if token not in BROAD_MATCH_TOKENS and token not in LOW_SIGNAL_CLUSTER_TOKENS
+        }
+        query_entity_overlap = {
+            actionable_entity(entity)
+            for entity in item.named_entities
+            if actionable_entity(entity)
+        } & query_entities
+        join_match = should_join_cluster(item, cluster)
+        if not join_match and not query_entity_overlap and len(strong_query_overlap) < 2:
+            continue
+        score = cluster_match_score(item, cluster)
+        score += len(strong_query_overlap) * 3
+        score += len(query_entity_overlap) * 2
+        if join_match:
+            score += 2
+        score += summary_quality_score(
+            item.title,
+            item.summary,
+            extraction_quality=item.extraction_quality,
+            body_text=item.body_preview,
+        )
+        if item.access_signal == "open":
+            score += 3
+        if item.extraction_quality == "article_body":
+            score += 4
+        ranked.append((score, item))
+
+    selected: list[FeedItem] = []
+    seen_sources: set[str] = set()
+    for _score, item in sorted(ranked, key=lambda pair: pair[0], reverse=True):
+        if item.source in seen_sources:
+            continue
+        seen_sources.add(item.source)
+        selected.append(item)
+        if len(selected) >= limit:
+            break
+    return selected
+
+
+def augment_thin_clusters(
+    items: list[FeedItem],
+    clusters: list[list[FeedItem]],
+    feeds: list[dict[str, Any]],
+) -> list[FeedItem]:
+    selected_clusters = [
+        cluster
+        for cluster in sorted(clusters, key=augmentation_priority, reverse=True)
+        if should_augment_cluster(cluster)
+    ][:AUGMENTATION_CLUSTER_LIMIT]
+    if not selected_clusters:
+        return []
+
+    feed_cache: dict[str, list[FeedItem]] = {}
+    existing_urls = {item.url for item in items}
+    augmented: list[FeedItem] = []
+
+    candidate_feeds = sorted(
+        feeds,
+        key=lambda feed: SOURCE_PRIORITY_BONUS.get(feed["source"], 0),
+        reverse=True,
+    )
+
+    for cluster in selected_clusters:
+        cluster_candidates: list[FeedItem] = []
+        cluster_sources = {item.source for item in cluster}
+        for feed in candidate_feeds:
+            if feed["source"] in cluster_sources:
+                continue
+            if feed["feed_url"] not in feed_cache:
+                feed_cache[feed["feed_url"]] = parse_feed(
+                    {
+                        "source": feed["source"],
+                        "feed_url": feed["feed_url"],
+                        "feed_type": feed["feed_type"],
+                    },
+                    enrich_articles=False,
+                    item_limit=AUGMENTATION_FEED_ITEM_LIMIT,
+                )
+            parsed_items = [
+                item
+                for item in feed_cache[feed["feed_url"]]
+                if item.url not in existing_urls and item.url not in {candidate.url for candidate in augmented}
+            ]
+            if not parsed_items:
+                continue
+            cluster_candidates.extend(
+                select_story_augmentation_candidates(
+                    cluster,
+                    parsed_items,
+                    limit=1,
+                )
+            )
+            if len(cluster_candidates) >= AUGMENTATION_ITEMS_PER_CLUSTER:
+                break
+
+        for item in select_story_augmentation_candidates(
+            cluster,
+            cluster_candidates,
+            limit=AUGMENTATION_ITEMS_PER_CLUSTER,
+        ):
+            if item.url in existing_urls or item.url in {candidate.url for candidate in augmented}:
+                continue
+            augmented.append(item)
+            if len(augmented) >= AUGMENTATION_TOTAL_ITEM_LIMIT:
+                return augmented
+
+    return augmented
 
 
 def story_priority_score(cluster: dict[str, Any]) -> int:
@@ -534,6 +777,13 @@ def main() -> int:
             print(json.dumps({"feed_errors": feed_errors}, indent=2), file=sys.stderr)
         return 1
 
+    initial_deduped = {item.url: item for item in all_items}
+    initial_filtered_items = filter_candidate_items(list(initial_deduped.values()))
+    initial_clusters = cluster_items(initial_filtered_items)
+    augmented_items = augment_thin_clusters(initial_filtered_items, initial_clusters, feeds)
+    if augmented_items:
+        all_items.extend(augmented_items)
+
     deduped = {item.url: item for item in all_items}
     raw_discovered_count = insert_raw_discovered_urls(client, list(deduped.values()), feed_map)
 
@@ -590,6 +840,7 @@ def main() -> int:
                     "feeds_polled": len(feeds),
                     "feed_errors": len(feed_errors),
                     "raw_discovered_inserted": raw_discovered_count,
+                    "augmented_items_discovered": len(augmented_items),
                     "live_stories_synced": 0,
                     "low_quality_live_clusters_dropped": dropped_low_quality,
                     "stale_live_clusters_removed": 0,
@@ -616,6 +867,7 @@ def main() -> int:
                 "feeds_polled": len(feeds),
                 "feed_errors": len(feed_errors),
                 "raw_discovered_inserted": raw_discovered_count,
+                "augmented_items_discovered": len(augmented_items),
                 "live_stories_synced": len(stories),
                 "low_quality_live_clusters_dropped": dropped_low_quality,
                 "stale_live_clusters_removed": removed,
