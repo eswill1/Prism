@@ -190,6 +190,41 @@ LOW_SIGNAL_ENTITY_NAMES = {
     "united states",
     "us",
 }
+CONTEXTUAL_CLUSTER_TOKENS = {
+    "analysis",
+    "context",
+    "explain",
+    "explainer",
+    "here",
+    "know",
+    "latest",
+    "live",
+    "matter",
+    "photo",
+    "photos",
+    "podcast",
+    "question",
+    "takeaway",
+    "timeline",
+    "update",
+    "updates",
+    "video",
+    "watch",
+    "what",
+    "why",
+}
+CONTEXT_HEADLINE_PATTERN = re.compile(
+    r"\b(?:analysis|column|explainer|fact check|five things|how to|live updates?|liveblog|minute-by-minute|opinion|photos|podcast|q&a|questions answered|takeaways?|timeline|video|what to know|what we know|why it matters)\b",
+    re.IGNORECASE,
+)
+CONTEXT_URL_PATTERN = re.compile(
+    r"/(?:analysis|explainer|fact-check|live|live-updates|opinion|photos|podcast|timeline|video)/",
+    re.IGNORECASE,
+)
+EVENT_HEADLINE_PATTERN = re.compile(
+    r"\b(?:announces?|bombs?|deploys?|fires?|grills?|halts?|launches?|moves?|orders?|rejects?|restarts?|resumes?|says?|sends?|strikes?|suspends?|threatens?|vows?|warns?)\b",
+    re.IGNORECASE,
+)
 
 PHRASE_NORMALIZATIONS: list[tuple[str, str]] = [
     (r"\bstrait of hormuz\b", "straithormuz"),
@@ -240,6 +275,7 @@ ENTITY_STOPWORDS = {
 ARTICLE_FETCH_CACHE: dict[str, dict[str, object]] = {}
 SEMANTIC_SIMILARITY_JOIN_THRESHOLD = float(os.getenv("PRISM_SEMANTIC_JOIN_THRESHOLD", "0.42"))
 SEMANTIC_SIMILARITY_SUPPORT_THRESHOLD = float(os.getenv("PRISM_SEMANTIC_SUPPORT_THRESHOLD", "0.32"))
+CONTEXTUAL_SEMANTIC_JOIN_THRESHOLD = float(os.getenv("PRISM_CONTEXTUAL_JOIN_THRESHOLD", "0.66"))
 LIKELY_PAYWALLED_DOMAINS = {"ft.com", "bloomberg.com", "nytimes.com", "wsj.com"}
 OPEN_ACCESS_DOMAINS = {
     "abcnews.com",
@@ -389,10 +425,20 @@ PHOTO_CREDIT_FRAGMENT_PATTERN = re.compile(
     r"(?:\|\s*[^|]{0,120}?/(?:AP|Reuters|Getty|AFP|EPA)\b|\([^)]{0,120}?(?:via AP|via Reuters|Getty Images|AP Photo|Reuters|AFP|EPA|ISNA)[^)]*\))",
     re.IGNORECASE,
 )
+LEADING_WIRE_CREDIT_FRAGMENT_PATTERN = re.compile(
+    r"^(?:[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,4}/(?:AP|Reuters|Getty|AFP|EPA)\s+)+",
+    re.IGNORECASE,
+)
+LEADING_OUTLET_CREDIT_FRAGMENT_PATTERN = re.compile(
+    r"^(?:[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,4}\s+for\s+[A-Z][A-Za-z'’.-]+"
+    r"(?:/[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,4}\s+for\s+[A-Z][A-Za-z'’.-]+)*)\s+",
+    re.IGNORECASE,
+)
 NOTE_FRAGMENT_PATTERN = re.compile(
     r"^(?:notes?:|notice:\s*transcripts?\s+are\s+machine\s+and\s+human\s+generated|they may contain errors\.?$|data delayed at least|data shows future contract prices|chart:|graphic:|read more:)",
     re.IGNORECASE,
 )
+PROMO_FRAGMENT_PATTERN = re.compile(r"^(?:watch|listen|read more|see also):\s*", re.IGNORECASE)
 SCRIPT_ARTIFACT_PATTERN = re.compile(
     r"(?:\bfunction\s*\(|\bvar\s+[a-z_$]+\s*=|\bwindow\.[A-Za-z_$]+|\bdocument\.[A-Za-z_$]+|\be\.exports\b|\bt\[\d+\]|\b__INITIAL_STATE__\b|Ajax/DataUrl/Excluded|NREUM|&&|\|\|)",
     re.IGNORECASE,
@@ -405,7 +451,7 @@ TRAILING_BYLINE_FRAGMENT_PATTERN = re.compile(
     r"([.?!])\s+(?:[A-Z][A-Za-z'’.-]+(?:,\s*)?)(?:\s+(?:and\s+)?[A-Z][A-Za-z'’.-]+){0,5}$"
 )
 CAPTION_PARAGRAPH_PATTERN = re.compile(
-    r"^(?:a man|a woman|people|residents|supporters|children|protesters|smoke|flames|vehicles|ships|boats)\b",
+    r"^(?:a man|a woman|firefighters?|people|residents|supporters|children|protesters|smoke|flames|vehicles|ships|boats)\b",
     re.IGNORECASE,
 )
 CAPTION_SCENE_FRAGMENT_PATTERN = re.compile(
@@ -414,6 +460,14 @@ CAPTION_SCENE_FRAGMENT_PATTERN = re.compile(
 )
 REPORTING_VERB_FRAGMENT_PATTERN = re.compile(
     r"\b(?:said|says|told|warned|announced|reported|according|officials|authorities|police)\b",
+    re.IGNORECASE,
+)
+REPORTER_BIO_FRAGMENT_PATTERN = re.compile(
+    r"^[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,2}(?:\s+and\s+[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,2})?\s+have reported\b",
+    re.IGNORECASE,
+)
+REPORTER_TRAVEL_FRAGMENT_PATTERN = re.compile(
+    r"^(?:they|he|she)\s+travel(?:s)?\s+with\s+the\s+u\.s\.\s+secretary\s+of\s+state\b",
     re.IGNORECASE,
 )
 DATE_OR_DAY_FRAGMENT_PATTERN = re.compile(
@@ -426,9 +480,15 @@ def sanitize_extracted_text(text: str) -> str:
     cleaned = strip_html(text)
     if not cleaned:
         return ""
-    cleaned = PHOTO_CREDIT_FRAGMENT_PATTERN.sub(". ", cleaned)
-    cleaned = BYLINE_FRAGMENT_PATTERN.sub(" ", cleaned)
-    cleaned = TRAILING_BYLINE_FRAGMENT_PATTERN.sub(r"\1", cleaned)
+    previous = None
+    while cleaned and cleaned != previous:
+        previous = cleaned
+        cleaned = PHOTO_CREDIT_FRAGMENT_PATTERN.sub(". ", cleaned)
+        cleaned = LEADING_WIRE_CREDIT_FRAGMENT_PATTERN.sub("", cleaned)
+        cleaned = LEADING_OUTLET_CREDIT_FRAGMENT_PATTERN.sub("", cleaned)
+        cleaned = PROMO_FRAGMENT_PATTERN.sub("", cleaned)
+        cleaned = BYLINE_FRAGMENT_PATTERN.sub(" ", cleaned)
+        cleaned = TRAILING_BYLINE_FRAGMENT_PATTERN.sub(r"\1", cleaned)
     cleaned = re.sub(r"(?<=\d)\.\s+(?=\d)", ".", cleaned)
     cleaned = re.sub(r"\s+([,.;:!?])", r"\1", cleaned)
     return re.sub(r"\s+", " ", cleaned).strip()
@@ -494,6 +554,18 @@ def extracted_text_looks_non_narrative(text: str) -> bool:
         return True
     if PHOTO_CREDIT_FRAGMENT_PATTERN.search(text):
         return True
+    if LEADING_WIRE_CREDIT_FRAGMENT_PATTERN.search(normalized) or LEADING_OUTLET_CREDIT_FRAGMENT_PATTERN.search(normalized):
+        return True
+    if PROMO_FRAGMENT_PATTERN.search(normalized):
+        return True
+    if re.match(r"^[A-Z]\.\s+[a-z]", normalized):
+        return True
+    if re.search(r"\b[A-Z][a-z]+\s+[A-Z]\.$", normalized):
+        return True
+    if REPORTER_BIO_FRAGMENT_PATTERN.search(normalized):
+        return True
+    if REPORTER_TRAVEL_FRAGMENT_PATTERN.search(normalized):
+        return True
     if CAPTION_PARAGRAPH_PATTERN.match(normalized):
         if DATE_OR_DAY_FRAGMENT_PATTERN.search(normalized):
             return True
@@ -505,10 +577,12 @@ def extracted_text_looks_non_narrative(text: str) -> bool:
 def looks_clipped(text: str) -> bool:
     trimmed = text.strip()
     if len(trimmed) < 80:
-        return False
+        return bool(re.search(r"\b[A-Z][a-z]+\s+[A-Z]\.$", trimmed))
     if trimmed.endswith("...") or trimmed.endswith("…"):
         return True
     if trimmed.count("“") > trimmed.count("”") or trimmed.count('"') % 2 == 1:
+        return True
+    if re.search(r"\b[A-Z][a-z]+\s+[A-Z]\.$", trimmed):
         return True
     if not re.search(r"[.!?]$", trimmed):
         return True
@@ -636,6 +710,135 @@ def strong_named_entities(entities: Iterable[str]) -> set[str]:
         for entity in entities
         if (normalized := normalize_entity(entity)) and normalized not in LOW_SIGNAL_ENTITY_NAMES
     }
+
+
+def story_item_value(item: FeedItem | dict[str, object], *fields: str) -> str:
+    for field in fields:
+        value = item.get(field) if isinstance(item, dict) else getattr(item, field, None)
+        if isinstance(value, str) and value.strip():
+            return value
+    return ""
+
+
+def story_item_tokens(item: FeedItem | dict[str, object]) -> set[str]:
+    raw_tokens = item.get("tokens") if isinstance(item, dict) else getattr(item, "tokens", None)
+    if isinstance(raw_tokens, set):
+        return set(raw_tokens)
+    if isinstance(raw_tokens, list):
+        return {str(token) for token in raw_tokens if str(token)}
+    text = " ".join(
+        filter(
+            None,
+            [
+                story_item_value(item, "title", "headline"),
+                story_item_value(item, "summary", "feed_summary", "lede"),
+            ],
+        )
+    )
+    return tokenize(text)
+
+
+def story_item_entities(item: FeedItem | dict[str, object]) -> set[str]:
+    raw_entities = item.get("named_entities") if isinstance(item, dict) else getattr(item, "named_entities", None)
+    if isinstance(raw_entities, list):
+        return strong_named_entities(raw_entities)
+    return set()
+
+
+def story_item_event_tags(item: FeedItem | dict[str, object]) -> set[str]:
+    raw_tags = item.get("event_tags") if isinstance(item, dict) else getattr(item, "event_tags", None)
+    if isinstance(raw_tags, set):
+        return set(raw_tags)
+    if isinstance(raw_tags, list):
+        return {str(tag) for tag in raw_tags if str(tag)}
+    return extract_event_tags(
+        story_item_value(item, "title", "headline"),
+        story_item_value(item, "summary", "feed_summary", "lede"),
+        story_item_value(item, "body_preview", "body_text"),
+    )
+
+
+def event_anchor_tokens(tokens: set[str]) -> set[str]:
+    return {
+        token
+        for token in anchored_cluster_overlap(tokens)
+        if token not in CONTEXTUAL_CLUSTER_TOKENS
+    }
+
+
+def story_item_context_score(item: FeedItem | dict[str, object]) -> int:
+    title = normalize_whitespace(story_item_value(item, "title", "headline"))
+    url = story_item_value(item, "url", "canonical_url", "original_url")
+    summary = normalize_whitespace(story_item_value(item, "summary", "feed_summary", "lede"))
+    extraction_quality = story_item_value(item, "extraction_quality")
+    score = 0
+    if CONTEXT_HEADLINE_PATTERN.search(title):
+        score += 3
+    if CONTEXT_URL_PATTERN.search(url):
+        score += 2
+    if "?" in title:
+        score += 1
+    if len(story_item_tokens(item) & CONTEXTUAL_CLUSTER_TOKENS) >= 2:
+        score += 1
+    if any(phrase in normalize_matching_text(f"{title} {summary}") for phrase in ("what to know", "what we know", "why it matters")):
+        score += 1
+    if EVENT_HEADLINE_PATTERN.search(title):
+        score -= 1
+    if extraction_quality == "article_body" and score > 0 and not CONTEXT_HEADLINE_PATTERN.search(title):
+        score -= 1
+    return max(score, 0)
+
+
+def story_item_is_contextual(item: FeedItem | dict[str, object]) -> bool:
+    return story_item_context_score(item) >= 2
+
+
+def story_item_event_signal(item: FeedItem | dict[str, object]) -> int:
+    title = story_item_value(item, "title", "headline")
+    extraction_quality = story_item_value(item, "extraction_quality")
+    score = 0
+    if EVENT_HEADLINE_PATTERN.search(title):
+        score += 3
+    if extraction_quality == "article_body":
+        score += 2
+    if story_item_value(item, "access_signal") == "open":
+        score += 1
+    score += min(len(story_item_event_tags(item)), 2) * 2
+    score += min(len(event_anchor_tokens(story_item_tokens(item))), 2)
+    score += min(len(story_item_entities(item)), 2)
+    score -= story_item_context_score(item) * 2
+    return score
+
+
+def story_item_is_event_driven(item: FeedItem | dict[str, object]) -> bool:
+    return story_item_event_signal(item) >= 3
+
+
+def preferred_story_items(items: list[FeedItem] | list[dict[str, object]]) -> list[FeedItem] | list[dict[str, object]]:
+    event_items = [item for item in items if story_item_is_event_driven(item)]
+    if event_items:
+        return event_items
+    reporting_items = [item for item in items if not story_item_is_contextual(item)]
+    return reporting_items or items
+
+
+def contextual_join_requires_stronger_match(
+    item: FeedItem,
+    cluster: list[FeedItem],
+    *,
+    event_overlap: set[str],
+    entity_overlap: set[str],
+    semantic_similarity: float,
+) -> bool:
+    cluster_contextual = [entry for entry in cluster if story_item_is_contextual(entry)]
+    cluster_reporting = [entry for entry in cluster if not story_item_is_contextual(entry)]
+    item_contextual = story_item_is_contextual(item)
+    strong_overlap = len(event_overlap) >= 2 or len(entity_overlap) >= 2
+    if item_contextual and cluster_reporting and not strong_overlap:
+        return semantic_similarity < CONTEXTUAL_SEMANTIC_JOIN_THRESHOLD
+    if not item_contextual and cluster_contextual and not cluster_reporting and not strong_overlap:
+        return semantic_similarity < CONTEXTUAL_SEMANTIC_JOIN_THRESHOLD
+    return False
 
 
 def image_from_description(raw: str | None) -> str | None:
@@ -1314,16 +1517,20 @@ def choose_story_summary(
 ) -> tuple[str, int, int]:
     best_summary = ""
     best_score = -999
+    best_selection_score = -999.0
     best_access_signal = "unknown"
     best_is_open = False
     best_open_summary = ""
     best_open_score = -999
+    best_open_selection_score = -999.0
     best_alignment = 0.0
     best_aligned_summary = ""
     best_aligned_score = -999
+    best_aligned_selection_score = -999.0
     best_aligned_alignment = 0.0
     lead_summary = ""
     lead_score = -999
+    lead_selection_score = -999.0
     lead_alignment = 0.0
     substantive_sources: set[str] = set()
     normalized_title = normalize_matching_text(title)
@@ -1379,27 +1586,37 @@ def choose_story_summary(
             body_text=body_text,
         )
         alignment = summary_title_alignment_score(title, cleaned_candidate)
+        context_penalty = story_item_context_score(article) * 4.0
+        event_bonus = max(story_item_event_signal(article), 0) * 1.5
+        selection_score = score + event_bonus + (alignment * 5.0) - context_penalty
         if score >= 6:
             substantive_sources.add(str(source_name))
-        if cleaned_candidate and score > best_score:
+        if cleaned_candidate and selection_score > best_selection_score:
             best_summary = cleaned_candidate
             best_score = score
+            best_selection_score = selection_score
             best_access_signal = str(access_signal)
             best_is_open = str(access_signal) == "open"
             best_alignment = alignment
         if cleaned_candidate and alignment >= 0.28 and (
             alignment > best_aligned_alignment
-            or (abs(alignment - best_aligned_alignment) < 1e-9 and score > best_aligned_score)
+            or (
+                abs(alignment - best_aligned_alignment) < 1e-9
+                and selection_score > best_aligned_selection_score
+            )
         ):
             best_aligned_summary = cleaned_candidate
             best_aligned_score = score
+            best_aligned_selection_score = selection_score
             best_aligned_alignment = alignment
-        if cleaned_candidate and str(access_signal) == "open" and score > best_open_score:
+        if cleaned_candidate and str(access_signal) == "open" and selection_score > best_open_selection_score:
             best_open_summary = cleaned_candidate
             best_open_score = score
-        if normalize_matching_text(article_title) == normalized_title and cleaned_candidate and score > lead_score:
+            best_open_selection_score = selection_score
+        if normalize_matching_text(article_title) == normalized_title and cleaned_candidate and selection_score > lead_selection_score:
             lead_summary = cleaned_candidate
             lead_score = score
+            lead_selection_score = selection_score
             lead_alignment = alignment
 
     if (
@@ -2001,7 +2218,16 @@ def cluster_match_score(
         semantic_similarity = max(similarity_lookup.get((item.url, entry.url), 0.0) for entry in cluster)
 
     anchored_specific_overlap = anchored_cluster_overlap(specific_overlap)
+    event_overlap = event_anchor_tokens(specific_overlap)
     if generic_tag_overlap and not strong_tag_overlap and not entity_overlap and len(anchored_specific_overlap) < 2:
+        return 0.0
+    if contextual_join_requires_stronger_match(
+        item,
+        cluster,
+        event_overlap=event_overlap,
+        entity_overlap=entity_overlap,
+        semantic_similarity=semantic_similarity,
+    ):
         return 0.0
     if not tag_overlap and not entity_overlap and not anchored_specific_overlap and semantic_similarity < SEMANTIC_SIMILARITY_JOIN_THRESHOLD:
         return 0.0
@@ -2010,6 +2236,7 @@ def cluster_match_score(
     score += len(generic_tag_overlap) * 3.0
     score += len(specific_overlap) * 2.5
     score += len(anchored_specific_overlap) * 3.0
+    score += len(event_overlap) * 3.5
     score += len(overlap) * 1.25
     score += token_ratio * 4.0
     score += specific_ratio * 5.0
@@ -2022,6 +2249,10 @@ def cluster_match_score(
         score += 1.5
     if semantic_similarity >= SEMANTIC_SIMILARITY_JOIN_THRESHOLD and (strong_tag_overlap or anchored_specific_overlap or entity_overlap):
         score += 3.0
+    if story_item_is_contextual(item):
+        score -= 4.5
+    if any(not story_item_is_contextual(entry) for entry in cluster) and story_item_is_contextual(item):
+        score -= 3.5
 
     return score
 
@@ -2051,7 +2282,16 @@ def should_join_cluster(
         semantic_similarity = max(similarity_lookup.get((item.url, entry.url), 0.0) for entry in cluster)
 
     anchored_specific_overlap = anchored_cluster_overlap(specific_overlap)
+    event_overlap = event_anchor_tokens(specific_overlap)
     if generic_tag_overlap and not strong_tag_overlap and not entity_overlap and len(anchored_specific_overlap) < 2:
+        return False
+    if contextual_join_requires_stronger_match(
+        item,
+        cluster,
+        event_overlap=event_overlap,
+        entity_overlap=entity_overlap,
+        semantic_similarity=semantic_similarity,
+    ):
         return False
     if not tag_overlap and not entity_overlap and not anchored_specific_overlap:
         return semantic_similarity >= SEMANTIC_SIMILARITY_JOIN_THRESHOLD
@@ -2068,6 +2308,8 @@ def should_join_cluster(
     if strong_tag_overlap and len(anchored_specific_overlap) >= 1:
         return True
     if generic_tag_overlap and len(anchored_specific_overlap) >= 2:
+        return True
+    if len(event_overlap) >= 2:
         return True
     if len(anchored_specific_overlap) >= 4:
         return True
@@ -2109,8 +2351,9 @@ def cluster_items(items: Iterable[FeedItem]) -> list[list[FeedItem]]:
 
 
 def pick_cluster_label(items: list[FeedItem]) -> str:
+    label_items = preferred_story_items(items)
     tokens = Counter(
-        token for item in items for token in item.tokens if token not in BROAD_MATCH_TOKENS
+        token for item in label_items for token in item.tokens if token not in BROAD_MATCH_TOKENS
     )
     common = [token for token, _count in tokens.most_common(3)]
     return " / ".join(token.title() for token in common) if common else "Live story"
@@ -2127,6 +2370,7 @@ def representative_cluster_item(items: list[FeedItem]) -> FeedItem:
     if len(items) == 1:
         return items[0]
 
+    candidate_items = preferred_story_items(items)
     freshest = max(parse_datetime(item.published_at) for item in items)
 
     def representative_score(item: FeedItem) -> tuple[float, float]:
@@ -2138,13 +2382,15 @@ def representative_cluster_item(items: list[FeedItem]) -> FeedItem:
         )
         centrality = sum(cluster_match_score(item, [other]) for other in items if other.url != item.url)
         extraction_bonus = 6 if item.extraction_quality == "article_body" else 2 if item.extraction_quality == "metadata_description" else 0
+        event_bonus = max(story_item_event_signal(item), 0) * 1.5
+        context_penalty = story_item_context_score(item) * 6.0
         recency_penalty_hours = max(0.0, (freshest - parse_datetime(item.published_at)).total_seconds() / 3600.0)
         return (
-            (content_score * 2.0) + centrality + extraction_bonus - min(recency_penalty_hours, 12.0),
+            (content_score * 2.0) + centrality + extraction_bonus + event_bonus - context_penalty - min(recency_penalty_hours, 12.0),
             parse_datetime(item.published_at).timestamp(),
         )
 
-    return max(items, key=representative_score)
+    return max(candidate_items, key=representative_score)
 
 
 def build_cluster_payload(
@@ -2164,7 +2410,21 @@ def build_cluster_payload(
 
     primary_articles: list[FeedItem] = []
     seen_sources: set[str] = set()
-    for item in ordered:
+    prioritized_articles = sorted(
+        ordered,
+        key=lambda item: (
+            0 if not story_item_is_contextual(item) else 1,
+            -story_item_event_signal(item),
+            -summary_quality_score(
+                item.title,
+                item.summary,
+                extraction_quality=item.extraction_quality,
+                body_text=item.body_preview,
+            ),
+            -parse_datetime(item.published_at).timestamp(),
+        ),
+    )
+    for item in prioritized_articles:
         if item.source in seen_sources:
             continue
         seen_sources.add(item.source)
@@ -2173,7 +2433,7 @@ def build_cluster_payload(
             break
 
     if len(primary_articles) < min(5, len(ordered)):
-        for item in ordered:
+        for item in prioritized_articles:
             if item in primary_articles:
                 continue
             primary_articles.append(item)

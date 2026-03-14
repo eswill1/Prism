@@ -544,6 +544,46 @@ def main() -> int:
     if representative_payload["title"] != abc_kharg.title:
         raise SystemExit(f"expected cluster payload title to use representative article, got {representative_payload}")
 
+    live_one_event = FeedItem(
+        source="Reuters",
+        feed_url="https://example.com/reuters",
+        title="Fire at UAE oil hub as Iran vows retaliation for U.S. attack on Kharg Island",
+        url="https://example.com/live-one-event",
+        published_at="2026-03-14T15:05:00+00:00",
+        summary="A fire at a UAE oil hub followed Iran's retaliation threat after the U.S. struck Kharg Island.",
+        feed_summary="A fire at a UAE oil hub followed Iran's retaliation threat after the U.S. struck Kharg Island.",
+        lede="A fire at a UAE oil hub followed Iran's retaliation threat after the U.S. struck Kharg Island.",
+        body_preview="Officials said loading operations at Fujairah were disrupted after the fire.",
+        named_entities=["Fujairah", "Kharg Island", "UAE"],
+        extraction_quality="rss_only",
+        access_signal="open",
+        image=None,
+        tokens={"fujairah", "fire", "retaliation", "khargisland", "uae", "hub"},
+        event_tags=set(),
+    )
+    live_one_explainer = FeedItem(
+        source="PBS NewsHour",
+        feed_url="https://example.com/pbs",
+        title="After the U.S. strike on Kharg Island, here's what to know about Iran's islands",
+        url="https://example.com/live-one-explainer",
+        published_at="2026-03-14T15:02:00+00:00",
+        summary="The explainer focuses on Iran's islands and the shipping lanes around Kharg Island.",
+        feed_summary="The explainer focuses on Iran's islands and the shipping lanes around Kharg Island.",
+        lede="The explainer focuses on Iran's islands and the shipping lanes around Kharg Island.",
+        body_preview="Kharg Island has long been central to Iran's oil exports and the Strait of Hormuz shipping story.",
+        named_entities=["Kharg Island", "Iran"],
+        extraction_quality="article_body",
+        access_signal="open",
+        image=None,
+        tokens={"khargisland", "island", "explainer", "know", "shipping"},
+        event_tags=set(),
+    )
+    mixed_story_payload = build_cluster_payload(1, [live_one_event, live_one_explainer])
+    if mixed_story_payload["title"] != live_one_event.title:
+        raise SystemExit(f"expected mixed event-plus-explainer cluster to keep event title, got {mixed_story_payload}")
+    if "A fire at a UAE oil hub followed" not in str(mixed_story_payload["dek"]):
+        raise SystemExit(f"expected mixed event-plus-explainer cluster dek to stay on the event, got {mixed_story_payload}")
+
     reuters_hormuz = FeedItem(
         source="Reuters",
         feed_url="https://example.com/reuters",
@@ -672,6 +712,13 @@ def main() -> int:
     query_tokens, query_entities = story_query_from_cluster([nyt_paywalled])
     if "straithormuz" not in query_tokens or "strait of hormuz" not in query_entities:
         raise SystemExit(f"expected story query to preserve strong Hormuz anchors, got {(query_tokens, query_entities)}")
+
+    mixed_query_tokens, _mixed_query_entities = story_query_from_cluster([live_one_event, live_one_explainer])
+    if "fujairah" not in mixed_query_tokens:
+        raise SystemExit(f"expected mixed cluster query anchors to keep the event token, got {mixed_query_tokens}")
+    if "know" in mixed_query_tokens or "explainer" in mixed_query_tokens:
+        raise SystemExit(f"expected mixed cluster query anchors to avoid explainer tokens, got {mixed_query_tokens}")
+
     augmentation_candidates = select_story_augmentation_candidates(
         [nyt_paywalled],
         [reuters_alternate, unrelated_bloomberg],
@@ -1273,6 +1320,37 @@ def main() -> int:
     if any("machine and human generated" in snapshot.get("used_snippet", "").lower() for snapshot in transcript_brief["source_snapshot"]):
         raise SystemExit(f"expected source snapshot excerpt to filter transcript boilerplate, got {transcript_brief}")
 
+    abbreviation_split_cluster = {
+        "canonical_headline": "After the U.S. strike on Kharg Island, here's what to know about Iran's islands",
+        "summary": "JERUSALEM (AP) — The islands off Iran have become the latest focus of the war after a U.S strike destroyed military sites Friday on Kharg Island, which is vital to Iran's oil network.",
+        "topic_label": "World",
+        "outlet_count": 1,
+        "cluster_key_facts": [],
+        "correction_events": [],
+        "cluster_articles": [
+            {
+                "rank_in_cluster": 1,
+                "framing_group": "center",
+                "articles": quality_article(
+                    article_id="abbr-a1",
+                    outlet="PBS NewsHour",
+                    headline="After the U.S. strike on Kharg Island, here's what to know about Iran's islands",
+                    summary="JERUSALEM (AP) — The islands off Iran have become the latest focus of the war after a U.S strike destroyed military sites Friday on Kharg Island, which is vital to Iran's oil network.",
+                    body_text=(
+                        "JERUSALEM (AP) — The islands off Iran have become the latest focus of the war after a U.S strike destroyed military sites Friday on Kharg Island, which is vital to Iran's oil network. "
+                        "The U.S. strike on the island in the Persian Gulf left its oil infrastructure intact, but President Donald Trump warned that if Iran or anyone else interferes with the passage of ships through the Strait of Hormuz, he will reconsider his decision not to wipe it out. "
+                        "WATCH: More Marines heading to Middle East as U.S. continues relentless strikes on Iran"
+                    ),
+                ),
+            }
+        ],
+    }
+    abbreviation_split_brief = build_grounded_brief(abbreviation_split_cluster)
+    if any("U. S strike" in paragraph for paragraph in abbreviation_split_brief["paragraphs"]):
+        raise SystemExit(f"expected U.S abbreviation to stay intact in early brief paragraphs, got {abbreviation_split_brief}")
+    if len(abbreviation_split_brief["paragraphs"]) < 2 or "The U.S. strike on the island in the Persian Gulf left its oil infrastructure intact" not in abbreviation_split_brief["paragraphs"][1]:
+        raise SystemExit(f"expected one-source early brief to use the second grounded sentence after U.S abbreviation fix, got {abbreviation_split_brief}")
+
     focused_full_brief = build_grounded_brief(
         {
             "canonical_headline": "Trump says Iran is totally defeated as war reaches 2-week mark",
@@ -1323,8 +1401,351 @@ def main() -> int:
             ],
         }
     )
+    if focused_full_brief["status"] != "full":
+        raise SystemExit(f"expected aligned two-source cluster to stay full, got {focused_full_brief}")
     if "president and trump" in focused_full_brief["paragraphs"][-1].lower():
         raise SystemExit(f"expected focus phrasing to avoid 'president and trump', got {focused_full_brief}")
+    if "trump and iran" in focused_full_brief["where_coverage_differs"].lower():
+        raise SystemExit(f"expected focus phrasing to avoid generic 'trump and iran', got {focused_full_brief}")
+    if any(snapshot.get("focus") == "war reaches 2" for snapshot in focused_full_brief["source_snapshot"]):
+        raise SystemExit(f"expected focus extraction to preserve hyphenated phrases, got {focused_full_brief}")
+
+    live_one_context_cluster = {
+        "canonical_headline": "Fire at UAE oil hub as Iran vows retaliation for U.S. attack",
+        "summary": "A fire at a UAE oil hub followed Iran's threat of retaliation after a U.S. attack.",
+        "topic_label": "World",
+        "outlet_count": 2,
+        "cluster_key_facts": [],
+        "correction_events": [],
+        "cluster_articles": [
+            {
+                "rank_in_cluster": 1,
+                "framing_group": "center",
+                "articles": quality_article(
+                    article_id="live-one-core-a1",
+                    outlet="Reuters",
+                    headline="Fire at UAE oil hub as Iran vows retaliation for U.S. attack",
+                    summary="A fire at a UAE oil hub followed Iran's threat of retaliation after a U.S. attack.",
+                    body_text=(
+                        "A fire at a UAE oil hub followed Iran's threat of retaliation after a U.S. attack. "
+                        "Reuters reported that loading operations at Fujairah were suspended while officials assessed damage. "
+                        "Iranian officials said retaliation would target logistics tied to the strike."
+                    ),
+                ),
+            },
+            {
+                "rank_in_cluster": 2,
+                "framing_group": "center",
+                "articles": quality_article(
+                    article_id="live-one-context-a2",
+                    outlet="New York Times",
+                    headline="What to know about Iran's oil routes after U.S. strikes",
+                    summary="Iran's oil routes run through several chokepoints that matter to the global economy.",
+                    body_text=(
+                        "Iran's oil routes run through several chokepoints that matter to the global economy. "
+                        "The explainer focused on Kharg Island, tanker lanes and the Strait of Hormuz. "
+                        "It outlined how export routes work when shipping is disrupted."
+                    ),
+                ),
+            },
+        ],
+    }
+    live_one_context_brief = build_grounded_brief(live_one_context_cluster)
+    if live_one_context_brief["status"] != "early" or live_one_context_brief["metadata"]["full_brief_ready"] is not False:
+        raise SystemExit(f"expected core-event plus explainer cluster to stay early, got {live_one_context_brief}")
+    if not live_one_context_brief["paragraphs"][0].startswith("A fire at a UAE oil hub followed"):
+        raise SystemExit(f"expected live-one opener to stay anchored to the retaliation event, got {live_one_context_brief}")
+    if any("Kharg Island" in paragraph or "What to know" in paragraph for paragraph in live_one_context_brief["paragraphs"]):
+        raise SystemExit(f"expected explainer context to stay out of early brief paragraphs, got {live_one_context_brief}")
+    if any("one-source early brief" in paragraph for paragraph in live_one_context_brief["paragraphs"]):
+        raise SystemExit(f"expected mixed-source early brief wording to avoid claiming one-source support, got {live_one_context_brief}")
+
+    live_one_hardened_full_brief = build_grounded_brief(
+        {
+            "canonical_headline": "Fire at UAE oil hub as Iran vows retaliation for U.S. attack",
+            "summary": "A fire at a UAE oil hub followed Iran's threat of retaliation after a U.S. attack.",
+            "topic_label": "World",
+            "outlet_count": 3,
+            "cluster_key_facts": [],
+            "correction_events": [],
+            "cluster_articles": [
+                {
+                    "rank_in_cluster": 1,
+                    "framing_group": "center",
+                    "articles": quality_article(
+                        article_id="live-one-full-a1",
+                        outlet="Reuters",
+                        headline="Fire at UAE oil hub as Iran vows retaliation for U.S. attack",
+                        summary="A fire at a UAE oil hub followed Iran's threat of retaliation after a U.S. attack.",
+                        body_text=(
+                            "A fire at a UAE oil hub followed Iran's threat of retaliation after a U.S. attack. "
+                            "Reuters reported that loading operations at Fujairah were suspended while officials assessed damage. "
+                            "Iranian officials said retaliation would target logistics tied to the strike. "
+                            "Shipping insurers started reviewing risk premiums for Gulf routes."
+                        ),
+                    ),
+                },
+                {
+                    "rank_in_cluster": 2,
+                    "framing_group": "left",
+                    "articles": quality_article(
+                        article_id="live-one-full-a2",
+                        outlet="Associated Press",
+                        headline="UAE oil hub suspends loadings after fire as Iran threatens retaliation",
+                        summary="The UAE oil hub suspended loadings after a fire as Iran threatened retaliation for the U.S. strike.",
+                        body_text=(
+                            "The UAE oil hub suspended loadings after a fire as Iran threatened retaliation for the U.S. strike. "
+                            "Associated Press focused on emergency crews, tanker schedules and insurer reviews as operators prepared for delays. "
+                            "Regional officials said ship operators were rerouting cargoes while insurers priced in a longer risk window. "
+                            "The report spent more time on the commercial disruption spreading beyond the blast site."
+                        ),
+                    ),
+                },
+                {
+                    "rank_in_cluster": 3,
+                    "framing_group": "center",
+                    "articles": quality_article(
+                        article_id="live-one-full-a3",
+                        outlet="New York Times",
+                        headline="What to know about Iran's oil routes after U.S. strikes",
+                        summary="Iran's oil routes run through several chokepoints that matter to the global economy.",
+                        body_text=(
+                            "Iran's oil routes run through several chokepoints that matter to the global economy. "
+                            "The explainer focused on Kharg Island, tanker lanes and the Strait of Hormuz. "
+                            "It outlined how export routes work when shipping is disrupted."
+                        ),
+                    ),
+                },
+            ],
+        }
+    )
+    if live_one_hardened_full_brief["status"] != "full":
+        raise SystemExit(f"expected two aligned core-event sources to produce a full brief, got {live_one_hardened_full_brief}")
+    if any("What to know" in paragraph or "Kharg Island" in paragraph for paragraph in live_one_hardened_full_brief["paragraphs"]):
+        raise SystemExit(f"expected context explainer source to stay out of full brief body copy, got {live_one_hardened_full_brief}")
+    if "New York Times" in live_one_hardened_full_brief["paragraphs"][-1]:
+        raise SystemExit(f"expected difference paragraph to compare aligned event sources, got {live_one_hardened_full_brief}")
+
+    live_one_false_full_cluster = {
+        "canonical_headline": "Fire at UAE oil hub as Iran vows retaliation for US attack on Kharg Island",
+        "summary": "A fire at a UAE oil hub followed Iran's retaliation threat after the U.S. struck Kharg Island.",
+        "topic_label": "World",
+        "outlet_count": 3,
+        "cluster_key_facts": [],
+        "correction_events": [],
+        "cluster_articles": [
+            {
+                "rank_in_cluster": 1,
+                "framing_group": "center",
+                "articles": quality_article(
+                    article_id="live-one-false-full-a1",
+                    outlet="NPR",
+                    headline="U.S. military bombs Kharg Island, Iran's main oil export hub, Trump says",
+                    summary="President Trump said the U.S. military had totally obliterated military targets on Kharg Island.",
+                    body_text=(
+                        "President Trump said the U.S. military had totally obliterated military targets on Kharg Island. "
+                        "Kharg Island sits 15 miles off Iran's coast and is critical to Iran's oil infrastructure and the country's economy. "
+                        "Roughly 90 percent of Iran's export crude oil passes through the island."
+                    ),
+                ),
+            },
+            {
+                "rank_in_cluster": 2,
+                "framing_group": "center",
+                "articles": quality_article(
+                    article_id="live-one-false-full-a2",
+                    outlet="BBC News",
+                    headline="Hamas urges key ally Iran to halt attacks on Gulf states",
+                    summary="Hamas called on Iran to stop attacking Gulf states while affirming Tehran's right to defend itself.",
+                    body_text=(
+                        "Hamas called on Iran to stop attacking Gulf states, in a rare appeal to its key ally. "
+                        "The group affirmed Tehran's right to defend itself while urging regional nations to preserve the bonds of brotherhood. "
+                        "BBC News focused on the diplomatic strain around the appeal."
+                    ),
+                ),
+            },
+            {
+                "rank_in_cluster": 3,
+                "framing_group": "center",
+                "articles": {
+                    **quality_article(
+                        article_id="live-one-false-full-a3",
+                        outlet="Bloomberg",
+                        headline="UAE's Key Oil Hub Suspends Loadings After Drone Attack, Fire",
+                        summary="Bloomberg said the UAE oil hub suspended loadings after a drone attack and fire.",
+                        body_text="",
+                    ),
+                    "metadata": {
+                        "feed_summary": "Bloomberg said the UAE oil hub suspended loadings after a drone attack and fire.",
+                        "extraction_quality": "rss_only",
+                        "access_signal": "likely_paywalled",
+                    },
+                },
+            },
+        ],
+    }
+    live_one_false_full_brief = build_grounded_brief(live_one_false_full_cluster)
+    if live_one_false_full_brief["status"] != "early":
+        raise SystemExit(f"expected live-one false-full cluster to stay early, got {live_one_false_full_brief}")
+    if any("Hamas" in paragraph for paragraph in live_one_false_full_brief["paragraphs"]):
+        raise SystemExit(f"expected live-one false-full cluster to keep Hamas angle out of brief body, got {live_one_false_full_brief}")
+    if len(live_one_false_full_brief["paragraphs"]) < 3 or not any(
+        "Kharg Island sits 15 miles off Iran's coast" in paragraph or "Roughly 90 percent of Iran's export crude oil passes through the island." in paragraph
+        for paragraph in live_one_false_full_brief["paragraphs"][:2]
+    ):
+        raise SystemExit(f"expected live-one false-full cluster to borrow a grounded alternate detail paragraph, got {live_one_false_full_brief}")
+
+    hormuz_commentary_cluster = {
+        "canonical_headline": "Trump calls on allies to send warships to reopen Strait of Hormuz",
+        "summary": "Trump called on allies to send warships to reopen the Strait of Hormuz after Iran threatened shipping.",
+        "topic_label": "World",
+        "outlet_count": 3,
+        "cluster_key_facts": [],
+        "correction_events": [],
+        "cluster_articles": [
+            {
+                "rank_in_cluster": 1,
+                "framing_group": "center",
+                "articles": quality_article(
+                    article_id="hormuz-event-a1",
+                    outlet="Reuters",
+                    headline="Trump calls on allies to send warships to reopen Strait of Hormuz",
+                    summary="Trump called on allies to send warships to reopen the Strait of Hormuz after Iran threatened shipping.",
+                    body_text=(
+                        "Trump called on allies to send warships to reopen the Strait of Hormuz after Iran threatened shipping. "
+                        "Reuters reported that naval officials were discussing escort plans for commercial tankers. "
+                        "The report focused on the immediate sequence around the shipping threat."
+                    ),
+                ),
+            },
+            {
+                "rank_in_cluster": 2,
+                "framing_group": "right",
+                "articles": quality_article(
+                    article_id="hormuz-commentary-a2",
+                    outlet="Fox News",
+                    headline="Iran holds world energy hostage with 'nightmare' Strait of Hormuz sea mines, former CENTCOM official warns",
+                    summary="Former CENTCOM Communications Director Col. Joe Buccino (ret.) explains how Iran's sea mines threaten global oil flow.",
+                    body_text=(
+                        "Former CENTCOM Communications Director Col. Joe Buccino (ret.) explains how Iran's sea mines threaten global oil flow through the Strait of Hormuz. "
+                        "A former U.S. Central Command official said Iran is holding the world's energy supply hostage using old tactics. "
+                        "Fox News focused on commentary from a former official rather than the event sequence itself."
+                    ),
+                ),
+            },
+            {
+                "rank_in_cluster": 3,
+                "framing_group": "left",
+                "articles": quality_article(
+                    article_id="hormuz-commentary-a3",
+                    outlet="The Hill",
+                    headline="Maher swipes at Trump over Iran war: 'I don't understand' why US can't control Strait of Hormuz",
+                    summary="Bill Maher questioned why the U.S. could not control the Strait of Hormuz during the Iran conflict.",
+                    body_text=(
+                        "Bill Maher questioned why the U.S. could not control the Strait of Hormuz during the Iran conflict. "
+                        "The Hill centered the exchange with panelists rather than the shipping decision itself. "
+                        "The segment was framed around commentary and criticism."
+                    ),
+                ),
+            },
+        ],
+    }
+    hormuz_commentary_brief = build_grounded_brief(hormuz_commentary_cluster)
+    if not hormuz_commentary_brief["paragraphs"][0].startswith("Trump called on allies to send warships"):
+        raise SystemExit(f"expected Hormuz brief opener to stay on the direct event source, got {hormuz_commentary_brief}")
+    if any(term in " ".join(hormuz_commentary_brief["paragraphs"]) for term in ("Buccino", "Maher", "panelists")):
+        raise SystemExit(f"expected commentary sources to stay out of the Hormuz brief body, got {hormuz_commentary_brief}")
+
+    kyiv_caption_cluster = {
+        "canonical_headline": "Russian strike on Kyiv region kills 4 and wounds 15, with peace talks stalled",
+        "summary": "A combined missile and drone attack on the Kyiv region killed at least four people and wounded at least 15.",
+        "topic_label": "World",
+        "outlet_count": 1,
+        "cluster_key_facts": [],
+        "correction_events": [],
+        "cluster_articles": [
+            {
+                "rank_in_cluster": 1,
+                "framing_group": "center",
+                "articles": quality_article(
+                    article_id="kyiv-caption-a1",
+                    outlet="NPR",
+                    headline="Russian strike on Kyiv region kills 4 and wounds 15, with peace talks stalled",
+                    summary="A combined missile and drone attack on the Kyiv region killed at least four people and wounded at least 15.",
+                    body_text=(
+                        "Firefighters put out the fire at a residential neighbourhood following a Russia missile and drone attack, in Brovary, close to Kyiv, Ukraine, on Saturday. "
+                        "Efrem Lukatsky/AP KYIV, Ukraine — A combined missile and drone attack on the Kyiv region killed at least four people and wounded at least 15 overnight into Saturday, an official said. "
+                        "Officials said the strike came after the U.S. postponed Russia-Ukraine talks due to the war with Iran."
+                    ),
+                ),
+            }
+        ],
+    }
+    kyiv_caption_brief = build_grounded_brief(kyiv_caption_cluster)
+    if kyiv_caption_brief["paragraphs"][0].startswith("Firefighters put out the fire") or "Efrem Lukatsky/AP" in " ".join(kyiv_caption_brief["paragraphs"]):
+        raise SystemExit(f"expected Kyiv brief to strip caption and credit contamination, got {kyiv_caption_brief}")
+
+    prediction_credit_cluster = {
+        "canonical_headline": "With boom in prediction markets, some lawmakers worry about how to police themselves",
+        "summary": "House and Senate ethics committees give no financial disclosure guidance on event contracts or prediction markets.",
+        "topic_label": "Business",
+        "outlet_count": 1,
+        "cluster_key_facts": [],
+        "correction_events": [],
+        "cluster_articles": [
+            {
+                "rank_in_cluster": 1,
+                "framing_group": "center",
+                "articles": quality_article(
+                    article_id="prediction-credit-a1",
+                    outlet="NPR",
+                    headline="With boom in prediction markets, some lawmakers worry about how to police themselves",
+                    summary="House and Senate ethics committees give no financial disclosure guidance on event contracts or prediction markets.",
+                    body_text=(
+                        "House and Senate ethics committees give no financial disclosure guidance on event contracts or prediction markets — unlike stock, cryptocurrency and bond trades. "
+                        "Luke Garrett for NPR/Luke Garrett for NPR In the hours leading up to the joint U.S.-Israeli attack on Iran, bets on a potential strike were being bought and sold on prediction markets like Polymarket. "
+                        "Lawmakers are now debating whether those markets should face stricter disclosure rules."
+                    ),
+                ),
+            }
+        ],
+    }
+    prediction_credit_brief = build_grounded_brief(prediction_credit_cluster)
+    if "Luke Garrett for NPR" in " ".join(prediction_credit_brief["paragraphs"]):
+        raise SystemExit(f"expected repeated outlet credit to be stripped from prediction-market brief, got {prediction_credit_brief}")
+
+    clipped_summary_cluster = {
+        "canonical_headline": "Justice Dept. Legal Threat Complicates Trump's Pick for Fed Chair",
+        "summary": "An investigation of the Federal Reserve was thwarted on Friday, but a department appeal could reimpose an obstacle in Kevin Warsh's path. For a moment on Friday, Kevin M.",
+        "topic_label": "Business",
+        "outlet_count": 1,
+        "cluster_key_facts": [],
+        "correction_events": [],
+        "cluster_articles": [
+            {
+                "rank_in_cluster": 1,
+                "framing_group": "center",
+                "articles": quality_article(
+                    article_id="clipped-summary-a1",
+                    outlet="New York Times",
+                    headline="Justice Dept. Legal Threat Complicates Trump's Pick for Fed Chair",
+                    summary="An investigation of the Federal Reserve was thwarted on Friday, but a department appeal could reimpose an obstacle in Kevin Warsh's path. For a moment on Friday, Kevin M.",
+                    body_text=(
+                        "An investigation of the Federal Reserve was thwarted on Friday, but a department appeal could reimpose an obstacle in Kevin Warsh's path. "
+                        "That afternoon, a federal judge tossed out a pair of subpoenas that the Justice Department had issued to the central bank. "
+                        "They travel with the U.S. secretary of state. "
+                        "I. video featuring Secretary of State Marco Rubio circulated online."
+                    ),
+                ),
+            }
+        ],
+    }
+    clipped_summary_brief = build_grounded_brief(clipped_summary_cluster)
+    clipped_text = " ".join(clipped_summary_brief["paragraphs"])
+    if "Kevin M." in clipped_text or "They travel with the U.S. secretary of state." in clipped_text or "I. video featuring" in clipped_text:
+        raise SystemExit(f"expected clipped and stray fragments to stay out of paywalled-summary brief, got {clipped_summary_brief}")
+    if "They travel with the U.S. secretary of state." in str(clipped_summary_brief["where_sources_agree"]) or "They travel with the U.S. secretary of state." in json.dumps(clipped_summary_brief.get("source_snapshot") or []):
+        raise SystemExit(f"expected clipped and stray fragments to stay out of paywalled-summary support text, got {clipped_summary_brief}")
 
     mixed_access_cluster = {
         "id": "cluster-mixed-access",
@@ -1385,7 +1806,7 @@ def main() -> int:
     reuters_headline = "Reserve release aims to steady oil prices as shipping routes stay under scrutiny"
     ap_headline = "Reserve move calms traders while shipping disruption risks remain"
     reuters_snippet = "Officials said the reserve release could steady oil prices while shipping routes stayed under scrutiny."
-    ap_snippet = "Associated Press said the move was meant to calm traders while officials watched whether the disruption widened."
+    ap_snippet = "Associated Press said the reserve move was meant to calm traders while shipping disruption risks remained."
     reuters_focus = "shipping routes and reserve policy"
     ap_focus = "trader reaction and disruption risk"
 
@@ -1419,7 +1840,7 @@ def main() -> int:
                     headline=ap_headline,
                     summary=ap_snippet,
                     body_text=(
-                        "Associated Press said the move was meant to calm traders while officials watched whether the disruption widened. "
+                        "Associated Press said the reserve move was meant to calm traders while shipping disruption risks remained. "
                         "The report said shipping markets were still sensitive to tanker routing and port access. "
                         "Officials described the reserve step as a near-term stabilizer rather than a lasting solution. "
                         "Traders said the next major signal would be whether the shipping disruption spread further."
@@ -1495,7 +1916,7 @@ def main() -> int:
     quality_cluster_control = {
         "id": "cluster-quality-control",
         "slug": "oil-quality-control",
-        "canonical_headline": "Reserve move calms oil markets while disruption risk remains",
+        "canonical_headline": "Reserve release aims to steady oil prices as shipping routes stay under scrutiny",
         "summary": "Reuters and Associated Press both said the reserve move was meant to steady oil markets while shipping risks stayed in focus.",
         "latest_event_at": "2026-03-14T13:00:00Z",
         "cluster_articles": [
@@ -1522,7 +1943,7 @@ def main() -> int:
                     headline=ap_headline,
                     summary=ap_snippet,
                     body_text=(
-                        "Associated Press said the move was meant to calm traders while officials watched whether the disruption widened. "
+                        "Associated Press said the reserve move was meant to calm traders while shipping disruption risks remained. "
                         "The report said shipping markets were still sensitive to tanker routing and port access. "
                         "Officials described the reserve step as a near-term stabilizer rather than a lasting solution. "
                         "Traders said the next major signal would be whether the shipping disruption spread further."
