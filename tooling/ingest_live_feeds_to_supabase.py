@@ -16,6 +16,8 @@ from generate_temporary_live_feed import (
     build_cluster_payload,
     cluster_match_score,
     cluster_items,
+    story_item_context_score,
+    story_item_is_contextual,
     normalize_entity,
     parse_feed,
     should_join_cluster,
@@ -248,7 +250,9 @@ def actionable_entity(entity: str) -> str:
 
 
 def story_query_from_cluster(cluster: list[FeedItem]) -> tuple[set[str], set[str]]:
-    anchor_items = [item for item in cluster if substantive_feed_item(item)] or cluster
+    anchor_items = [item for item in cluster if substantive_feed_item(item) and not story_item_is_contextual(item)]
+    if not anchor_items:
+        anchor_items = [item for item in cluster if substantive_feed_item(item)] or cluster
     token_counts = {}
     for item in anchor_items:
         for token in item.tokens:
@@ -303,17 +307,24 @@ def item_matches_story_query(item: FeedItem, query_tokens: set[str], query_entit
 def should_augment_cluster(cluster: list[FeedItem]) -> bool:
     source_count = len({item.source for item in cluster})
     substantive_items = [item for item in cluster if substantive_feed_item(item)]
+    event_items = [item for item in substantive_items if not story_item_is_contextual(item)]
     open_substantive = [item for item in substantive_items if item.access_signal == "open"]
     likely_paywalled = [item for item in cluster if item.access_signal == "likely_paywalled"]
-    return source_count <= 1 or len(substantive_items) <= 1 or (len(open_substantive) == 0 and len(likely_paywalled) >= 1)
+    return (
+        source_count <= 1
+        or len(substantive_items) <= 1
+        or len(event_items) <= 1
+        or (len(open_substantive) == 0 and len(likely_paywalled) >= 1)
+    )
 
 
 def augmentation_priority(cluster: list[FeedItem]) -> tuple[int, int, int]:
     substantive_items = [item for item in cluster if substantive_feed_item(item)]
+    event_items = [item for item in substantive_items if not story_item_is_contextual(item)]
     public_interest = max((item_quality_score(item) for item in cluster), default=0)
     return (
         1 if should_augment_cluster(cluster) else 0,
-        len(substantive_items),
+        len(event_items),
         public_interest,
     )
 
@@ -327,6 +338,7 @@ def select_story_augmentation_candidates(
     existing_urls = {item.url for item in cluster}
     existing_sources = {item.source for item in cluster}
     query_tokens, query_entities = story_query_from_cluster(cluster)
+    cluster_prefers_event = any(not story_item_is_contextual(item) for item in cluster)
     ranked: list[tuple[float, FeedItem]] = []
     for item in candidates:
         if item.url in existing_urls or item.source in existing_sources:
@@ -344,6 +356,8 @@ def select_story_augmentation_candidates(
             for entity in item.named_entities
             if actionable_entity(entity)
         } & query_entities
+        if cluster_prefers_event and story_item_is_contextual(item) and len(strong_query_overlap) < 2 and len(query_entity_overlap) < 2:
+            continue
         join_match = should_join_cluster(item, cluster)
         if not join_match and not query_entity_overlap and len(strong_query_overlap) < 2:
             continue
@@ -352,6 +366,7 @@ def select_story_augmentation_candidates(
         score += len(query_entity_overlap) * 2
         if join_match:
             score += 2
+        score -= story_item_context_score(item) * 4
         score += summary_quality_score(
             item.title,
             item.summary,

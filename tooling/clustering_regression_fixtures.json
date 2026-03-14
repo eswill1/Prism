@@ -90,5 +90,51 @@
       "https://example.com/shipping-1": ["https://example.com/shipping-2"],
       "https://example.com/china-npc": []
     }
+  },
+  {
+    "name": "kharg explainers split from retaliation event coverage",
+    "items": [
+      {
+        "source": "Reuters",
+        "title": "Fire at UAE oil hub as Iran vows retaliation for U.S. attack on Kharg Island",
+        "url": "https://example.com/fujairah-event",
+        "summary": "A fire at a UAE oil hub followed Iran's retaliation threat after the U.S. struck Kharg Island.",
+        "lede": "A fire at a UAE oil hub followed Iran's retaliation threat after the U.S. struck Kharg Island.",
+        "body_preview": "Officials said shipping and loading operations were disrupted after the fire in Fujairah.",
+        "named_entities": ["Fujairah", "Kharg Island", "UAE"],
+        "tokens": ["fujairah", "fire", "retaliation", "khargisland", "uae", "hub"],
+        "event_tags": []
+      },
+      {
+        "source": "PBS NewsHour",
+        "title": "After the U.S. strike on Kharg Island, here's what to know about Iran's islands",
+        "url": "https://example.com/pbs-explainer",
+        "summary": "The explainer focuses on Iran's islands and the shipping lanes around Kharg Island.",
+        "lede": "The explainer focuses on Iran's islands and the shipping lanes around Kharg Island.",
+        "body_preview": "Kharg Island has long been central to Iran's oil exports and the Strait of Hormuz shipping story.",
+        "named_entities": ["Kharg Island", "Iran"],
+        "tokens": ["khargisland", "island", "explainer", "know", "shipping"],
+        "event_tags": []
+      },
+      {
+        "source": "CBS News",
+        "title": "What to know about Kharg Island, the Iranian oil site struck by U.S.",
+        "url": "https://example.com/cbs-explainer",
+        "summary": "Kharg Island is a fortified oil site and a key part of Iran's export network.",
+        "lede": "Kharg Island is a fortified oil site and a key part of Iran's export network.",
+        "body_preview": "The explainer describes the island's role in oil exports and the broader regional context.",
+        "named_entities": ["Kharg Island", "Iran"],
+        "tokens": ["khargisland", "island", "know", "site", "struck"],
+        "event_tags": []
+      }
+    ],
+    "expected_cluster_groups": [
+      ["https://example.com/cbs-explainer", "https://example.com/pbs-explainer"],
+      ["https://example.com/fujairah-event"]
+    ],
+    "expected_neighbors": {
+      "https://example.com/fujairah-event": [],
+      "https://example.com/pbs-explainer": ["https://example.com/cbs-explainer"]
+    }
   }
 ]
