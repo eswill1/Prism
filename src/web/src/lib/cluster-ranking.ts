@@ -7,6 +7,7 @@ export type CoverageCounts = {
 }
 
 export type ClusterSummaryRankInput = {
+  clusterId?: string
   slug: string
   topic: string
   title: string

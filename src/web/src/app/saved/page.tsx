@@ -10,6 +10,7 @@ export default async function SavedStoriesPage() {
   const liveFeed = await loadLiveFeed()
 
   const summaryStories: TrackedStoryCandidate[] = summaries.map((story) => ({
+    clusterId: story.clusterId,
     slug: story.slug,
     topic: story.topic,
     title: story.title,
@@ -47,10 +48,11 @@ export default async function SavedStoriesPage() {
       <header className="masthead">
         <div>
           <p className="eyebrow">Saved stories</p>
-          <h1>Your local working set for follow-up reading.</h1>
+          <h1>Your tracked working set for follow-up reading and change review.</h1>
           <p className="hero-dek">
-            This prototype persists save and follow state in this browser until account sync
-            is wired through Supabase.
+            Save and follow still work instantly in this browser. Prism now shows the latest
+            narrative and Perspective deltas for each tracked story, with optional sign-in only
+            if you want that working set synced across devices.
           </p>
         </div>
       </header>

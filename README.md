@@ -28,7 +28,7 @@ The current local product direction now supports that flow across:
 - a newsroom-style homepage that is the definitive current-news front door
 - an article-first story page with a distinct Perspective rail
 - direct source links in the reporting stack and alternate-read sections
-- browser-local save/follow state while account persistence is still being built
+- optional account-backed save/follow sync, with browser-local tracking still available when readers stay signed out
 
 Its core unit is the **Story**, not a link feed. Each story shows:
 
@@ -136,6 +136,7 @@ Environment baseline:
 - `npm run ingest:local:status` reads the local scheduler state from `.local/local-ingest/status.json` and shows last raw/full outcomes plus the next due windows
 - `npm run ingest:local:launchd:install` writes and loads a macOS LaunchAgent so the scheduler can keep running in the background even when you are not holding open a terminal session; `npm run ingest:local:launchd:uninstall` removes it
 - `npm run sync:stories` is now for explicit snapshot or manual sync work only; connected Prism should rely on real sourced stories
+- `NEXT_PUBLIC_PRISM_READER_EMAIL_AUTH_MODE` controls the sync-page auth UI: keep it at `magic_link` for normal use, or temporarily set it to `otp` only when the Supabase email template is also switched to emit `{{ .Token }}` for code-entry testing
 - `npm run sources:upsert` activates the current launch feed registry in Supabase
 - `npm run ingest:feeds` is the default operator path: it now goes through the local ingest lock/status wrapper before running the full pipeline, so manual runs will wait rather than colliding with the attached dev loop or the always-on local scheduler
 - `npm run ingest:feeds:raw` does the same for the fast discovery and story-sync-only pass

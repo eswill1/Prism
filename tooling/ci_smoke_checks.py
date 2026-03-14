@@ -20,13 +20,17 @@ try:
         promote_revision_current_state as promote_perspective_revision_current_state,
     )
     from tooling.generate_story_briefs_to_supabase import (
+        build_grounded_brief,
         insert_brief_revision_draft,
         promote_revision_current_state as promote_brief_revision_current_state,
     )
+    from tooling.enrich_articles_to_supabase import merge_article_metadata
     from tooling.generate_temporary_live_feed import (
         FeedItem,
+        classify_fetch_block,
         choose_story_summary,
         cluster_items,
+        detect_fetch_block,
         normalize_feed_fetch_url,
         summary_quality_score,
     )
@@ -35,8 +39,9 @@ try:
     from tooling.url_normalization import normalize_canonical_url
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
     from generate_perspective_to_supabase import build_perspective, current_revision_row_id, insert_perspective_revision_draft, promote_revision_current_state as promote_perspective_revision_current_state
-    from generate_story_briefs_to_supabase import insert_brief_revision_draft, promote_revision_current_state as promote_brief_revision_current_state
-    from generate_temporary_live_feed import FeedItem, choose_story_summary, cluster_items, normalize_feed_fetch_url, summary_quality_score
+    from generate_story_briefs_to_supabase import build_grounded_brief, insert_brief_revision_draft, promote_revision_current_state as promote_brief_revision_current_state
+    from enrich_articles_to_supabase import merge_article_metadata
+    from generate_temporary_live_feed import FeedItem, classify_fetch_block, choose_story_summary, cluster_items, detect_fetch_block, normalize_feed_fetch_url, summary_quality_score
     from local_ingest_runtime import build_launchd_plist, choose_due_job
     from semantic_story_candidates import build_similarity_lookup
     from url_normalization import normalize_canonical_url
@@ -116,6 +121,10 @@ def run_web_regression_tests() -> None:
                 "--test",
                 "src/web/src/lib/perspective-versioning.test.ts",
                 "src/web/src/lib/cluster-ranking.test.ts",
+                "src/web/src/lib/reader-persistence.test.ts",
+                "src/web/src/lib/story-brief-versioning.test.ts",
+                "src/web/src/lib/story-briefs.test.ts",
+                "src/web/src/lib/tracked-story-history.test.ts",
             ],
             cwd=REPO_ROOT,
             check=True,
@@ -198,6 +207,128 @@ def main() -> int:
     normalized = normalize_canonical_url("https://example.com/story?utm_source=test&id=42#top")
     if normalized != "https://example.com/story?id=42":
         raise SystemExit(f"unexpected canonical URL normalization result: {normalized}")
+
+    fetch_block = detect_fetch_block(
+        """
+        <html>
+          <head>
+            <meta name="description" content="px-captcha" />
+            <title>Access to this page has been denied</title>
+          </head>
+          <body>Before we continue... Press & Hold to confirm you are a human.</body>
+        </html>
+        """
+    )
+    if fetch_block != {"reason": "anti_bot_challenge", "vendor": "perimeterx"}:
+        raise SystemExit(f"expected perimeterx fetch block detection, got {fetch_block}")
+
+    status_only_block = classify_fetch_block("", status_code=403)
+    if status_only_block != {"reason": "http_access_denied", "vendor": "generic"}:
+        raise SystemExit(f"expected generic HTTP access-denied fetch block, got {status_only_block}")
+
+    blocked_metadata = merge_article_metadata(
+        {"metadata": {"feed_summary": "Fallback summary."}},
+        {
+            "named_entities": [],
+            "extraction_quality": "rss_only",
+            "access_signal": "open",
+            "fetch_blocked": True,
+            "fetch_block_reason": "anti_bot_challenge",
+            "fetch_block_vendor": "perimeterx",
+        },
+        "2026-03-14T03:43:31Z",
+    )
+    if blocked_metadata.get("fetch_blocked") is not True or blocked_metadata.get("fetch_block_vendor") != "perimeterx":
+        raise SystemExit(f"expected fetch block metadata to be retained, got {blocked_metadata}")
+
+    single_source_brief = build_grounded_brief(
+        {
+            "canonical_headline": "Cuba confirms talks with Trump administration amid fuel shortages",
+            "summary": "Cuba confirmed talks with the Trump administration after fuel shortages deepened the country’s economic crisis.",
+            "topic_label": "World",
+            "outlet_count": 1,
+            "cluster_key_facts": [
+                {"fact_text": "Officials said the talks are aimed at easing immediate fuel shortages.", "sort_order": 0},
+                {"fact_text": "Power generation and freight movement have already been disrupted.", "sort_order": 1},
+                {"fact_text": "State media described the contacts as practical crisis management.", "sort_order": 2},
+            ],
+            "correction_events": [],
+            "cluster_articles": [
+                {
+                    "rank_in_cluster": 1,
+                    "framing_group": "center",
+                    "articles": {
+                        "id": "article-1",
+                        "headline": "Cuba confirms talks with Trump administration amid fuel shortages",
+                        "summary": "Cuba said the talks were focused on fuel shortages, transport disruption and a broader economic crunch after Venezuelan oil shipments were cut.",
+                        "body_text": (
+                            "Cuba said the talks were focused on fuel shortages, transport disruption and a broader economic crunch after Venezuelan oil shipments were cut. "
+                            "Officials said the immediate goal was to stabilize domestic supply and keep freight lines moving. "
+                            "The government described the contacts as practical rather than a diplomatic reset. "
+                            "Power generation has already been reduced in several provinces because fuel stocks are low. "
+                            "Freight delays have started to disrupt deliveries and factory schedules across the island. "
+                            "State media said any agreement would be judged by whether it eases shortages quickly for households and businesses."
+                        ),
+                        "metadata": {
+                            "feed_summary": "Cuba confirmed talks as fuel shortages worsened.",
+                            "extraction_quality": "article_body",
+                        },
+                        "original_url": "https://example.com/cuba-talks",
+                        "canonical_url": "https://example.com/cuba-talks",
+                        "outlets": {
+                            "canonical_name": "Reuters",
+                        },
+                    },
+                }
+            ],
+        }
+    )
+    if single_source_brief["status"] != "early":
+        raise SystemExit(f"expected one-source brief to stay early, got {single_source_brief['status']}")
+    if len(single_source_brief["paragraphs"]) < 3:
+        raise SystemExit(
+            f"expected richer one-source early brief paragraphs, got {len(single_source_brief['paragraphs'])}: {single_source_brief['paragraphs']}"
+        )
+
+    blocked_single_source_brief = build_grounded_brief(
+        {
+            "canonical_headline": "Trump says he has own idea on how long Iran war will last",
+            "summary": "President Trump said Friday that he has his own idea of how long the conflict in Iran could last.",
+            "topic_label": "World",
+            "outlet_count": 1,
+            "cluster_key_facts": [
+                {"fact_text": "The strongest available source read is already open.", "sort_order": 0},
+            ],
+            "correction_events": [],
+            "cluster_articles": [
+                {
+                    "rank_in_cluster": 1,
+                    "framing_group": "center",
+                    "articles": {
+                        "id": "article-blocked-1",
+                        "headline": "Trump says he has own idea on how long Iran war will last",
+                        "summary": "President Trump said Friday that he has his own idea of how long the conflict in Iran could last.",
+                        "body_text": "",
+                        "metadata": {
+                            "feed_summary": "President Trump said Friday that he has his own idea of how long the conflict in Iran could last.",
+                            "extraction_quality": "rss_only",
+                            "access_signal": "open",
+                            "fetch_blocked": True,
+                        },
+                        "original_url": "https://thehill.com/example-story",
+                        "canonical_url": "https://thehill.com/example-story",
+                        "outlets": {
+                            "canonical_name": "The Hill",
+                        },
+                    },
+                }
+            ],
+        }
+    )
+    if not any("blocked automated full-text retrieval" in paragraph for paragraph in blocked_single_source_brief["paragraphs"]):
+        raise SystemExit(f"expected blocked-fetch brief to disclose retrieval failure, got {blocked_single_source_brief['paragraphs']}")
+    if "The strongest available source read is already open." in blocked_single_source_brief["supporting_points"]:
+        raise SystemExit("expected access-status boilerplate to stay out of supporting points")
 
     sitemap_fetch_url = normalize_feed_fetch_url(
         "https://www.reuters.com/arc/outboundfeeds/news-sitemap/?outputType=xml&from=100"

@@ -27,6 +27,7 @@ export function SiteNav() {
         </div>
         <nav className="site-utility-links" aria-label="Utility">
           <Link href="/saved">Saved</Link>
+          <Link href="/sync">Sync</Link>
           <Link href="/methodology">Methodology</Link>
           <Link href="/corrections">Corrections</Link>
         </nav>

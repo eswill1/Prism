@@ -68,6 +68,11 @@ def article_access_signal(article: dict[str, Any]) -> str:
     return "unknown"
 
 
+def article_fetch_blocked(article: dict[str, Any]) -> bool:
+    metadata = article.get("metadata") or {}
+    return bool(isinstance(metadata, dict) and metadata.get("fetch_blocked") is True)
+
+
 def main() -> int:
     client = SupabaseRestClient(REST_BASE, SUPABASE_SERVICE_ROLE_KEY)
     cutoff = datetime.now(timezone.utc) - timedelta(hours=LOOKBACK_HOURS)
@@ -79,7 +84,7 @@ def main() -> int:
         "/source_feeds?select=source_registry_id,feed_type,feed_url,is_active,last_success_at,consecutive_failures&limit=300"
     ) or []
     discovery_rows = client.get(
-        "/raw_discovered_urls?select=source_registry_id,fetch_status,discovered_at,last_attempted_at&order=discovered_at.desc&limit=4000"
+        "/raw_discovered_urls?select=source_registry_id,fetch_status,discovered_at,last_attempted_at,error_message&order=discovered_at.desc&limit=4000"
     ) or []
     article_rows = client.get(
         "/articles?select=source_registry_id,site_name,summary,body_text,published_at,metadata&order=published_at.desc&limit=4000"
@@ -114,6 +119,7 @@ def main() -> int:
         substantive_articles = [article for article in articles if article_is_substantive(article)]
         open_articles = [article for article in articles if article_access_signal(article) == "open"]
         paywalled_articles = [article for article in articles if article_access_signal(article) == "likely_paywalled"]
+        blocked_articles = [article for article in articles if article_fetch_blocked(article)]
         thin_paywalled_articles = [
             article
             for article in articles
@@ -128,6 +134,13 @@ def main() -> int:
         fetched_count = sum(1 for row in discoveries if row.get("fetch_status") == "fetched")
         failed_count = sum(1 for row in discoveries if row.get("fetch_status") == "failed")
         pending_count = sum(1 for row in discoveries if row.get("fetch_status") in ("pending", "normalized"))
+        blocked_count = sum(
+            1
+            for row in discoveries
+            if row.get("fetch_status") == "failed"
+            and isinstance(row.get("error_message"), str)
+            and row["error_message"].startswith("fetch_blocked:")
+        )
         substantive_rate = round(len(substantive_articles) / len(articles), 3) if articles else 0.0
 
         report.append(
@@ -150,9 +163,11 @@ def main() -> int:
                 "fetched_48h": fetched_count,
                 "pending_or_normalized_48h": pending_count,
                 "failed_48h": failed_count,
+                "fetch_blocked_48h": blocked_count,
                 "articles_48h": len(articles),
                 "substantive_articles_48h": len(substantive_articles),
                 "substantive_rate_48h": substantive_rate,
+                "blocked_articles_48h": len(blocked_articles),
                 "open_articles_48h": len(open_articles),
                 "likely_paywalled_articles_48h": len(paywalled_articles),
                 "thin_paywalled_articles_48h": len(thin_paywalled_articles),

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { ContextPackPanel } from './context-pack-panel'
 import { SiteFooter } from './site-footer'
 import { SiteNav } from './site-nav'
+import { StoryControls } from './story-controls'
 import { getClusterDetail } from '../lib/cluster-api'
 import type { StoryCluster } from '../lib/mock-clusters'
 import { buildStoryBrief } from '../lib/story-briefs'
@@ -342,6 +343,16 @@ export async function StoryPage({ slug }: StoryPageProps) {
         </section>
 
         <aside className="inspector-rail">
+          <StoryControls
+            clusterId={cluster.clusterId}
+            slug={cluster.slug}
+            title={cluster.title}
+            topic={cluster.topic}
+            updatedAt={cluster.updatedAt}
+            changeCount={cluster.changeTimeline.length}
+            briefRevisionTag={storyBrief.revisionTag}
+            perspectiveRevisionTag={perspectiveRevision.revisionTag}
+          />
           <article className="panel inspector-panel perspective-panel">
             <div className="section-heading">
               <div>

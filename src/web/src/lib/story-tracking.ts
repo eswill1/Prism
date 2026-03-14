@@ -1,13 +1,6 @@
-export type StoryTrackingRecord = {
-  slug: string
-  title?: string
-  topic?: string
-  saved: boolean
-  followed: boolean
-  savedAt?: string
-  followedAt?: string
-  lastViewedAt?: string
-}
+import type { ReaderTrackingState } from './reader-tracking-types'
+
+export type StoryTrackingRecord = ReaderTrackingState
 
 type StoryTrackingStore = Record<string, StoryTrackingRecord>
 
@@ -20,6 +13,7 @@ function canUseStorage() {
 function sanitizeRecord(slug: string, value: Partial<StoryTrackingRecord> | null | undefined) {
   return {
     slug,
+    clusterId: typeof value?.clusterId === 'string' ? value.clusterId : undefined,
     title: typeof value?.title === 'string' ? value.title : undefined,
     topic: typeof value?.topic === 'string' ? value.topic : undefined,
     saved: value?.saved === true,
@@ -27,6 +21,14 @@ function sanitizeRecord(slug: string, value: Partial<StoryTrackingRecord> | null
     savedAt: typeof value?.savedAt === 'string' ? value.savedAt : undefined,
     followedAt: typeof value?.followedAt === 'string' ? value.followedAt : undefined,
     lastViewedAt: typeof value?.lastViewedAt === 'string' ? value.lastViewedAt : undefined,
+    lastSeenBriefRevisionTag:
+      typeof value?.lastSeenBriefRevisionTag === 'string'
+        ? value.lastSeenBriefRevisionTag
+        : undefined,
+    lastSeenPerspectiveRevisionTag:
+      typeof value?.lastSeenPerspectiveRevisionTag === 'string'
+        ? value.lastSeenPerspectiveRevisionTag
+        : undefined,
   } satisfies StoryTrackingRecord
 }
 
@@ -50,12 +52,36 @@ export function readStoryTrackingStore(): StoryTrackingStore {
   }
 }
 
+export function listTrackedStoryRecords() {
+  return Object.values(readStoryTrackingStore()).filter(
+    (record) => record.saved || record.followed || record.lastViewedAt,
+  )
+}
+
 function writeStoryTrackingStore(store: StoryTrackingStore) {
   if (!canUseStorage()) {
     return
   }
 
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store))
+}
+
+export function writeStoryTrackingRecord(record: StoryTrackingRecord) {
+  const store = readStoryTrackingStore()
+  store[record.slug] = sanitizeRecord(record.slug, record)
+  writeStoryTrackingStore(store)
+  return store[record.slug]
+}
+
+export function mergeStoryTrackingRecords(records: StoryTrackingRecord[]) {
+  const store = readStoryTrackingStore()
+
+  for (const record of records) {
+    store[record.slug] = sanitizeRecord(record.slug, record)
+  }
+
+  writeStoryTrackingStore(store)
+  return store
 }
 
 function upsertStoryTracking(
@@ -79,12 +105,19 @@ export function getStoryTracking(slug: string) {
   return sanitizeRecord(slug, readStoryTrackingStore()[slug])
 }
 
-export function toggleSavedStory(story: Pick<StoryTrackingRecord, 'slug' | 'title' | 'topic'>) {
+export function emptyStoryTrackingRecord(slug: string) {
+  return sanitizeRecord(slug, null)
+}
+
+export function toggleSavedStory(
+  story: Pick<StoryTrackingRecord, 'clusterId' | 'slug' | 'title' | 'topic'>,
+) {
   return upsertStoryTracking(story.slug, (existing) => {
     const nextSaved = !existing.saved
 
     return {
       ...existing,
+      clusterId: story.clusterId || existing.clusterId,
       title: story.title || existing.title,
       topic: story.topic || existing.topic,
       saved: nextSaved,
@@ -93,12 +126,15 @@ export function toggleSavedStory(story: Pick<StoryTrackingRecord, 'slug' | 'titl
   })
 }
 
-export function toggleFollowedStory(story: Pick<StoryTrackingRecord, 'slug' | 'title' | 'topic'>) {
+export function toggleFollowedStory(
+  story: Pick<StoryTrackingRecord, 'clusterId' | 'slug' | 'title' | 'topic'>,
+) {
   return upsertStoryTracking(story.slug, (existing) => {
     const nextFollowed = !existing.followed
 
     return {
       ...existing,
+      clusterId: story.clusterId || existing.clusterId,
       title: story.title || existing.title,
       topic: story.topic || existing.topic,
       saved: nextFollowed ? true : existing.saved,
@@ -109,12 +145,25 @@ export function toggleFollowedStory(story: Pick<StoryTrackingRecord, 'slug' | 't
   })
 }
 
-export function markStoryViewed(story: Pick<StoryTrackingRecord, 'slug' | 'title' | 'topic'>) {
+export function markStoryViewed(
+  story: Pick<
+    StoryTrackingRecord,
+    | 'clusterId'
+    | 'slug'
+    | 'title'
+    | 'topic'
+    | 'lastSeenBriefRevisionTag'
+    | 'lastSeenPerspectiveRevisionTag'
+  >,
+) {
   return upsertStoryTracking(story.slug, (existing) => ({
     ...existing,
+    clusterId: story.clusterId || existing.clusterId,
     title: story.title || existing.title,
     topic: story.topic || existing.topic,
     lastViewedAt: new Date().toISOString(),
+    lastSeenBriefRevisionTag: story.lastSeenBriefRevisionTag || existing.lastSeenBriefRevisionTag,
+    lastSeenPerspectiveRevisionTag:
+      story.lastSeenPerspectiveRevisionTag || existing.lastSeenPerspectiveRevisionTag,
   }))
 }
-

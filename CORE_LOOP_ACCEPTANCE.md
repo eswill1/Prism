@@ -53,8 +53,7 @@ The local prototype passes if:
 
 ## Known Limits
 
-- save/follow state is browser-local only
-- no Supabase-backed persistence yet
-- no synced accounts yet
+- saved/follow stays browser-local until a reader opts into sync
+- synced save/follow requires optional account sign-in
 - no real notifications yet
 - story data may still come from mocks or temporary live snapshots

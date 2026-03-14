@@ -358,6 +358,71 @@ button {
   background: rgba(255, 255, 255, 0.58);
 }
 
+.action-pill:disabled,
+.primary-link:disabled,
+.secondary-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tracking-card,
+.sync-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.tracking-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tracking-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 12px;
+  border: 1px solid var(--prism-deep-line);
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--prism-slate);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.tracking-chip.active {
+  border-color: rgba(168, 116, 42, 0.28);
+  background: rgba(168, 116, 42, 0.08);
+  color: var(--prism-brass);
+}
+
+.tracking-footnote {
+  margin: 0;
+  color: var(--prism-slate);
+  font-size: 0.92rem;
+}
+
+.sync-panel-stack,
+.sync-field {
+  display: grid;
+  gap: 12px;
+}
+
+.sync-field span {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--prism-slate);
+}
+
+.newsletter-input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--prism-stone);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--prism-ink);
+  font: inherit;
+}
+
 .status-chip,
 .cluster-badge {
   padding: 10px 14px;
@@ -2006,6 +2071,58 @@ button {
 .saved-story-note span,
 .saved-story-footer span {
   color: var(--prism-slate);
+}
+
+.saved-history-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.saved-history-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--prism-deep-line);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.saved-history-card-updated {
+  background: rgba(227, 244, 229, 0.72);
+  border-color: rgba(72, 121, 82, 0.28);
+}
+
+.saved-history-card-pending {
+  background: rgba(246, 239, 221, 0.72);
+  border-color: rgba(143, 120, 73, 0.24);
+}
+
+.saved-history-header,
+.saved-history-compare {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.saved-history-title {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.saved-history-tag {
+  font-size: 0.78rem;
+  color: var(--prism-slate);
+}
+
+.saved-history-compare {
+  color: var(--prism-slate);
+  font-size: 0.78rem;
+}
+
+.saved-history-list {
+  margin: 0;
 }
 
 .narrative-panel,

@@ -47,6 +47,18 @@ PAYWALL_HINT_PATTERNS = (
     r"gateway-content",
     r"paywall",
 )
+FETCH_BLOCK_PATTERNS: tuple[tuple[str, str], ...] = (
+    ("perimeterx", r"px-captcha"),
+    ("perimeterx", r"_pxAppId"),
+    ("perimeterx", r"captcha\.px-cloud\.net"),
+    ("perimeterx", r"Access to this page has been denied"),
+    ("perimeterx", r"Press\s*&\s*Hold to confirm you are"),
+    ("cloudflare", r"Attention Required!"),
+    ("cloudflare", r"__cf_chl"),
+    ("cloudflare", r"challenge-platform"),
+    ("generic", r"verify you are human"),
+    ("generic", r"enable javascript and cookies to continue"),
+)
 
 FEEDS = [
     {"source": "NPR", "feed_url": "https://feeds.npr.org/1001/rss.xml"},
@@ -618,6 +630,28 @@ def infer_access_signal_from_url(url: str | None) -> str:
     return "unknown"
 
 
+def detect_fetch_block(markup: str) -> dict[str, str] | None:
+    for vendor, pattern in FETCH_BLOCK_PATTERNS:
+        if re.search(pattern, markup, re.IGNORECASE):
+            return {
+                "reason": "anti_bot_challenge",
+                "vendor": vendor,
+            }
+    return None
+
+
+def classify_fetch_block(markup: str, status_code: int | None = None) -> dict[str, str] | None:
+    detected = detect_fetch_block(markup)
+    if detected:
+        return detected
+    if status_code in (401, 403, 429):
+        return {
+            "reason": "http_access_denied",
+            "vendor": "generic",
+        }
+    return None
+
+
 def extract_named_entities(text: str) -> list[str]:
     seen: set[str] = set()
     entities: list[str] = []
@@ -645,6 +679,7 @@ def default_enrichment(summary: str = "", url: str = "") -> dict[str, object]:
         "named_entities": [],
         "extraction_quality": "rss_only",
         "access_signal": infer_access_signal_from_url(url),
+        "fetch_blocked": False,
     }
 
 
@@ -950,13 +985,41 @@ def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, 
         "named_entities": [],
         "extraction_quality": "rss_only",
         "access_signal": infer_access_signal_from_url(url),
+        "fetch_blocked": False,
     }
 
+    status_code: int | None = None
     try:
         markup = fetch_text(url, timeout=ARTICLE_ENRICHMENT_TIMEOUT_SECONDS)
-    except (HTTPError, URLError, TimeoutError, ValueError):
+    except HTTPError as exc:
+        status_code = exc.code
+        markup = exc.read().decode("utf-8", errors="replace")
+        fetch_block = classify_fetch_block(markup, status_code=status_code)
+        if fetch_block:
+            payload = {
+                **default_payload,
+                "fetch_blocked": True,
+                "fetch_block_reason": fetch_block["reason"],
+                "fetch_block_vendor": fetch_block["vendor"],
+            }
+            ARTICLE_FETCH_CACHE[url] = payload
+            return payload
         ARTICLE_FETCH_CACHE[url] = default_payload
         return default_payload
+    except (URLError, TimeoutError, ValueError):
+        ARTICLE_FETCH_CACHE[url] = default_payload
+        return default_payload
+
+    fetch_block = classify_fetch_block(markup, status_code=status_code)
+    if fetch_block:
+        payload = {
+            **default_payload,
+            "fetch_blocked": True,
+            "fetch_block_reason": fetch_block["reason"],
+            "fetch_block_vendor": fetch_block["vendor"],
+        }
+        ARTICLE_FETCH_CACHE[url] = payload
+        return payload
 
     match = re.search(
         r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
@@ -1008,6 +1071,7 @@ def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, 
         "named_entities": extract_named_entities(" ".join(part for part in (lede, body_preview) if part)),
         "extraction_quality": extraction_quality,
         "access_signal": detect_access_signal(markup, url),
+        "fetch_blocked": False,
     }
     ARTICLE_FETCH_CACHE[url] = payload
     return payload
