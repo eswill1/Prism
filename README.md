@@ -104,6 +104,7 @@ The code scaffold is intentionally minimal. The doctrine set is the primary deli
 Core commands:
 
 - `npm run dev`
+- `npm run validate`
 - `npm run dev:web:connected`
 - `npm run dev:web:connected:web-only`
 - `npm run refresh:live-feed`
@@ -124,6 +125,7 @@ Environment baseline:
 
 - copy `.env.example` into your local secret system or Doppler project
 - this repo is now scoped locally to Doppler project `prism-wire` config `dev`
+- `npm run validate` is the default pre-PR check: it builds the web app, compiles Python tooling, and runs the smoke suite, including the TypeScript Perspective/ranking regressions
 - `npm run dev:web:connected` is now the preferred local real-news loop: it starts the connected app on `127.0.0.1:3002` and reruns `npm run ingest:feeds` on a fixed interval while the server is alive; tune the cadence with `PRISM_LOCAL_INGEST_INTERVAL_SECONDS` if needed
 - `npm run dev:web:connected:web-only` keeps the older server-only behavior when you explicitly do not want the ingest loop
 - `npm run sync:stories` is now for explicit snapshot or manual sync work only; connected Prism should rely on real sourced stories

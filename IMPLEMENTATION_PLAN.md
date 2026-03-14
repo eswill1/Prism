@@ -279,7 +279,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Prism Brief expansion so mature story pages routinely deliver fuller multi-paragraph briefs rather than minimum viable summaries
 - [x] Paywall-aware alternate-source matching when the strongest available source is too thin or inaccessible to the reader
 - [ ] Methodology pages and version registry
-- [ ] Perspective firewall tests
+- [x] Perspective firewall tests
 - [ ] Morning and evening briefing generation
 - [ ] Follow alerts and topic following
 - [ ] Saved-story history with visible narrative and Perspective deltas over time
@@ -293,7 +293,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Wire the story page to stored Perspective summaries, presence groups, and lens-based Context Packs
 - [x] Add operator commands so `ingest:feeds` now advances Perspective revisions after brief generation
 - [x] Add Perspective methodology/version surfacing so readers can inspect what changed in the current Perspective revision
-- [ ] Add Perspective firewall tests and regression fixtures so presence/context data cannot leak into ranking or become implicit truth scoring
+- [x] Add Perspective firewall tests and regression fixtures so presence/context data cannot leak into ranking or become implicit truth scoring
 - [x] Tune Context Pack selection with `perspective:readiness`, `sources:health`, and manual review on live stories before broadening the feature surface
 
 #### Success metrics:

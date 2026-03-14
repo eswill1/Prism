@@ -6,6 +6,10 @@ on:
       - main
   pull_request:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-web:
     name: build-web
@@ -22,10 +26,10 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Build web app
-        run: npm run build:web
+      - name: Validate web app
+        run: npm run validate:web
 
   python-pipeline:
     name: python-pipeline
@@ -40,8 +44,14 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile Python tooling
-        run: python3 -m py_compile tooling/*.py
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
 
-      - name: Run Python smoke checks
-        run: python3 tooling/ci_smoke_checks.py
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate pipeline
+        run: npm run validate:pipeline

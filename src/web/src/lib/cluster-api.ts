@@ -1,30 +1,18 @@
+import {
+  sortClusterSummaries,
+  type ClusterSortMode,
+  type ClusterSummaryRankInput,
+  type CoverageCounts,
+} from './cluster-ranking'
 import { clusterBySlug, mockClusters, type FramingGroup, type StoryCluster } from './mock-clusters'
 import { loadLiveStoryBySlug } from './live-feed'
 import { buildPerspectiveRevisionInfo, type PerspectiveRevisionSnapshot } from './perspective-versioning'
-import { getNewsSectionKey } from './news-sections'
 import { inferSourceAccessTier } from './source-access'
 import type { StoryBrief } from './story-brief-types'
 import type { StoryPerspective } from './story-perspective-types'
 import { getSupabaseServerClient, hasSupabaseServerConfig, type JsonObject } from './supabase/server'
 
-export type ClusterSummary = {
-  slug: string
-  topic: string
-  title: string
-  dek: string
-  updatedAt: string
-  status: string
-  heroImage: string
-  heroAlt: string
-  heroCredit: string
-  outletCount: number
-  reliabilityRange: string
-  coverageCounts: StoryCluster['coverageCounts']
-  latestEventAt: string
-  storyOrigin: string
-  qualityScore: number
-  homepageEligible: boolean
-}
+export type ClusterSummary = ClusterSummaryRankInput
 
 function toClusterSummary(cluster: StoryCluster): ClusterSummary {
   return {
@@ -47,7 +35,7 @@ function toClusterSummary(cluster: StoryCluster): ClusterSummary {
   }
 }
 
-function normalizeCoverageCounts(value: unknown): Record<FramingGroup, number> {
+function normalizeCoverageCounts(value: unknown): CoverageCounts {
   if (value && typeof value === 'object') {
     const counts = value as Partial<Record<FramingGroup, number>>
     return {
@@ -413,73 +401,6 @@ function mapSummaryRow(row: StoryClusterRow): ClusterSummary {
 
 function isReaderVisibleStoryOrigin(origin: string) {
   return origin !== 'editorial_seed'
-}
-
-type ClusterSortMode = 'frontpage' | 'latest'
-
-function coverageDiversityScore(counts: StoryCluster['coverageCounts']) {
-  return [counts.left, counts.center, counts.right].filter((value) => value > 0).length
-}
-
-function freshnessBonus(value: string) {
-  const timestamp = new Date(value).getTime()
-  if (Number.isNaN(timestamp)) {
-    return 0
-  }
-
-  const ageMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000))
-
-  if (ageMinutes <= 30) return 12
-  if (ageMinutes <= 90) return 9
-  if (ageMinutes <= 240) return 6
-  if (ageMinutes <= 720) return 3
-  return 0
-}
-
-function frontPagePriority(summary: ClusterSummary) {
-  let score = summary.qualityScore
-  score += Math.min(summary.outletCount, 4) * 14
-  score += coverageDiversityScore(summary.coverageCounts) * 6
-  score += freshnessBonus(summary.latestEventAt)
-  score += getNewsSectionKey(summary.topic) === 'more' ? -14 : 10
-
-  if (summary.storyOrigin === 'editorial_seed') {
-    score -= 8
-  }
-
-  if (summary.storyOrigin === 'automated_feed_ingestion') {
-    score += 10
-  }
-
-  if (summary.homepageEligible) {
-    score += 18
-  } else {
-    score -= 18
-  }
-
-  if (summary.status === 'Live intake' && summary.outletCount === 1) {
-    score -= 16
-  }
-
-  return score
-}
-
-function sortClusterSummaries(clusters: ClusterSummary[], mode: ClusterSortMode) {
-  const sorted = [...clusters]
-
-  if (mode === 'latest') {
-    return sorted.sort((left, right) => {
-      const recency = new Date(right.latestEventAt).getTime() - new Date(left.latestEventAt).getTime()
-      if (recency !== 0) return recency
-      return frontPagePriority(right) - frontPagePriority(left)
-    })
-  }
-
-  return sorted.sort((left, right) => {
-    const priority = frontPagePriority(right) - frontPagePriority(left)
-    if (priority !== 0) return priority
-    return new Date(right.latestEventAt).getTime() - new Date(left.latestEventAt).getTime()
-  })
 }
 
 function mapLensName(lens: string) {
