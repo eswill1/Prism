@@ -21,7 +21,10 @@ The system goal is maximum automation with narrow human-review points.
 - input: `source_registry`, `source_feeds`
 - output: `raw_discovered_urls`
 - failure rule: source marked degraded after 3 consecutive failures
-- current local-dev helper: `npm run dev:web:connected` keeps the full ingest pipeline running on a repeating local interval while the connected server is alive; tune with `PRISM_LOCAL_INGEST_INTERVAL_SECONDS` when needed
+- current local-dev helpers:
+  - `npm run dev:web:connected` keeps the full ingest pipeline running on a repeating local interval while the connected server is alive; tune with `PRISM_LOCAL_INGEST_INTERVAL_SECONDS` when needed
+  - `npm run ingest:local:scheduler` runs an always-on local scheduler with raw discovery every 6 hours, full pipeline refreshes every 12 hours, a 30 minute startup delay, and a 1 hour retry delay by default
+  - `npm run ingest:local:launchd:install` installs the same scheduler as a macOS LaunchAgent for background local refreshes
 
 #### `poll_news_sitemaps`
 
@@ -87,6 +90,7 @@ The system goal is maximum automation with narrow human-review points.
 - audit rule: Perspective must describe presence and structure, not imply truth, ranking, or verdicts
 - failure rule: keep the previous current Perspective revision in place; do not blank out the Perspective rail
 - current state: `npm run ingest:feeds` now runs Perspective generation after brief generation, and `npm run perspective:generate` can be run directly for Perspective-only refreshes
+- local safety rule: all local scheduler and operator paths now share the same ingest lock, so raw/full runs cannot overlap and trample each other on one laptop
 
 #### `evaluate_perspective_readiness`
 

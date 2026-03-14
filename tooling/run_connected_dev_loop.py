@@ -12,11 +12,20 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INTERVAL_SECONDS = int(os.getenv("PRISM_LOCAL_INGEST_INTERVAL_SECONDS", "900"))
-DEFAULT_STARTUP_DELAY_SECONDS = int(os.getenv("PRISM_LOCAL_INGEST_STARTUP_DELAY_SECONDS", "20"))
+DEFAULT_INTERVAL_SECONDS = int(os.getenv("PRISM_LOCAL_INGEST_INTERVAL_SECONDS", "43200"))
+DEFAULT_STARTUP_DELAY_SECONDS = int(os.getenv("PRISM_LOCAL_INGEST_STARTUP_DELAY_SECONDS", "1800"))
 
 SERVER_COMMAND = ["npm", "run", "dev:web:connected:web-only"]
-INGEST_COMMAND = ["npm", "run", "ingest:feeds"]
+INGEST_COMMAND = [
+    sys.executable,
+    str(ROOT / "tooling" / "run_local_ingest_job.py"),
+    "--mode",
+    "full",
+    "--if-busy",
+    "skip",
+    "--trigger",
+    "connected_dev_loop",
+]
 
 
 def log(message: str) -> None:

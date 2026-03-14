@@ -383,7 +383,7 @@ Before standing up a real backend, prove that Prism can feel alive on cheap infr
 Build:
 
 - Vercel-hosted preview deployment
-- GitHub Actions live feed refresh
+- local macOS launchd-backed ingest scheduler before hosted worker migration
 - Supabase-backed schema draft
 - Doppler-managed staging secrets
 
@@ -481,7 +481,7 @@ Local defaults should match the first hosted path:
 - `Vercel` for preview hosting
 - `Supabase` for early Postgres
 - `Upstash` for cache or queue primitives
-- `GitHub Actions` for scheduled refresh jobs
+- local always-on scheduler now, hosted worker or scheduler later
 
 Official local posture:
 

@@ -717,6 +717,18 @@ def fetch_current_revisions(client: SupabaseRestClient) -> dict[str, dict[str, A
     return {row["cluster_id"]: row for row in rows if row.get("cluster_id")}
 
 
+def fetch_revision_by_signature(
+    client: SupabaseRestClient,
+    cluster_id: str,
+    input_signature: str,
+) -> dict[str, Any] | None:
+    rows = client.get(
+        f"/story_perspective_revisions?select=id,cluster_id,revision_tag,input_signature,status,metadata,is_current"
+        f"&cluster_id=eq.{cluster_id}&input_signature=eq.{input_signature}&limit=1"
+    ) or []
+    return rows[0] if rows else None
+
+
 def patch_revision_current_state(client: SupabaseRestClient, revision_id: str, *, is_current: bool) -> None:
     client.patch(
         f"/story_perspective_revisions?id=eq.{revision_id}",
@@ -731,28 +743,43 @@ def insert_perspective_revision_draft(
     revision_tag: str,
     payload: dict[str, Any],
 ) -> str:
-    rows = client.post(
-        "/story_perspective_revisions?select=id",
-        [
-            {
-                "cluster_id": cluster_id,
-                "revision_tag": revision_tag,
-                "status": payload["status"],
-                "is_current": False,
-                "generation_method": GENERATION_METHOD,
-                "input_signature": payload["input_signature"],
-                "source_snapshot": payload["source_snapshot"],
-                "summary": payload["summary"],
-                "takeaways": payload["takeaways"],
-                "framing_presence": payload["framing_presence"],
-                "source_family_presence": payload["source_family_presence"],
-                "scope_presence": payload["scope_presence"],
-                "methodology_note": payload["methodology_note"],
-                "metadata": payload["metadata"],
-            }
-        ],
-        prefer="return=representation",
-    ) or []
+    existing_revision_id = current_revision_row_id(
+        fetch_revision_by_signature(client, cluster_id, payload["input_signature"])
+    )
+    if existing_revision_id:
+        return existing_revision_id
+
+    try:
+        rows = client.post(
+            "/story_perspective_revisions?select=id",
+            [
+                {
+                    "cluster_id": cluster_id,
+                    "revision_tag": revision_tag,
+                    "status": payload["status"],
+                    "is_current": False,
+                    "generation_method": GENERATION_METHOD,
+                    "input_signature": payload["input_signature"],
+                    "source_snapshot": payload["source_snapshot"],
+                    "summary": payload["summary"],
+                    "takeaways": payload["takeaways"],
+                    "framing_presence": payload["framing_presence"],
+                    "source_family_presence": payload["source_family_presence"],
+                    "scope_presence": payload["scope_presence"],
+                    "methodology_note": payload["methodology_note"],
+                    "metadata": payload["metadata"],
+                }
+            ],
+            prefer="return=representation",
+        ) or []
+    except RuntimeError as exc:
+        if "409" in str(exc) and "cluster_id, input_signature" in str(exc):
+            existing_revision_id = current_revision_row_id(
+                fetch_revision_by_signature(client, cluster_id, payload["input_signature"])
+            )
+            if existing_revision_id:
+                return existing_revision_id
+        raise
     revision_id = rows[0].get("id") if rows else None
     if not isinstance(revision_id, str) or not revision_id:
         raise RuntimeError(f"Perspective draft insert for cluster {cluster_id} did not return a revision id")
@@ -777,6 +804,13 @@ def promote_revision_current_state(
                     f"Failed to promote perspective revision {new_revision_id} and failed to restore previous current revision {current_revision_id}: {restore_exc}"
                 ) from exc
         raise
+
+
+def current_revision_row_id(current_revision: dict[str, Any] | None) -> str | None:
+    if not isinstance(current_revision, dict):
+        return None
+    revision_id = current_revision.get("id")
+    return revision_id if isinstance(revision_id, str) else None
 
 
 def patch_cluster_metadata(client: SupabaseRestClient, cluster: dict[str, Any], revision_tag: str, payload: dict[str, Any]) -> None:
@@ -890,7 +924,7 @@ def main() -> int:
         sync_context_pack_items(client, cluster["id"], context_packs)
         promote_revision_current_state(
             client,
-            current.get("id") if isinstance(current.get("id"), str) else None,
+            current_revision_row_id(current),
             inserted_revision_id,
         )
         patch_cluster_metadata(client, cluster, revision_tag, payload)
