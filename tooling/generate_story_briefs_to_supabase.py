@@ -261,6 +261,10 @@ REPORTER_TRAVEL_PATTERN = re.compile(
     r"^(?:they|he|she)\s+travel(?:s)?\s+with\s+the\s+u\.s\.\s+secretary\s+of\s+state\b",
     re.IGNORECASE,
 )
+REPORTER_SIGNOFF_PATTERN = re.compile(
+    r"^[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,2}\s+reports\.?$",
+    re.IGNORECASE,
+)
 CONTEXT_HEADLINE_PATTERN = re.compile(
     r"\b(?:analysis|column|explainer|fact check|five things|how to|jokes?\b|live updates?|liveblog|minute-by-minute|mock(?:s|ed)?|opinion|photos|podcast|q&a|questions answered|slams?\b|swipes?\s+at|takeaways?|timeline|video|what to know|what we know|why it matters)\b",
     re.IGNORECASE,
@@ -271,6 +275,10 @@ CONTEXT_URL_PATTERN = re.compile(
 )
 COMMENTARY_SOURCE_PATTERN = re.compile(
     r"\b(?:blog|comedian|commentary|former\s+[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,4}\s+(?:aide|director|official)|host|panelists?|pundit|ret\.\)|swipes?\s+at)\b",
+    re.IGNORECASE,
+)
+BRIEF_SCOPE_NOTE_PATTERN = re.compile(
+    r"^Prism (?:could not retrieve|currently sees|found an open alternate read from|has also linked|has linked|is grounding|is holding back|is still treating|is still working with|only has|still needs)\b",
     re.IGNORECASE,
 )
 FOCUS_CONNECTOR_PATTERN = re.compile(
@@ -556,16 +564,48 @@ def source_is_contextual(source: dict[str, Any]) -> bool:
     return int(source.get("context_score") or 0) >= 2
 
 
-def source_is_core_story_source(source: dict[str, Any]) -> bool:
+def source_has_distinct_narrative_text(source: dict[str, Any]) -> bool:
+    headline = str(source.get("headline") or "")
+    for field_name in ("detail", "followup", "snippet"):
+        candidate = ensure_period(str(source.get(field_name) or "").strip())
+        if not candidate:
+            continue
+        if sentence_looks_non_narrative(candidate) or text_looks_clipped(candidate):
+            continue
+        if not text_looks_title_like(headline, candidate):
+            return True
+    return False
+
+
+def source_is_title_only_stub(source: dict[str, Any]) -> bool:
+    if source_has_distinct_narrative_text(source):
+        return False
+    if source.get("title_like_snippet"):
+        return True
+    return bool(
+        source_is_contextual(source)
+        and source.get("extraction_quality") != "article_body"
+        and not str(source.get("detail") or "").strip()
+        and not str(source.get("followup") or "").strip()
+    )
+
+
+def source_is_comparison_ready(source: dict[str, Any]) -> bool:
     if not source_is_story_aligned(source):
         return False
     if not source_is_shell_aligned(source):
         return False
     if source_is_contextual(source):
         return False
-    if source.get("title_like_snippet") and source.get("extraction_quality") != "article_body":
+    if source.get("fetch_blocked"):
+        return False
+    if source_is_title_only_stub(source):
         return False
     return True
+
+
+def source_is_core_story_source(source: dict[str, Any]) -> bool:
+    return source_is_comparison_ready(source)
 
 
 def source_priority_score(source: dict[str, Any]) -> float:
@@ -575,11 +615,13 @@ def source_priority_score(source: dict[str, Any]) -> float:
         + float(source.get("detail_alignment") or 0.0) * 1.4
         + float(source.get("followup_alignment") or 0.0)
         + (0.4 if source_is_core_story_source(source) else 0.0)
+        + (0.18 if source_has_distinct_narrative_text(source) else 0.0)
         + (0.18 if source_is_shell_aligned(source) else -0.28)
         + (0.24 if source.get("extraction_quality") == "article_body" else 0.0)
         + (0.06 if source.get("access_tier") == "open" else 0.0)
         - (0.34 * int(source.get("context_score") or 0))
         - (0.16 if source.get("fetch_blocked") else 0.0)
+        - (0.48 if source_is_title_only_stub(source) else 0.0)
         - (0.12 if source.get("title_like_snippet") else 0.0)
         - (0.01 * int(source.get("rank_in_cluster") or 999))
     )
@@ -628,6 +670,8 @@ def sentence_looks_non_narrative(text: str) -> bool:
     if REPORTER_BIO_PATTERN.search(cleaned):
         return True
     if REPORTER_TRAVEL_PATTERN.search(cleaned):
+        return True
+    if REPORTER_SIGNOFF_PATTERN.search(cleaned):
         return True
     if CAPTION_START_PATTERN.match(cleaned):
         if DATE_OR_DAY_PATTERN.search(cleaned):
@@ -721,11 +765,22 @@ def split_narrative_sentences(text: str) -> list[str]:
 
 
 def filtered_narrative_sentences(text: str) -> list[str]:
-    return [
+    filtered = [
         sentence
         for sentence in split_narrative_sentences(text)
         if sentence and not sentence_looks_non_narrative(sentence) and not text_looks_clipped(sentence)
     ]
+    deduped: list[str] = []
+    for sentence in filtered:
+        if any(
+            sentence_similarity(sentence, existing) >= 0.72
+            or narrative_token_overlap(sentence, existing) >= 0.66
+            or normalize_whitespace(sentence).lower() == normalize_whitespace(existing).lower()
+            for existing in deduped
+        ):
+            continue
+        deduped.append(sentence)
+    return deduped
 
 
 def has_body_mismatch(article: dict[str, Any]) -> bool:
@@ -874,6 +929,80 @@ def short_body_followup_sentences(
     return " ".join(selected).strip()
 
 
+def sentence_has_detail_signal(sentence: str) -> bool:
+    cleaned = normalize_whitespace(sentence)
+    if len(cleaned) < 45:
+        return False
+    if re.search(r"\b\d[\d,]*(?:\.\d+)?\b", cleaned):
+        return True
+    if re.search(r"\b(?:Pentagon|White House|Congress|Senate|House|Navy|Marines|military|officials|analysts|police|court|judge|prosecutors?)\b", cleaned):
+        return True
+    if REPORTING_VERB_PATTERN.search(cleaned):
+        return True
+    return bool(re.search(r"\b[A-Z]{2,}\b", cleaned))
+
+
+def sentence_starts_with_new_proper_noun(reference_text: str, sentence: str) -> bool:
+    match = re.match(
+        r"^(?:[A-Z][A-Za-z'’.-]+|Gov\.|Sen\.|Rep\.|President|Prime|Minister)(?:\s+(?:[A-Z][A-Za-z'’.-]+|Gov\.|Sen\.|Rep\.|President|Prime|Minister)){1,4}",
+        normalize_whitespace(sentence),
+    )
+    if not match:
+        return False
+
+    reference_lower = normalize_whitespace(reference_text).lower()
+    tokens = [
+        token.lower()
+        for token in re.findall(r"[A-Za-z'’.-]{3,}", match.group(0))
+        if token.lower() not in {"gov", "sen", "rep", "prime", "minister", "president"}
+    ]
+    return len(tokens) >= 2 and all(token not in reference_lower for token in tokens)
+
+
+def contiguous_body_detail_sentences(
+    article: dict[str, Any],
+    *,
+    skip_count: int,
+    sentence_count: int,
+) -> str:
+    body_text = str(article.get("body_text") or "").strip()
+    if not body_text:
+        return ""
+
+    sentences = filtered_narrative_sentences(body_text)
+    if len(sentences) <= skip_count:
+        return ""
+
+    reference_text = source_reference_text(article)
+    prior_sentences = sentences[:skip_count]
+    selected: list[str] = []
+    for sentence in sentences[skip_count:]:
+        if len(selected) >= sentence_count:
+            break
+        if len(sentence) < 35:
+            continue
+        if any(
+            sentence_similarity(sentence, existing) >= 0.72
+            or narrative_token_overlap(sentence, existing) >= 0.66
+            for existing in prior_sentences + selected
+        ):
+            continue
+        if reference_text.strip():
+            overlap = focused_overlap_count(reference_text, sentence)
+            alignment = focused_alignment_score(reference_text, sentence)
+            if overlap >= 2 and alignment >= 0.16:
+                selected.append(sentence)
+                continue
+            if overlap >= 1 and alignment >= 0.08 and sentence_has_detail_signal(sentence):
+                selected.append(sentence)
+                continue
+        if sentence_has_detail_signal(sentence):
+            selected.append(sentence)
+            continue
+
+    return " ".join(selected).strip()
+
+
 def detail_text_for_article(article: dict[str, Any]) -> str:
     metadata = article.get("metadata") or {}
     extraction_quality = metadata.get("extraction_quality") if isinstance(metadata, dict) else None
@@ -898,6 +1027,10 @@ def detail_text_for_article(article: dict[str, Any]) -> str:
         aligned = aligned_later_body_sentences(article, skip_count=2, sentence_count=2)
         if aligned:
             return ensure_period(aligned)
+
+        contiguous_detail = ensure_period(contiguous_body_detail_sentences(article, skip_count=2, sentence_count=2))
+        if contiguous_detail:
+            return contiguous_detail
 
         short_followup = ensure_period(short_body_followup_sentences(article, sentence_count=2))
         if short_followup:
@@ -945,6 +1078,56 @@ def followup_text_for_article(article: dict[str, Any]) -> str:
         if len(sentences) >= 3:
             return ensure_period(" ".join(sentences[2:4]))
     return ""
+
+
+def body_story_paragraph_candidates(
+    article: dict[str, Any],
+    *,
+    max_paragraphs: int = 4,
+    max_sentences_per_paragraph: int = 2,
+) -> list[str]:
+    metadata = article.get("metadata") or {}
+    extraction_quality = metadata.get("extraction_quality") if isinstance(metadata, dict) else None
+    body_text = str(article.get("body_text") or "").strip()
+    if not body_text or extraction_quality != "article_body" or has_body_mismatch(article):
+        return []
+
+    paragraphs: list[str] = []
+    current_sentences: list[str] = []
+    reference_text = source_reference_text(article)
+    for sentence in filtered_narrative_sentences(body_text):
+        if len(sentence) < 35:
+            continue
+        if (
+            reference_text
+            and focused_overlap_count(reference_text, sentence) == 0
+            and focused_alignment_score(reference_text, sentence) < 0.05
+            and sentence_starts_with_new_proper_noun(reference_text, sentence)
+        ):
+            continue
+        current_sentences.append(sentence)
+        if len(current_sentences) >= max_sentences_per_paragraph or len(" ".join(current_sentences)) >= 240:
+            paragraph = ensure_period(" ".join(current_sentences))
+            if paragraph and not any(
+                sentence_similarity(paragraph, existing) >= 0.72
+                or narrative_token_overlap(paragraph, existing) >= 0.66
+                for existing in paragraphs
+            ):
+                paragraphs.append(paragraph)
+            current_sentences = []
+        if len(paragraphs) >= max_paragraphs:
+            break
+
+    if current_sentences and len(paragraphs) < max_paragraphs:
+        paragraph = ensure_period(" ".join(current_sentences))
+        if paragraph and not any(
+            sentence_similarity(paragraph, existing) >= 0.72
+            or narrative_token_overlap(paragraph, existing) >= 0.66
+            for existing in paragraphs
+        ):
+            paragraphs.append(paragraph)
+
+    return paragraphs
 
 
 def first_narrative_sentences(text: str, sentence_count: int) -> str:
@@ -1178,6 +1361,7 @@ def cluster_source_rows(cluster: dict[str, Any], *, substantive_only: bool) -> l
                 "focus": article_focus(article, family),
                 "detail": detail,
                 "followup": followup,
+                "body_paragraphs": body_story_paragraph_candidates(article),
                 "extraction_quality": metadata.get("extraction_quality") if isinstance(metadata, dict) else None,
                 "story_alignment": story_alignment,
                 "headline_alignment": headline_alignment,
@@ -1277,12 +1461,22 @@ def ranked_story_sources(sources: list[dict[str, Any]], *, core_only: bool = Fal
 
 def best_story_aligned_source(sources: list[dict[str, Any]]) -> dict[str, Any] | None:
     ranked = ranked_story_sources(sources)
-    return ranked[0] if ranked else None
+    preferred = [source for source in ranked if source_is_story_aligned(source) and not source_is_title_only_stub(source)]
+    if preferred:
+        return preferred[0]
+    aligned = [source for source in ranked if source_is_story_aligned(source)]
+    return aligned[0] if aligned else (ranked[0] if ranked else None)
 
 
 def best_shell_aligned_source(sources: list[dict[str, Any]]) -> dict[str, Any] | None:
     shell_aligned = [source for source in ranked_story_sources(sources) if source_is_shell_aligned(source)]
-    return shell_aligned[0] if shell_aligned else None
+    preferred = [source for source in shell_aligned if not source_is_title_only_stub(source)]
+    return preferred[0] if preferred else (shell_aligned[0] if shell_aligned else None)
+
+
+def best_comparison_ready_source(sources: list[dict[str, Any]]) -> dict[str, Any] | None:
+    candidates = [source for source in ranked_story_sources(sources) if source_is_comparison_ready(source)]
+    return candidates[0] if candidates else None
 
 
 def source_distinct_candidate_text(source: dict[str, Any], existing: list[str]) -> str:
@@ -1371,6 +1565,11 @@ def cluster_brief_source_metrics(cluster: dict[str, Any]) -> dict[str, Any]:
         row["outlet"] for row in rows if source_is_shell_aligned(row) and row.get("extraction_quality") == "article_body"
     }
     core_story_outlets = {row["outlet"] for row in rows if source_is_core_story_source(row)}
+    comparison_ready_outlets = {row["outlet"] for row in rows if source_is_comparison_ready(row)}
+    title_only_shell_outlets = {
+        row["outlet"] for row in rows if source_is_shell_aligned(row) and source_is_title_only_stub(row)
+    }
+    contextual_outlets = {row["outlet"] for row in rows if source_is_contextual(row)}
     open_outlets = {row["outlet"] for row in rows if row.get("access_tier") == "open"}
     paywalled_outlets = {row["outlet"] for row in rows if row.get("access_tier") == "likely_paywalled"}
     lead_source, divergence_source = substantive_alignment_pair(cluster, rows)
@@ -1383,11 +1582,14 @@ def cluster_brief_source_metrics(cluster: dict[str, Any]) -> dict[str, Any]:
         "shell_aligned_outlet_count": len(shell_aligned_outlets),
         "shell_aligned_article_body_outlet_count": len(shell_aligned_article_body_outlets),
         "core_story_outlet_count": len(core_story_outlets),
+        "comparison_ready_outlet_count": len(comparison_ready_outlets),
+        "title_only_shell_outlet_count": len(title_only_shell_outlets),
+        "contextual_outlet_count": len(contextual_outlets),
         "open_outlet_count": len(open_outlets),
         "likely_paywalled_outlet_count": len(paywalled_outlets),
         "full_brief_ready": bool(
             len(substantive_outlets) >= 2
-            and len(shell_aligned_outlets) >= 2
+            and len(comparison_ready_outlets) >= 2
             and len(shell_aligned_article_body_outlets) >= 1
             and len(core_story_outlets) >= 2
             and lead_source
@@ -1420,14 +1622,15 @@ def cluster_open_alternate_source(
     exclude_article_ids: set[str] | None = None,
 ) -> dict[str, Any] | None:
     exclude_article_ids = exclude_article_ids or set()
-    candidates = ranked_story_sources(
-        [
-            source
-            for source in cluster_substantive_source_rows(cluster)
-            if source_is_story_aligned(source) and source_is_shell_aligned(source)
-        ]
-    )
-    for source in candidates:
+    candidates = ranked_story_sources(cluster_substantive_source_rows(cluster))
+    preferred = [source for source in candidates if source_is_comparison_ready(source)]
+    fallback = [
+        source
+        for source in candidates
+        if source_is_story_aligned(source) and source_is_shell_aligned(source) and not source_is_title_only_stub(source)
+    ]
+    ordered_candidates = preferred or fallback
+    for source in ordered_candidates:
         if source.get("access_tier") != "open":
             continue
         article_id = source.get("article_id")
@@ -1472,6 +1675,8 @@ def open_alternate_source(sources: list[dict[str, Any]], exclude_outlet: str | N
         if source.get("access_tier") != "open":
             continue
         if exclude_outlet and source.get("outlet") == exclude_outlet:
+            continue
+        if source_is_title_only_stub(source):
             continue
         return source
     return None
@@ -1518,7 +1723,8 @@ def narrative_token_overlap(left: str, right: str) -> float:
 
 def source_support_excerpt(source: dict[str, Any]) -> str:
     segments: list[str] = []
-    for value in (source.get("snippet"), source.get("detail"), source.get("followup")):
+    values = [*(source.get("body_paragraphs") or []), source.get("snippet"), source.get("detail"), source.get("followup")]
+    for value in values:
         for sentence in split_narrative_sentences(str(value or "").strip()):
             cleaned = ensure_period(sentence)
             if not cleaned or sentence_looks_non_narrative(cleaned):
@@ -1605,10 +1811,14 @@ def early_brief_opening(cluster: dict[str, Any], central: dict[str, Any] | None)
     snippet = ensure_period(first_narrative_sentences(str(central.get("snippet") or "").strip(), 1))
     summary_score = alignment_score(str(cluster.get("canonical_headline") or ""), summary)
     snippet_score = alignment_score(str(cluster.get("canonical_headline") or ""), snippet)
+    summary_is_title_like_shell = text_looks_title_like(str(cluster.get("canonical_headline") or ""), summary) or bool(
+        CONTEXT_HEADLINE_PATTERN.search(summary)
+    )
     if snippet and (
         not summary
         or sentence_looks_non_narrative(summary)
         or text_looks_clipped(summary)
+        or (source_is_comparison_ready(central) and summary_is_title_like_shell)
         or (has_spaced_abbreviation(summary) and not has_spaced_abbreviation(snippet))
         or snippet_score >= summary_score + 0.08
         or (
@@ -1626,6 +1836,7 @@ def early_brief_opening(cluster: dict[str, Any], central: dict[str, Any] | None)
     summary_anchor = re.sub(r"[.!?]+$", "", normalized_summary)
     if (
         snippet
+        and not (source_is_comparison_ready(central) and summary_is_title_like_shell)
         and not normalized_snippet.startswith(summary_anchor)
         and normalized_snippet not in normalized_summary
         and normalized_summary not in normalized_snippet
@@ -1759,6 +1970,109 @@ def first_distinct_paragraph(candidates: list[str], existing: list[str]) -> str:
     return ""
 
 
+def source_story_followon_paragraphs(
+    source: dict[str, Any] | None,
+    *,
+    opening: str,
+    limit: int,
+) -> list[str]:
+    if not source:
+        return []
+
+    existing = [opening]
+    paragraphs: list[str] = []
+    candidate_pool: list[str] = []
+
+    snippet_extension = ensure_period(snippet_extension_after_opening(opening, str(source.get("snippet") or "")))
+    candidate_pool.extend(str(value or "") for value in source.get("body_paragraphs") or [])
+    if snippet_extension:
+        candidate_pool.append(snippet_extension)
+    candidate_pool.extend(
+        [
+            str(source.get("detail") or ""),
+            str(source.get("followup") or ""),
+        ]
+    )
+
+    for raw_candidate in candidate_pool:
+        candidate = ensure_period(remove_overlapping_sentences(str(raw_candidate or ""), existing))
+        paragraph = first_distinct_paragraph([candidate], existing)
+        if not paragraph:
+            continue
+        paragraphs.append(paragraph)
+        existing.append(paragraph)
+        if len(paragraphs) >= limit:
+            break
+
+    return paragraphs
+
+
+def paragraph_materially_distinct(text: str, anchors: list[str]) -> bool:
+    cleaned = ensure_period(text)
+    if not cleaned:
+        return False
+    for anchor in anchors:
+        normalized_anchor = normalize_whitespace(anchor)
+        if not normalized_anchor:
+            continue
+        if (
+            sentence_similarity(cleaned, normalized_anchor) >= 0.72
+            or narrative_token_overlap(cleaned, normalized_anchor) >= 0.66
+            or normalize_whitespace(cleaned).lower() in normalize_whitespace(normalized_anchor).lower()
+            or normalize_whitespace(normalized_anchor).lower() in normalize_whitespace(cleaned).lower()
+        ):
+            return False
+    return True
+
+
+def paragraph_entry_adds_reader_value(
+    cluster: dict[str, Any],
+    entry: dict[str, Any],
+    *,
+    opening: str,
+) -> bool:
+    text = str(entry.get("text") or "")
+    if entry.get("grounding_mode") != "required":
+        return False
+    if entry.get("role") in {"opening", "scope_note", "blocked_notice"}:
+        return False
+    if BRIEF_SCOPE_NOTE_PATTERN.search(text):
+        return False
+    if sentence_looks_non_narrative(text) or text_looks_clipped(text):
+        return False
+    anchors = [
+        opening,
+        str(cluster.get("summary") or ""),
+        str(cluster.get("canonical_headline") or ""),
+        str(cluster.get("dek") or ""),
+    ]
+    return paragraph_materially_distinct(text, anchors)
+
+
+def brief_display_state(
+    cluster: dict[str, Any],
+    paragraph_entries: list[dict[str, Any]],
+    *,
+    full_brief: bool,
+) -> tuple[bool, str | None]:
+    if not paragraph_entries:
+        return False, "no_paragraphs"
+
+    opening = str(paragraph_entries[0].get("text") or "")
+    value_entries = [
+        entry
+        for entry in paragraph_entries[1:]
+        if paragraph_entry_adds_reader_value(cluster, entry, opening=opening)
+    ]
+    if full_brief:
+        if len(value_entries) >= 1:
+            return True, None
+        return False, "no_distinct_grounded_followup"
+    if value_entries:
+        return True, None
+    return False, "no_distinct_grounded_followup"
+
+
 def early_scope_note_text(
     *,
     anchor_source: dict[str, Any] | None,
@@ -1874,13 +2188,16 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
     ranked_core_sources = ranked_story_sources(all_sources, core_only=True)
     central = ranked_core_sources[0] if ranked_core_sources else (ranked_sources[0] if ranked_sources else None)
     divergent = divergent_source(all_sources, central, family) if central else None
+    comparison_anchor = best_comparison_ready_source(ranked_sources) or best_comparison_ready_source(review_sources)
     anchor_source = central or best_shell_aligned_source(review_sources) or best_story_aligned_source(review_sources)
-    review_anchor = best_shell_aligned_source(review_sources) or best_story_aligned_source(review_sources)
+    review_anchor = comparison_anchor or best_shell_aligned_source(review_sources) or best_story_aligned_source(review_sources)
     if review_anchor and (
         not anchor_source
         or float(review_anchor.get("priority_score") or 0.0) >= float(anchor_source.get("priority_score") or 0.0) + 0.2
     ):
         anchor_source = review_anchor
+    if comparison_anchor and (not anchor_source or source_is_title_only_stub(anchor_source)):
+        anchor_source = comparison_anchor
     outlet_count = len({source["outlet"] for source in ranked_sources})
     full_brief = bool(source_metrics["full_brief_ready"] and central and divergent and outlet_count >= 2)
     blocked_article = blocked_cluster_article(cluster)
@@ -2030,29 +2347,34 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
                 role="difference",
             )
     else:
-        opening_sources = [anchor_source] if anchor_source else (ranked_sources[:2] or [])
-        opening = early_brief_opening(cluster, anchor_source)
+        brief_anchor = comparison_anchor or anchor_source
+        opening_sources = [brief_anchor] if brief_anchor else (ranked_sources[:2] or [])
+        opening = early_brief_opening(cluster, brief_anchor)
         add_paragraph(
             opening,
             *opening_sources,
             role="opening",
             grounding_mode="required" if opening_sources else "scaffold",
         )
-        detail_followup = early_brief_detail_followup(cluster, anchor_source, opening)
-        if detail_followup:
-            detail_sources = support_payload(anchor_source) if anchor_source else []
+        detail_followups = source_story_followon_paragraphs(
+            brief_anchor,
+            opening=opening,
+            limit=3,
+        )
+        for index, detail_followup in enumerate(detail_followups):
+            detail_sources = support_payload(brief_anchor) if brief_anchor else []
             add_paragraph(
                 detail_followup,
                 *detail_sources,
-                role="detail",
+                role="detail" if index == 0 else "body",
                 grounding_mode="required" if detail_sources else "scaffold",
             )
-        elif (
+        if (
             open_alternate
-            and anchor_source
+            and brief_anchor
             and (
-                anchor_source.get("title_like_snippet")
-                or anchor_source.get("extraction_quality") != "article_body"
+                brief_anchor.get("title_like_snippet")
+                or brief_anchor.get("extraction_quality") != "article_body"
             )
             and not source_is_contextual(open_alternate)
         ):
@@ -2072,74 +2394,12 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
                     grounding_mode="required",
                 )
 
-        grounded_followup_candidates = [
-            {
-                "text": str((anchor_source or {}).get("followup") or ""),
-                "role": "followup",
-                "grounding_mode": "required" if anchor_source else "scaffold",
-                "sources": [anchor_source] if anchor_source else [],
-            },
-            {
-                "text": visible_facts[0] if visible_facts else "",
-                "role": "fact",
-                "grounding_mode": "required" if anchor_source else "scaffold",
-                "sources": [anchor_source] if anchor_source else [],
-            },
-            {
-                "text": (
-                    f"Prism could not retrieve the full article text from {anchor_source['outlet']} because the site served an automated access challenge to the enrichment worker. "
-                    "This early brief is limited to feed-level material until Prism can verify the full body text or another independent report arrives."
-                )
-                if anchor_source and anchor_source.get("fetch_blocked")
-                else "",
-                "role": "blocked_notice",
-                "grounding_mode": "scaffold",
-                "sources": [anchor_source] if anchor_source else [],
-            },
-            {
-                "text": (
-                    f"Prism could not retrieve the full article text from {blocked_article['outlet']} because the site served an automated access challenge to the enrichment worker. "
-                    "This early brief is limited to feed-level material until Prism can verify the full body text or another independent report arrives."
-                )
-                if not central and blocked_article
-                else "",
-                "role": "blocked_notice",
-                "grounding_mode": "scaffold",
-                "sources": [],
-            },
-        ]
-        grounded_followup = next(
-            (
-                candidate
-                for candidate in grounded_followup_candidates
-                if first_distinct_paragraph(
-                    [candidate["text"]],
-                    [opening, detail_followup],
-                )
-            ),
-            None,
-        )
-        if grounded_followup:
-            add_paragraph(
-                str(grounded_followup["text"]),
-                *grounded_followup["sources"],
-                role=str(grounded_followup["role"]),
-                grounding_mode=str(grounded_followup["grounding_mode"]),
-            )
-        scope_note_text, scope_note_support = early_scope_note_text(
-            anchor_source=anchor_source,
-            blocked_article=blocked_article,
-            open_alternate=open_alternate,
-            source_metrics=source_metrics,
-        )
-        add_paragraph(
-            scope_note_text,
-            *scope_note_support,
-            role="scope_note",
-            grounding_mode="scaffold",
-        )
-
     filtered_paragraphs = [entry["text"] for entry in paragraph_entries]
+    display_visible, display_hide_reason = brief_display_state(
+        cluster,
+        paragraph_entries,
+        full_brief=full_brief,
+    )
     paragraph_support = [
         {
             "index": index,
@@ -2159,11 +2419,11 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
     )
     watch_text, watch_mode = watch_next_copy(cluster, family, full_brief=full_brief)
     why_support = support_payload(*(secondary_sources[:2] or ([central] if central else []))) if why_mode == "required" else []
-    agree_anchor = anchor_source or central
+    agree_anchor = comparison_anchor or anchor_source or central
     agree_support = (
         support_payload(central, secondary_sources[0])
-        if central and secondary_sources
-        else support_payload(*(ranked_sources[:2] or ([agree_anchor] if agree_anchor else [])))
+        if full_brief and central and secondary_sources
+        else support_payload(agree_anchor) if agree_anchor and not source_is_title_only_stub(agree_anchor) else []
     )
     agree_mode = "required" if agree_support else "scaffold"
     differs_support = (
@@ -2184,13 +2444,22 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
         else difference_focus
     )
 
-    where_sources_agree = (
-        (
-                f"Across {outlet_text(cluster)}, the shared baseline is clear: {(central or {}).get('snippet') or full_brief_opening(cluster, central)}"
-                if full_brief
-                else f"The best-supported baseline right now comes from {(agree_anchor or {}).get('outlet') or 'the first linked report'}: {(agree_anchor or {}).get('snippet') or ensure_period(cluster['summary'])}"
+    if full_brief:
+        where_sources_agree = (
+            f"Across {outlet_text(cluster)}, the shared baseline is clear: {(central or {}).get('snippet') or full_brief_opening(cluster, central)}"
         )
-    )
+    elif agree_anchor and not source_is_title_only_stub(agree_anchor) and (comparison_anchor or not source_is_contextual(agree_anchor)):
+        where_sources_agree = (
+            f"The best-supported baseline right now comes from {(agree_anchor or {}).get('outlet') or 'the first linked report'}: "
+            f"{(agree_anchor or {}).get('snippet') or ensure_period(cluster['summary'])}"
+        )
+    else:
+        where_sources_agree = (
+            "Prism is holding back from calling a shared baseline because the lead shell-aligned source is still just a live-update style headline or other thin stub. "
+            "It needs a fuller event-aligned report before an outlet-to-outlet comparison is useful."
+        )
+        agree_mode = "scaffold"
+        agree_support = []
     where_coverage_differs = (
         (
             f"The split so far is mostly about the next angle, not the underlying event. {divergent['outlet']} pushes further into {difference_reference}, while {(central or {}).get('outlet') or 'the lead outlet'} stays tighter on the immediate sequence."
@@ -2212,7 +2481,8 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
     snapshot_candidates = [
         source
         for source in (ranked_sources if all_sources else review_sources[:3])
-        if source_is_core_story_source(source)
+        if source_is_comparison_ready(source)
+        or source_is_core_story_source(source)
         or source_is_shell_aligned(source)
         or source.get("article_id") == (anchor_source or {}).get("article_id")
     ]
@@ -2234,6 +2504,11 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
             "access_tier": source.get("access_tier"),
             "focus": source["focus"],
             "used_snippet": source_support_excerpt(source) or source["snippet"],
+            "context_score": int(source.get("context_score") or 0),
+            "story_aligned": source_is_story_aligned(source),
+            "shell_aligned": source_is_shell_aligned(source),
+            "comparison_ready": source_is_comparison_ready(source),
+            "title_only_stub": source_is_title_only_stub(source),
         }
         for source in snapshot_sources
     ]
@@ -2254,12 +2529,17 @@ def build_grounded_brief(cluster: dict[str, Any]) -> dict[str, Any]:
             "paragraph_count": len(filtered_paragraphs),
             "family": family,
             "full_brief_ready": full_brief,
+            "display_visible": display_visible,
+            "display_hide_reason": display_hide_reason,
             "aligned_source_count": source_metrics["aligned_outlet_count"],
             "aligned_article_body_source_count": source_metrics["aligned_article_body_outlet_count"],
+            "comparison_ready_source_count": source_metrics["comparison_ready_outlet_count"],
+            "title_only_shell_source_count": source_metrics["title_only_shell_outlet_count"],
+            "contextual_source_count": source_metrics["contextual_outlet_count"],
             "open_source_count": source_metrics["open_outlet_count"],
             "likely_paywalled_source_count": source_metrics["likely_paywalled_outlet_count"],
             "open_alternate_available": bool(open_alternate_available),
-            "support_strategy_version": "grounded_sections_v3",
+            "support_strategy_version": "grounded_sections_v4",
             "section_grounding_mode": {
                 "why_it_matters": why_mode,
                 "where_sources_agree": agree_mode,

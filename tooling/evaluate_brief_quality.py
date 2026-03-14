@@ -338,6 +338,9 @@ def current_source_metrics(cluster: dict[str, Any], article_rows: list[dict[str,
         "substantive_source_count": source_metrics["substantive_source_count"],
         "substantive_outlet_count": source_metrics["substantive_outlet_count"],
         "article_body_outlet_count": source_metrics["article_body_outlet_count"],
+        "comparison_ready_outlet_count": source_metrics.get("comparison_ready_outlet_count", 0),
+        "title_only_shell_outlet_count": source_metrics.get("title_only_shell_outlet_count", 0),
+        "contextual_outlet_count": source_metrics.get("contextual_outlet_count", 0),
         "open_outlet_count": len(open_outlets),
         "likely_paywalled_outlet_count": len(paywalled_outlets),
         "blocked_outlet_count": len(blocked_outlets),
@@ -358,6 +361,15 @@ def snapshot_metrics(brief: dict[str, Any]) -> dict[str, Any]:
         "snapshot_source_count": len(snapshot),
         "snapshot_outlet_count": len(outlets),
         "snapshot_article_body_outlet_count": len(article_body_outlets),
+        "snapshot_comparison_ready_source_count": len(
+            [row for row in snapshot if isinstance(row, dict) and row.get("comparison_ready") is True]
+        ),
+        "snapshot_title_only_source_count": len(
+            [row for row in snapshot if isinstance(row, dict) and row.get("title_only_stub") is True]
+        ),
+        "snapshot_contextual_source_count": len(
+            [row for row in snapshot if isinstance(row, dict) and int(row.get("context_score") or 0) >= 2]
+        ),
     }
 
 
@@ -388,6 +400,9 @@ def evaluate_story_quality(cluster: dict[str, Any], brief: dict[str, Any] | None
             "snapshot_source_count": 0,
             "snapshot_outlet_count": 0,
             "snapshot_article_body_outlet_count": 0,
+            "snapshot_comparison_ready_source_count": 0,
+            "snapshot_title_only_source_count": 0,
+            "snapshot_contextual_source_count": 0,
         },
         "brief_status": None,
         "revision_tag": None,
@@ -410,6 +425,9 @@ def evaluate_story_quality(cluster: dict[str, Any], brief: dict[str, Any] | None
         return finalize_evaluation(evaluation)
 
     brief_metadata = brief.get("metadata") or {}
+    section_grounding_mode = brief_metadata.get("section_grounding_mode") if isinstance(brief_metadata, dict) else {}
+    if not isinstance(section_grounding_mode, dict):
+        section_grounding_mode = {}
     evaluation["brief_status"] = brief.get("status")
     evaluation["revision_tag"] = brief.get("revision_tag")
     evaluation["brief_preview"] = {
@@ -474,6 +492,39 @@ def evaluate_story_quality(cluster: dict[str, Any], brief: dict[str, Any] | None
                 "missing_open_alternate",
                 "warning",
                 "The current source mix suggests an open alternate should be recorded, but the stored brief metadata does not mark one.",
+            )
+        )
+
+    if (
+        section_grounding_mode.get("where_sources_agree") != "scaffold"
+        and current_metrics.get("comparison_ready_outlet_count", 0) == 0
+        and (
+            current_metrics.get("title_only_shell_outlet_count", 0) >= 1
+            or evaluation["metrics"].get("snapshot_title_only_source_count", 0) >= 1
+        )
+    ):
+        evaluation["flags"].append(
+            make_flag(
+                "title_only_shell_driving_brief",
+                "critical",
+                "The brief is still grounding substantive comparison copy on a title-like liveblog or other thin shell source.",
+                comparison_ready_outlet_count=current_metrics.get("comparison_ready_outlet_count", 0),
+                title_only_shell_outlet_count=current_metrics.get("title_only_shell_outlet_count", 0),
+                snapshot_title_only_source_count=evaluation["metrics"].get("snapshot_title_only_source_count", 0),
+            )
+        )
+    elif (
+        section_grounding_mode.get("where_sources_agree") != "scaffold"
+        and current_metrics.get("comparison_ready_outlet_count", 0) == 0
+        and current_metrics.get("contextual_outlet_count", 0) >= 1
+    ):
+        evaluation["flags"].append(
+            make_flag(
+                "contextual_source_driving_brief",
+                "warning",
+                "The brief is still grounding substantive comparison copy on contextual or explainer coverage instead of an event-aligned report.",
+                comparison_ready_outlet_count=current_metrics.get("comparison_ready_outlet_count", 0),
+                contextual_outlet_count=current_metrics.get("contextual_outlet_count", 0),
             )
         )
 

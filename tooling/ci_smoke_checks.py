@@ -160,7 +160,10 @@ def quality_snapshot(
     headline: str,
     snippet: str,
     focus: str,
-) -> dict[str, str]:
+    comparison_ready: bool = True,
+    title_only_stub: bool = False,
+    context_score: int = 0,
+) -> dict[str, Any]:
     return {
         "article_id": article_id,
         "outlet": outlet,
@@ -171,6 +174,9 @@ def quality_snapshot(
         "access_tier": "open",
         "focus": focus,
         "used_snippet": snippet,
+        "comparison_ready": comparison_ready,
+        "title_only_stub": title_only_stub,
+        "context_score": context_score,
     }
 
 
@@ -193,6 +199,7 @@ def run_web_regression_tests() -> None:
             [
                 str(TSX_BIN),
                 "--test",
+                "src/web/src/lib/cluster-api.test.ts",
                 "src/web/src/lib/perspective-versioning.test.ts",
                 "src/web/src/lib/cluster-ranking.test.ts",
                 "src/web/src/lib/reader-persistence.test.ts",
@@ -727,6 +734,81 @@ def main() -> int:
     if [item.source for item in augmentation_candidates] != ["Reuters"]:
         raise SystemExit(f"expected augmentation selector to choose matched open alternate only, got {augmentation_candidates}")
 
+    ft_live_stub = FeedItem(
+        source="Financial Times",
+        feed_url="https://example.com/ft-live",
+        title="Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+        url="https://example.com/ft-live-hormuz",
+        published_at="2026-03-14T14:08:00+00:00",
+        summary="Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+        feed_summary="Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+        lede="Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+        body_preview="",
+        named_entities=["Donald Trump", "China", "Japan", "Strait of Hormuz"],
+        extraction_quality="rss_only",
+        access_signal="likely_paywalled",
+        image=None,
+        tokens={"middleeast", "war", "live", "trump", "china", "japan", "straithormuz", "secure"},
+        event_tags={"iran_shipping_attacks"},
+    )
+    liveblog_augmentation_candidates = select_story_augmentation_candidates(
+        [ft_live_stub],
+        [reuters_alternate, ft_stockpile],
+        limit=2,
+    )
+    if [item.source for item in liveblog_augmentation_candidates] != ["Reuters"]:
+        raise SystemExit(
+            f"expected liveblog stub cluster to prefer event-style open alternate, got {liveblog_augmentation_candidates}"
+        )
+
+    liveblog_payload = build_cluster_payload(1, [ft_live_stub, reuters_alternate])
+    if liveblog_payload["title"] != reuters_alternate.title:
+        raise SystemExit(f"expected event report to win over liveblog stub for cluster shell, got {liveblog_payload}")
+
+    pbs_event_shell = FeedItem(
+        source="PBS NewsHour",
+        feed_url="https://example.com/pbs",
+        title="More Marines heading to Middle East as U.S. continues relentless strikes on Iran",
+        url="https://example.com/pbs-marines",
+        published_at="2026-03-14T14:12:00+00:00",
+        summary="Around 2,500 U.S. Marines are heading for the Middle East, along with a Navy amphibious warship.",
+        feed_summary="Around 2,500 U.S. Marines are heading for the Middle East, along with a Navy amphibious warship.",
+        lede="Around 2,500 U.S. Marines are heading for the Middle East, along with a Navy amphibious warship.",
+        body_preview=(
+            "Around 2,500 U.S. Marines are heading for the Middle East, along with a Navy amphibious warship. "
+            "Their mission is not yet clear, but it signals a marked increase in U.S. forces in the region."
+        ),
+        named_entities=["Middle East", "U.S. Marines", "Iran"],
+        extraction_quality="article_body",
+        access_signal="open",
+        image=None,
+        tokens={"marines", "middleeast", "strikes", "iran", "warship", "forces"},
+        event_tags={"iran_shipping_attacks"},
+    )
+    fox_commentary_shell = FeedItem(
+        source="Fox News",
+        feed_url="https://example.com/fox",
+        title="Iran holds world energy hostage with 'nightmare' Strait of Hormuz sea mines, former CENTCOM official warns",
+        url="https://example.com/fox-commentary",
+        published_at="2026-03-14T14:14:00+00:00",
+        summary="Former CENTCOM Communications Director Col. Joe Buccino (ret.) explains how Iran's sea mines threaten global oil flow.",
+        feed_summary="Former CENTCOM Communications Director Col. Joe Buccino (ret.) explains how Iran's sea mines threaten global oil flow.",
+        lede="Former CENTCOM Communications Director Col. Joe Buccino (ret.) explains how Iran's sea mines threaten global oil flow.",
+        body_preview=(
+            "Former CENTCOM Communications Director Col. Joe Buccino (ret.) explains how Iran's sea mines threaten global oil flow through the Strait of Hormuz. "
+            "Fox News focused on commentary from a former official rather than the event sequence itself."
+        ),
+        named_entities=["Iran", "Strait of Hormuz", "Joe Buccino"],
+        extraction_quality="article_body",
+        access_signal="open",
+        image=None,
+        tokens={"iran", "straithormuz", "energy", "hostage", "nightmare", "sea", "mines", "official"},
+        event_tags={"iran_shipping_attacks"},
+    )
+    shell_payload = build_cluster_payload(2, [pbs_event_shell, fox_commentary_shell])
+    if shell_payload["title"] != pbs_event_shell.title:
+        raise SystemExit(f"expected straight event report to beat commentary shell, got {shell_payload}")
+
     blocked_metadata = merge_article_metadata(
         {"metadata": {"feed_summary": "Fallback summary."}},
         {
@@ -813,6 +895,8 @@ def main() -> int:
         raise SystemExit(
             f"expected richer one-source early brief paragraphs, got {len(single_source_brief['paragraphs'])}: {single_source_brief['paragraphs']}"
         )
+    if any(paragraph.startswith("Prism ") for paragraph in single_source_brief["paragraphs"]):
+        raise SystemExit(f"expected one-source early brief body to stay narrative instead of showing Prism caveats, got {single_source_brief}")
 
     blocked_single_source_brief = build_grounded_brief(
         {
@@ -849,8 +933,10 @@ def main() -> int:
             ],
         }
     )
-    if not any("blocked automated full-text retrieval" in paragraph for paragraph in blocked_single_source_brief["paragraphs"]):
-        raise SystemExit(f"expected blocked-fetch brief to disclose retrieval failure, got {blocked_single_source_brief['paragraphs']}")
+    if blocked_single_source_brief["metadata"].get("display_visible") is not False:
+        raise SystemExit(f"expected blocked single-source brief to stay hidden instead of surfacing a weak summary, got {blocked_single_source_brief}")
+    if blocked_single_source_brief["metadata"].get("display_hide_reason") != "no_distinct_grounded_followup":
+        raise SystemExit(f"expected blocked single-source brief to use the distinct-followup hide reason, got {blocked_single_source_brief}")
     if "The strongest available source read is already open." in blocked_single_source_brief["supporting_points"]:
         raise SystemExit("expected access-status boilerplate to stay out of supporting points")
     source_grounded_single_source_quality = evaluate_story_quality(
@@ -1169,7 +1255,7 @@ def main() -> int:
             ],
         }
     )
-    if len(metadata_summary_brief["paragraphs"]) < 3 or "couldn't remember details" not in metadata_summary_brief["paragraphs"][1]:
+    if len(metadata_summary_brief["paragraphs"]) < 2 or "couldn't remember details" not in metadata_summary_brief["paragraphs"][1]:
         raise SystemExit(f"expected metadata-summary brief to pull a second narrative paragraph, got {metadata_summary_brief}")
 
     watch_reuters_headline = "Reserve release aims to steady oil prices as shipping routes stay under scrutiny"
@@ -1306,7 +1392,10 @@ def main() -> int:
                         "Around 2,500 U.S. Marines are heading for the Middle East, along with a Navy amphibious warship. "
                         "Their mission is not yet clear, but it signals a marked increase in U.S. forces in the region. "
                         "The deployment comes as the Pentagon said more than 15,000 targets had been struck in Iran over nearly two weeks of relentless bombing against the regime. "
-                        "Notice: Transcripts are machine and human generated and lightly edited for accuracy. They may contain errors."
+                        "Stephanie Sy reports. "
+                        "Notice: Transcripts are machine and human generated and lightly edited for accuracy. They may contain errors. "
+                        "Around 2,500 U.S. Marines are reportedly heading for the Middle East, along with a Navy amphibious warship. "
+                        "Their mission is not clear, but it’s a marked increase in U.S. presence in the region."
                     ),
                 ),
             }
@@ -1317,8 +1406,41 @@ def main() -> int:
         raise SystemExit(f"expected transcript boilerplate to stay out of early brief paragraphs, got {transcript_brief}")
     if len(transcript_brief["paragraphs"]) > 1 and transcript_brief["paragraphs"][1].startswith("Their mission is not yet clear"):
         raise SystemExit(f"expected detail paragraph to avoid repeating opening sentences, got {transcript_brief}")
+    if len(transcript_brief["paragraphs"]) < 2 or "The deployment comes as the Pentagon said more than 15,000 targets had been struck in Iran" not in transcript_brief["paragraphs"][1]:
+        raise SystemExit(f"expected transcript early brief to keep the grounded Pentagon follow-up sentence, got {transcript_brief}")
+    if transcript_brief["metadata"].get("display_visible") is not True:
+        raise SystemExit(f"expected transcript early brief with real second detail paragraph to stay visible, got {transcript_brief}")
     if any("machine and human generated" in snapshot.get("used_snippet", "").lower() for snapshot in transcript_brief["source_snapshot"]):
         raise SystemExit(f"expected source snapshot excerpt to filter transcript boilerplate, got {transcript_brief}")
+    if any("Stephanie Sy reports" in paragraph for paragraph in transcript_brief["paragraphs"]):
+        raise SystemExit(f"expected transcript early brief to filter reporter signoff lines, got {transcript_brief}")
+
+    hidden_one_source_cluster = {
+        "canonical_headline": "Lawmakers delay vote until next week",
+        "summary": "Lawmakers delayed the vote until next week.",
+        "topic_label": "Politics",
+        "outlet_count": 1,
+        "cluster_key_facts": [],
+        "correction_events": [],
+        "cluster_articles": [
+            {
+                "rank_in_cluster": 1,
+                "framing_group": "center",
+                "articles": quality_article(
+                    article_id="hidden-one-source-a1",
+                    outlet="Reuters",
+                    headline="Lawmakers delay vote until next week",
+                    summary="Lawmakers delayed the vote until next week.",
+                    body_text="Lawmakers delayed the vote until next week.",
+                ),
+            }
+        ],
+    }
+    hidden_one_source_brief = build_grounded_brief(hidden_one_source_cluster)
+    if hidden_one_source_brief["metadata"].get("display_visible") is not False:
+        raise SystemExit(f"expected thin one-source brief to be hidden entirely, got {hidden_one_source_brief}")
+    if hidden_one_source_brief["metadata"].get("display_hide_reason") != "no_distinct_grounded_followup":
+        raise SystemExit(f"expected thin one-source brief to record the distinct-followup hide reason, got {hidden_one_source_brief}")
 
     abbreviation_split_cluster = {
         "canonical_headline": "After the U.S. strike on Kharg Island, here's what to know about Iran's islands",
@@ -1656,6 +1778,87 @@ def main() -> int:
     if any(term in " ".join(hormuz_commentary_brief["paragraphs"]) for term in ("Buccino", "Maher", "panelists")):
         raise SystemExit(f"expected commentary sources to stay out of the Hormuz brief body, got {hormuz_commentary_brief}")
 
+    liveblog_stub_cluster = {
+        "canonical_headline": "Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+        "summary": "Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+        "topic_label": "World",
+        "outlet_count": 2,
+        "cluster_key_facts": [],
+        "correction_events": [],
+        "cluster_articles": [
+            {
+                "rank_in_cluster": 1,
+                "framing_group": "center",
+                "articles": {
+                    **quality_article(
+                        article_id="liveblog-stub-a1",
+                        outlet="Financial Times",
+                        headline="Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+                        summary="Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+                        body_text="",
+                    ),
+                    "metadata": {
+                        "feed_summary": "Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+                        "extraction_quality": "rss_only",
+                        "access_signal": "likely_paywalled",
+                    },
+                },
+            },
+            {
+                "rank_in_cluster": 2,
+                "framing_group": "left",
+                "articles": quality_article(
+                    article_id="liveblog-stub-a2",
+                    outlet="New York Times",
+                    headline="What to know about the Strait of Hormuz after Trump's call",
+                    summary="The explainer lays out why the Strait of Hormuz matters to oil markets after Trump's call to allies.",
+                    body_text=(
+                        "The explainer lays out why the Strait of Hormuz matters to oil markets after Trump's call to allies. "
+                        "It describes tanker routes, insurance exposure and the narrow waterway's strategic role."
+                    ),
+                ),
+            },
+        ],
+    }
+    liveblog_stub_brief = build_grounded_brief(liveblog_stub_cluster)
+    if not str(liveblog_stub_brief["where_sources_agree"]).startswith("Prism is holding back from calling a shared baseline"):
+        raise SystemExit(f"expected liveblog-stub cluster to abstain in where_sources_agree, got {liveblog_stub_brief}")
+    if liveblog_stub_brief["metadata"]["section_grounding_mode"]["where_sources_agree"] != "scaffold":
+        raise SystemExit(f"expected liveblog-stub cluster to mark where_sources_agree as scaffold, got {liveblog_stub_brief}")
+
+    liveblog_event_cluster = {
+        "canonical_headline": "Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+        "summary": "Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+        "topic_label": "World",
+        "outlet_count": 3,
+        "cluster_key_facts": [],
+        "correction_events": [],
+        "cluster_articles": [
+            liveblog_stub_cluster["cluster_articles"][0],
+            {
+                "rank_in_cluster": 2,
+                "framing_group": "center",
+                "articles": quality_article(
+                    article_id="liveblog-event-a2",
+                    outlet="Reuters",
+                    headline="Trump calls on allies to send warships to reopen Strait of Hormuz",
+                    summary="Trump called on allies to send warships to reopen the Strait of Hormuz after Iran threatened shipping.",
+                    body_text=(
+                        "Trump called on allies to send warships to reopen the Strait of Hormuz after Iran threatened shipping. "
+                        "Reuters reported that naval officials were discussing escort plans for commercial tankers. "
+                        "The report focused on the immediate sequence around the shipping threat."
+                    ),
+                ),
+            },
+            liveblog_stub_cluster["cluster_articles"][1],
+        ],
+    }
+    liveblog_event_brief = build_grounded_brief(liveblog_event_cluster)
+    if not liveblog_event_brief["paragraphs"][0].startswith("Trump called on allies to send warships"):
+        raise SystemExit(f"expected real event source to outrank liveblog stub in early brief opener, got {liveblog_event_brief}")
+    if str(liveblog_event_brief["where_sources_agree"]).startswith("Prism is holding back from calling a shared baseline"):
+        raise SystemExit(f"expected liveblog-plus-event cluster to use the real event source for baseline, got {liveblog_event_brief}")
+
     kyiv_caption_cluster = {
         "canonical_headline": "Russian strike on Kyiv region kills 4 and wounds 15, with peace talks stalled",
         "summary": "A combined missile and drone attack on the Kyiv region killed at least four people and wounded at least 15.",
@@ -1799,6 +2002,81 @@ def main() -> int:
     mixed_access_quality = evaluate_story_quality(mixed_access_cluster, mixed_access_brief)
     if any(flag["code"] == "missing_open_alternate" for flag in mixed_access_quality["flags"]):
         raise SystemExit(f"expected mixed-access full brief without extra open source to avoid alternate warning, got {mixed_access_quality}")
+
+    liveblog_quality_cluster = {
+        "id": "cluster-liveblog-quality",
+        "slug": "liveblog-quality-risk",
+        "canonical_headline": "Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+        "summary": "Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+        "latest_event_at": "2026-03-14T16:30:00Z",
+        "cluster_articles": liveblog_stub_cluster["cluster_articles"],
+    }
+    liveblog_stub_ref = quality_ref(
+        article_id="liveblog-stub-a1",
+        outlet="Financial Times",
+        headline="Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+        snippet="Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+        focus="strait of hormuz",
+    )
+    liveblog_quality_brief = {
+        "cluster_id": "cluster-liveblog-quality",
+        "revision_tag": "brief-liveblog-risk-1",
+        "status": "early",
+        "title": "What the reporting says so far",
+        "paragraphs": [
+            "Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz.",
+            "Prism has linked other coverage, but the source mix is still thin.",
+        ],
+        "why_it_matters": "This matters because shipping lanes are central to the regional economy.",
+        "where_sources_agree": "The best-supported baseline right now comes from Financial Times: Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz.",
+        "where_coverage_differs": "It is too early to call a real split in coverage. Prism needs at least one more detailed independent report before differences in framing become useful to compare.",
+        "what_to_watch": "Watch for new reporting or official updates that widen the source mix and sharpen where the coverage starts to split.",
+        "source_snapshot": [
+            quality_snapshot(
+                article_id="liveblog-stub-a1",
+                outlet="Financial Times",
+                headline="Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+                snippet="Middle East war live: Trump calls on China, UK and Japan to secure Strait of Hormuz",
+                focus="strait of hormuz",
+                comparison_ready=False,
+                title_only_stub=True,
+                context_score=4,
+            ),
+            quality_snapshot(
+                article_id="liveblog-stub-a2",
+                outlet="New York Times",
+                headline="What to know about the Strait of Hormuz after Trump's call",
+                snippet="The explainer lays out why the Strait of Hormuz matters to oil markets after Trump's call to allies.",
+                focus="strait of hormuz and oil markets",
+                comparison_ready=False,
+                title_only_stub=False,
+                context_score=3,
+            ),
+        ],
+        "metadata": {
+            "full_brief_ready": False,
+            "open_alternate_available": False,
+            "section_grounding_mode": {
+                "why_it_matters": "scaffold",
+                "where_sources_agree": "required",
+                "where_coverage_differs": "scaffold",
+                "what_to_watch": "scaffold",
+            },
+            "section_support": {
+                "paragraphs": [
+                    {"index": 0, "support": [liveblog_stub_ref]},
+                    {"index": 1, "support": []},
+                ],
+                "why_it_matters": [],
+                "where_sources_agree": [liveblog_stub_ref],
+                "where_coverage_differs": [],
+                "what_to_watch": [],
+            },
+        },
+    }
+    liveblog_quality = evaluate_story_quality(liveblog_quality_cluster, liveblog_quality_brief)
+    if "title_only_shell_driving_brief" not in {flag["code"] for flag in liveblog_quality["flags"]}:
+        raise SystemExit(f"expected liveblog quality review to flag title-only shell dominance, got {liveblog_quality}")
 
     if infer_thehill_post_id("https://thehill.com/regulation/court-battles/5783614-cfpb-consumer-watchdog-trump-vought") != "5783614":
         raise SystemExit("expected second The Hill URL shape to resolve its post id")
