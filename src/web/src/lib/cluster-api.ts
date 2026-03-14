@@ -268,6 +268,112 @@ type PerspectiveVersionEventRow = {
   version_tag: string
 }
 
+const GENERIC_ATTRIBUTION_FOLLOWUP_PATTERN =
+  /^(?:[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,4}'s reporting spends more time on|[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,4} add(?:s)? more detail around)\b/i
+
+function normalizeWhitespace(value: string) {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+function sentenceSimilarity(left: string, right: string) {
+  const leftTokens = new Set(left.toLowerCase().match(/[a-z0-9]{4,}/g) || [])
+  const rightTokens = new Set(right.toLowerCase().match(/[a-z0-9]{4,}/g) || [])
+
+  if (leftTokens.size === 0 || rightTokens.size === 0) {
+    return 0
+  }
+
+  let overlap = 0
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) {
+      overlap += 1
+    }
+  }
+
+  return overlap / Math.max(leftTokens.size, rightTokens.size)
+}
+
+function narrativeTokenOverlap(left: string, right: string) {
+  const leftTokens = new Set(left.toLowerCase().match(/[a-z0-9]{4,}/g) || [])
+  const rightTokens = new Set(right.toLowerCase().match(/[a-z0-9]{4,}/g) || [])
+
+  if (leftTokens.size === 0 || rightTokens.size === 0) {
+    return 0
+  }
+
+  let overlap = 0
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) {
+      overlap += 1
+    }
+  }
+
+  return overlap / Math.max(1, Math.min(leftTokens.size, rightTokens.size))
+}
+
+function storedBriefParagraphAddsReaderValue(paragraph: string, anchors: string[]) {
+  const cleaned = normalizeWhitespace(paragraph)
+  if (
+    !cleaned ||
+    GENERIC_ATTRIBUTION_FOLLOWUP_PATTERN.test(cleaned) ||
+    /^Prism (?:could not retrieve|currently sees|found an open alternate read from|has also linked|has linked|is grounding|is holding back|is still treating|is still working with|only has|still needs)\b/i.test(
+      cleaned,
+    )
+  ) {
+    return false
+  }
+
+  return anchors.every((anchor) => {
+    const normalizedAnchor = normalizeWhitespace(anchor)
+    if (!normalizedAnchor) {
+      return true
+    }
+
+    return (
+      sentenceSimilarity(cleaned, normalizedAnchor) < 0.72 &&
+      narrativeTokenOverlap(cleaned, normalizedAnchor) < 0.66 &&
+      !normalizedAnchor.toLowerCase().includes(cleaned.toLowerCase()) &&
+      !cleaned.toLowerCase().includes(normalizedAnchor.toLowerCase())
+    )
+  })
+}
+
+export function storedBriefShouldRender(
+  paragraphs: string[],
+  metadata: JsonObject | null | undefined,
+) {
+  if (metadata && metadata.display_visible === false) {
+    return {
+      visible: false,
+      reason:
+        typeof metadata.display_hide_reason === 'string' && metadata.display_hide_reason.trim().length > 0
+          ? metadata.display_hide_reason
+          : 'no_distinct_grounded_followup',
+    }
+  }
+
+  if (paragraphs.length < 2) {
+    return {
+      visible: false,
+      reason: 'no_distinct_grounded_followup',
+    }
+  }
+
+  const opening = paragraphs[0] || ''
+  const hasUsefulFollowup = paragraphs.slice(1).some((paragraph, index) =>
+    storedBriefParagraphAddsReaderValue(paragraph, [opening, ...paragraphs.slice(1, index + 1)]),
+  )
+
+  if (!hasUsefulFollowup) {
+    return {
+      visible: false,
+      reason: 'no_distinct_grounded_followup',
+    }
+  }
+
+  return { visible: true as const, reason: undefined }
+}
+
 function mapStoredBrief(row: StoryBriefRevisionRow | null | undefined): StoryBrief | undefined {
   if (!row) {
     return undefined
@@ -280,6 +386,7 @@ function mapStoredBrief(row: StoryBriefRevisionRow | null | undefined): StoryBri
   const supportingPoints = Array.isArray(row.supporting_points)
     ? row.supporting_points.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
     : []
+  const visibility = storedBriefShouldRender(paragraphs, metadata)
 
   return {
     revisionTag: row.revision_tag,
@@ -296,6 +403,8 @@ function mapStoredBrief(row: StoryBriefRevisionRow | null | undefined): StoryBri
         ? metadata.substantive_source_count
         : Number(metadata.substantive_source_count ?? 0),
     isEarlyBrief: row.status !== 'full',
+    isVisible: visibility.visible,
+    hideReason: visibility.reason,
   }
 }
 

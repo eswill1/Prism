@@ -17,7 +17,9 @@ from generate_temporary_live_feed import (
     cluster_match_score,
     cluster_items,
     story_item_context_score,
+    story_item_is_event_driven,
     story_item_is_contextual,
+    story_item_is_title_only_stub,
     normalize_entity,
     parse_feed,
     should_join_cluster,
@@ -250,7 +252,13 @@ def actionable_entity(entity: str) -> str:
 
 
 def story_query_from_cluster(cluster: list[FeedItem]) -> tuple[set[str], set[str]]:
-    anchor_items = [item for item in cluster if substantive_feed_item(item) and not story_item_is_contextual(item)]
+    anchor_items = [
+        item
+        for item in cluster
+        if substantive_feed_item(item) and not story_item_is_contextual(item) and not story_item_is_title_only_stub(item)
+    ]
+    if not anchor_items:
+        anchor_items = [item for item in cluster if substantive_feed_item(item) and not story_item_is_title_only_stub(item)]
     if not anchor_items:
         anchor_items = [item for item in cluster if substantive_feed_item(item)] or cluster
     token_counts = {}
@@ -307,7 +315,11 @@ def item_matches_story_query(item: FeedItem, query_tokens: set[str], query_entit
 def should_augment_cluster(cluster: list[FeedItem]) -> bool:
     source_count = len({item.source for item in cluster})
     substantive_items = [item for item in cluster if substantive_feed_item(item)]
-    event_items = [item for item in substantive_items if not story_item_is_contextual(item)]
+    event_items = [
+        item
+        for item in substantive_items
+        if story_item_is_event_driven(item) and not story_item_is_title_only_stub(item)
+    ]
     open_substantive = [item for item in substantive_items if item.access_signal == "open"]
     likely_paywalled = [item for item in cluster if item.access_signal == "likely_paywalled"]
     return (
@@ -320,7 +332,11 @@ def should_augment_cluster(cluster: list[FeedItem]) -> bool:
 
 def augmentation_priority(cluster: list[FeedItem]) -> tuple[int, int, int]:
     substantive_items = [item for item in cluster if substantive_feed_item(item)]
-    event_items = [item for item in substantive_items if not story_item_is_contextual(item)]
+    event_items = [
+        item
+        for item in substantive_items
+        if story_item_is_event_driven(item) and not story_item_is_title_only_stub(item)
+    ]
     public_interest = max((item_quality_score(item) for item in cluster), default=0)
     return (
         1 if should_augment_cluster(cluster) else 0,
@@ -338,7 +354,7 @@ def select_story_augmentation_candidates(
     existing_urls = {item.url for item in cluster}
     existing_sources = {item.source for item in cluster}
     query_tokens, query_entities = story_query_from_cluster(cluster)
-    cluster_prefers_event = any(not story_item_is_contextual(item) for item in cluster)
+    cluster_prefers_event = any(story_item_is_event_driven(item) and not story_item_is_title_only_stub(item) for item in cluster)
     ranked: list[tuple[float, FeedItem]] = []
     for item in candidates:
         if item.url in existing_urls or item.source in existing_sources:
@@ -356,7 +372,7 @@ def select_story_augmentation_candidates(
             for entity in item.named_entities
             if actionable_entity(entity)
         } & query_entities
-        if cluster_prefers_event and story_item_is_contextual(item) and len(strong_query_overlap) < 2 and len(query_entity_overlap) < 2:
+        if cluster_prefers_event and (story_item_is_contextual(item) or story_item_is_title_only_stub(item)) and len(strong_query_overlap) < 2 and len(query_entity_overlap) < 2:
             continue
         join_match = should_join_cluster(item, cluster)
         if not join_match and not query_entity_overlap and len(strong_query_overlap) < 2:
@@ -367,6 +383,7 @@ def select_story_augmentation_candidates(
         if join_match:
             score += 2
         score -= story_item_context_score(item) * 4
+        score -= 8 if story_item_is_title_only_stub(item) else 0
         score += summary_quality_score(
             item.title,
             item.summary,
@@ -377,6 +394,8 @@ def select_story_augmentation_candidates(
             score += 3
         if item.extraction_quality == "article_body":
             score += 4
+        if story_item_is_event_driven(item) and not story_item_is_title_only_stub(item):
+            score += 5
         ranked.append((score, item))
 
     selected: list[FeedItem] = []

@@ -12,11 +12,16 @@ type BriefSource = {
   focus: string
   detail: string
   followup: string
+  bodyParagraphs: string[]
   fetchBlocked?: boolean
 }
 
 const PLACEHOLDER_KEY_FACT =
   /^Prism has |^Prism only has |^The latest linked reporting came from |^The comparison set |^The strongest available source read is already open\.?$|^Prism found an open alternate read from |^Some linked reporting may be gated/i
+const BRIEF_SCOPE_NOTE_PATTERN =
+  /^Prism (?:could not retrieve|currently sees|found an open alternate read from|has also linked|has linked|is grounding|is holding back|is still treating|is still working with|only has|still needs)\b/i
+const GENERIC_ATTRIBUTION_FOLLOWUP_PATTERN =
+  /^(?:[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,4}'s reporting spends more time on|[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,4} add(?:s)? more detail around)\b/i
 const GENERIC_FOCUS_TOKENS = new Set([
   'another',
   'around',
@@ -168,6 +173,24 @@ function sentenceSimilarity(left: string, right: string) {
   return overlap / Math.max(leftTokens.size, rightTokens.size)
 }
 
+function narrativeTokenOverlap(left: string, right: string) {
+  const leftTokens = new Set(left.toLowerCase().match(/[a-z0-9]{4,}/g) || [])
+  const rightTokens = new Set(right.toLowerCase().match(/[a-z0-9]{4,}/g) || [])
+
+  if (leftTokens.size === 0 || rightTokens.size === 0) {
+    return 0
+  }
+
+  let overlap = 0
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) {
+      overlap += 1
+    }
+  }
+
+  return overlap / Math.max(1, Math.min(leftTokens.size, rightTokens.size))
+}
+
 function isNearDuplicateSentence(candidate: string, existing: string[]) {
   return existing.some((value) => sentenceSimilarity(candidate, value) >= 0.72)
 }
@@ -253,6 +276,37 @@ function laterNarrativeSentences(text: string, skipCount: number, sentenceCount:
 
 function followupNarrativeSentences(text: string) {
   return laterNarrativeSentences(text, 4, 2)
+}
+
+function bodyStoryParagraphCandidates(text: string, maxParagraphs = 4) {
+  const sentences = splitNarrativeSentences(text)
+    .map((sentence) => ensurePeriod(sentence))
+    .filter((sentence) => sentence.length >= 35)
+
+  const paragraphs: string[] = []
+  let current: string[] = []
+  for (const sentence of sentences) {
+    current.push(sentence)
+    if (current.length >= 2 || current.join(' ').length >= 240) {
+      const paragraph = current.join(' ').trim()
+      if (!isNearDuplicateSentence(paragraph, paragraphs)) {
+        paragraphs.push(paragraph)
+      }
+      current = []
+    }
+    if (paragraphs.length >= maxParagraphs) {
+      break
+    }
+  }
+
+  if (current.length > 0 && paragraphs.length < maxParagraphs) {
+    const paragraph = current.join(' ').trim()
+    if (!isNearDuplicateSentence(paragraph, paragraphs)) {
+      paragraphs.push(paragraph)
+    }
+  }
+
+  return paragraphs
 }
 
 function topicFamilyForStory(topic: string): TopicFamily {
@@ -370,15 +424,12 @@ function buildBriefSources(cluster: StoryCluster) {
       focus: articleFocus(article),
       detail: ensurePeriod(laterNarrativeSentences(article.bodyText || '', 2, 2)),
       followup: ensurePeriod(followupNarrativeSentences(article.bodyText || '')),
+      bodyParagraphs: bodyStoryParagraphCandidates(article.bodyText || ''),
       fetchBlocked: article.fetchBlocked === true,
     })
   }
 
   return sources
-}
-
-function blockedArticle(cluster: StoryCluster) {
-  return cluster.articles.find((article) => article.fetchBlocked === true)
 }
 
 function distinctOutletCount(cluster: StoryCluster) {
@@ -566,43 +617,6 @@ function snippetExtensionAfterOpening(opening: string, snippet: string) {
   return snippetSentences.slice(1).join(' ').trim()
 }
 
-function earlyBriefDetailFollowup(
-  cluster: StoryCluster,
-  central: ReturnType<typeof centralSource>,
-  opening: string,
-) {
-  if (!central) {
-    return ''
-  }
-
-  const snippet = ensurePeriod(central.snippet.trim())
-  const snippetExtension = ensurePeriod(snippetExtensionAfterOpening(opening, snippet))
-  if (
-    snippetExtension &&
-    !normalizeWhitespace(opening).toLowerCase().includes(normalizeWhitespace(snippetExtension).toLowerCase()) &&
-    sentenceSimilarity(snippetExtension, opening) < 0.72
-  ) {
-    return snippetExtension
-  }
-
-  const detail = ensurePeriod(central.detail.trim())
-  if (detail && !normalizeWhitespace(opening).toLowerCase().includes(normalizeWhitespace(detail).toLowerCase()) && sentenceSimilarity(detail, opening) < 0.72) {
-    return detail
-  }
-
-  const summary = ensurePeriod(cluster.dek)
-  if (
-    snippet &&
-    !normalizeWhitespace(opening).toLowerCase().includes(normalizeWhitespace(snippet).toLowerCase()) &&
-    sentenceSimilarity(snippet, summary) < 0.72 &&
-    sentenceSimilarity(snippet, opening) < 0.72
-  ) {
-    return snippet
-  }
-
-  return ''
-}
-
 function distinctEarlyParagraph(candidates: string[], existing: string[]) {
   for (const candidate of candidates) {
     const cleaned = ensurePeriod(candidate.trim())
@@ -623,6 +637,77 @@ function distinctEarlyParagraph(candidates: string[], existing: string[]) {
   return ''
 }
 
+function removeOverlappingSentences(candidate: string, existing: string[]) {
+  const candidateSentences = splitNarrativeSentences(candidate)
+  if (candidateSentences.length === 0) {
+    return ''
+  }
+
+  const existingSentences = existing.flatMap((paragraph) => splitNarrativeSentences(paragraph))
+  const remaining = candidateSentences.filter(
+    (sentence) =>
+      !existingSentences.some(
+        (prior) =>
+          sentenceSimilarity(sentence, prior) >= 0.72 ||
+          narrativeTokenOverlap(sentence, prior) >= 0.66 ||
+          normalizeWhitespace(prior).toLowerCase().includes(normalizeWhitespace(sentence).toLowerCase()),
+      ),
+  )
+
+  return remaining.join(' ').trim()
+}
+
+function sourceStoryFollowonParagraphs(source: BriefSource | undefined, opening: string, limit: number) {
+  if (!source) {
+    return []
+  }
+
+  const existing = [opening]
+  const paragraphs: string[] = []
+  const candidatePool = [
+    ...source.bodyParagraphs,
+    snippetExtensionAfterOpening(opening, source.snippet),
+    source.detail,
+    source.followup,
+  ]
+
+  for (const rawCandidate of candidatePool) {
+    const candidate = ensurePeriod(removeOverlappingSentences(rawCandidate, existing))
+    const paragraph = distinctEarlyParagraph([candidate], existing)
+    if (!paragraph) {
+      continue
+    }
+    paragraphs.push(paragraph)
+    existing.push(paragraph)
+    if (paragraphs.length >= limit) {
+      break
+    }
+  }
+
+  return paragraphs
+}
+
+function paragraphAddsReaderValue(paragraph: string, anchors: string[]) {
+  const cleaned = normalizeWhitespace(paragraph)
+  if (!cleaned || BRIEF_SCOPE_NOTE_PATTERN.test(cleaned) || GENERIC_ATTRIBUTION_FOLLOWUP_PATTERN.test(cleaned)) {
+    return false
+  }
+
+  return anchors.every((anchor) => {
+    const normalizedAnchor = normalizeWhitespace(anchor)
+    if (!normalizedAnchor) {
+      return true
+    }
+
+    return (
+      sentenceSimilarity(cleaned, normalizedAnchor) < 0.72 &&
+      narrativeTokenOverlap(cleaned, normalizedAnchor) < 0.66 &&
+      !normalizedAnchor.toLowerCase().includes(cleaned.toLowerCase()) &&
+      !cleaned.toLowerCase().includes(normalizedAnchor.toLowerCase())
+    )
+  })
+}
+
 export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
   const family = topicFamilyForStory(cluster.topic)
   const sources = buildBriefSources(cluster)
@@ -630,40 +715,12 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
   const central = centralSource(sources)
   const divergent = divergentSource(sources, central)
   const fullBrief = sources.length >= 2 && distinctOutletCount(cluster) >= 2
-  const blockedFetchArticle = blockedArticle(cluster)
   const secondarySources = sources
     .filter((source) => source.outlet !== central?.outlet)
     .slice(0, 3)
   const corroboratingOutlets = outletListText(secondarySources.map((source) => source.outlet))
   const earlyOpening = earlyBriefOpening(cluster, sources[0])
-  const earlyDetailFollowup = earlyBriefDetailFollowup(cluster, sources[0], earlyOpening)
-  const earlyGroundedFollowup = distinctEarlyParagraph(
-    [
-      sources[0]?.followup || '',
-      visibleFacts[0] || '',
-      sources[0]?.fetchBlocked
-        ? `Prism could not retrieve the full article text from ${sources[0].outlet} because the site served an automated access challenge to the enrichment worker. This early brief is limited to feed-level material until Prism can verify the full body text or another independent report arrives.`
-        : blockedFetchArticle
-          ? `Prism could not retrieve the full article text from ${blockedFetchArticle.outlet} because the site served an automated access challenge to the enrichment worker. This early brief is limited to feed-level material until Prism can verify the full body text or another independent report arrives.`
-        : '',
-      sources[0]
-        ? `${sources[0].outlet}'s reporting spends more time on ${cleanFocusPhrase(
-            sources[0].focus,
-            family,
-          )}, which is the clearest grounded line of reporting Prism can verify so far.`
-        : '',
-    ],
-    [earlyOpening, earlyDetailFollowup],
-  )
-  const earlyProvisionalParagraph = sources[1]
-    ? `Prism has linked another read from ${sources[1].outlet}, but the source mix is still too concentrated to treat differences in emphasis as a meaningful split in coverage yet. This early brief is meant to give a fuller working summary before that wider comparison arrives.`
-    : sources[0]?.fetchBlocked
-      ? `Prism is still treating this as a one-source early brief grounded primarily in ${sources[0].outlet}'s feed-level reporting because the site blocked automated full-text retrieval. Prism still needs either verified body text or another independent detailed report before coverage differences become useful to compare.`
-      : blockedFetchArticle
-        ? `Prism is still treating this as a one-source early brief grounded primarily in ${blockedFetchArticle.outlet}'s feed-level reporting because the site blocked automated full-text retrieval. Prism still needs either verified body text or another independent detailed report before coverage differences become useful to compare.`
-      : sources[0]
-      ? `Prism is still treating this as a one-source early brief grounded primarily in ${sources[0].outlet}'s reporting. It should already give you the core story and immediate stakes, but Prism still needs another independent detailed report before coverage differences become useful to compare.`
-      : `Prism is still working with a thin source set here. This early brief is meant to give readers a usable first summary now, then widen into a fuller comparison once another detailed report arrives.`
+  const earlyFollowupParagraphs = sourceStoryFollowonParagraphs(sources[0], earlyOpening, 3)
 
   const paragraphs = fullBrief
     ? [
@@ -684,9 +741,7 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
       ]
     : [
         earlyOpening,
-        earlyDetailFollowup,
-        earlyGroundedFollowup,
-        earlyProvisionalParagraph,
+        ...earlyFollowupParagraphs,
       ]
 
   const whereSourcesAgree = fullBrief
@@ -699,15 +754,22 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
       : `The reporting is still fairly aligned on the core sequence, but outlets are beginning to diverge in what they emphasize most.`
     : `It is too early to call a real split in coverage. Prism needs at least one more detailed independent report before differences in framing become useful to compare.`
 
+  const filteredParagraphs = paragraphs.filter((paragraph, index, values) => {
+    if (!paragraph.trim()) {
+      return false
+    }
+    return values.findIndex((value) => sentenceSimilarity(value, paragraph) >= 0.82) === index
+  })
+  const isVisible = filteredParagraphs
+    .slice(1)
+    .some((paragraph) =>
+      paragraphAddsReaderValue(paragraph, [filteredParagraphs[0] || '', cluster.dek, cluster.title]),
+    )
+
   return {
     label: fullBrief ? 'Prism brief' : 'Early brief',
     title: fullBrief ? 'The story so far' : 'What the reporting says so far',
-    paragraphs: paragraphs.filter((paragraph, index, values) => {
-      if (!paragraph.trim()) {
-        return false
-      }
-      return values.findIndex((value) => sentenceSimilarity(value, paragraph) >= 0.82) === index
-    }),
+    paragraphs: filteredParagraphs,
     whyItMatters: whyItMattersCopy(cluster, family, sources),
     whereSourcesAgree,
     whereCoverageDiffers,
@@ -715,5 +777,7 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
     supportingPoints: visibleFacts,
     substantiveSourceCount: sources.length,
     isEarlyBrief: !fullBrief,
+    isVisible,
+    hideReason: isVisible ? undefined : 'no_distinct_grounded_followup',
   }
 }

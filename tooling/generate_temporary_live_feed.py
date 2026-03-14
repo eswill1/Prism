@@ -214,11 +214,15 @@ CONTEXTUAL_CLUSTER_TOKENS = {
     "why",
 }
 CONTEXT_HEADLINE_PATTERN = re.compile(
-    r"\b(?:analysis|column|explainer|fact check|five things|how to|live updates?|liveblog|minute-by-minute|opinion|photos|podcast|q&a|questions answered|takeaways?|timeline|video|what to know|what we know|why it matters)\b",
+    r"\b(?:analysis|column|explainer|fact check|five things|how to|jokes?\b|live updates?|liveblog|minute-by-minute|mock(?:s|ed)?|opinion|photos|podcast|q&a|questions answered|slams?\b|swipes?\s+at|takeaways?|timeline|video|what to know|what we know|why it matters)\b",
     re.IGNORECASE,
 )
 CONTEXT_URL_PATTERN = re.compile(
-    r"/(?:analysis|explainer|fact-check|live|live-updates|opinion|photos|podcast|timeline|video)/",
+    r"/(?:analysis|blogs?|explainer|fact-check|live|live-updates|media|opinion|photos|podcast|timeline|video)/",
+    re.IGNORECASE,
+)
+COMMENTARY_HEADLINE_PATTERN = re.compile(
+    r"\b(?:comedian|commentary|former\s+[A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,4}\s+(?:aide|director|official)|host|panelists?|pundit|ret\.\)|swipes?\s+at)\b",
     re.IGNORECASE,
 )
 EVENT_HEADLINE_PATTERN = re.compile(
@@ -776,12 +780,21 @@ def story_item_context_score(item: FeedItem | dict[str, object]) -> int:
         score += 3
     if CONTEXT_URL_PATTERN.search(url):
         score += 2
+    if COMMENTARY_HEADLINE_PATTERN.search(f"{title} {summary}"):
+        score += 3
     if "?" in title:
         score += 1
     if len(story_item_tokens(item) & CONTEXTUAL_CLUSTER_TOKENS) >= 2:
         score += 1
     if any(phrase in normalize_matching_text(f"{title} {summary}") for phrase in ("what to know", "what we know", "why it matters")):
         score += 1
+    if item_looks_title_only_stub(
+        title,
+        summary,
+        extraction_quality=extraction_quality,
+        body_text=story_item_value(item, "body_preview", "body_text"),
+    ):
+        score += 2
     if EVENT_HEADLINE_PATTERN.search(title):
         score -= 1
     if extraction_quality == "article_body" and score > 0 and not CONTEXT_HEADLINE_PATTERN.search(title):
@@ -810,15 +823,24 @@ def story_item_event_signal(item: FeedItem | dict[str, object]) -> int:
     return score
 
 
+def story_item_is_title_only_stub(item: FeedItem | dict[str, object]) -> bool:
+    return item_looks_title_only_stub(
+        story_item_value(item, "title", "headline"),
+        story_item_value(item, "summary", "feed_summary", "lede"),
+        extraction_quality=story_item_value(item, "extraction_quality"),
+        body_text=story_item_value(item, "body_preview", "body_text"),
+    )
+
+
 def story_item_is_event_driven(item: FeedItem | dict[str, object]) -> bool:
     return story_item_event_signal(item) >= 3
 
 
 def preferred_story_items(items: list[FeedItem] | list[dict[str, object]]) -> list[FeedItem] | list[dict[str, object]]:
-    event_items = [item for item in items if story_item_is_event_driven(item)]
+    event_items = [item for item in items if story_item_is_event_driven(item) and not story_item_is_title_only_stub(item)]
     if event_items:
         return event_items
-    reporting_items = [item for item in items if not story_item_is_contextual(item)]
+    reporting_items = [item for item in items if not story_item_is_contextual(item) and not story_item_is_title_only_stub(item)]
     return reporting_items or items
 
 
@@ -1426,6 +1448,22 @@ def summary_looks_title_like(title: str, summary: str) -> bool:
     return overlap_ratio >= 0.85 and len(summary_tokens) <= len(title_tokens) + 2
 
 
+def item_looks_title_only_stub(
+    title: str,
+    summary: str,
+    *,
+    extraction_quality: str = "rss_only",
+    body_text: str = "",
+) -> bool:
+    cleaned_summary = clean_summary_snippet(summary, 320)
+    cleaned_body = normalize_whitespace(body_text)
+    if extraction_quality == "article_body":
+        body_excerpt = first_narrative_sentences(cleaned_body, sentence_count=2)
+        if body_excerpt and not summary_looks_title_like(title, body_excerpt):
+            return False
+    return summary_looks_title_like(title, cleaned_summary)
+
+
 def summary_title_alignment_score(title: str, summary: str) -> float:
     normalized_title = normalize_matching_text(title)
     normalized_summary = normalize_matching_text(summary)
@@ -1588,7 +1626,8 @@ def choose_story_summary(
         alignment = summary_title_alignment_score(title, cleaned_candidate)
         context_penalty = story_item_context_score(article) * 4.0
         event_bonus = max(story_item_event_signal(article), 0) * 1.5
-        selection_score = score + event_bonus + (alignment * 5.0) - context_penalty
+        stub_penalty = 8.0 if item_looks_title_only_stub(article_title, cleaned_candidate, extraction_quality=extraction_quality, body_text=body_text) else 0.0
+        selection_score = score + event_bonus + (alignment * 5.0) - context_penalty - stub_penalty
         if score >= 6:
             substantive_sources.add(str(source_name))
         if cleaned_candidate and selection_score > best_selection_score:
@@ -2352,6 +2391,9 @@ def cluster_items(items: Iterable[FeedItem]) -> list[list[FeedItem]]:
 
 def pick_cluster_label(items: list[FeedItem]) -> str:
     label_items = preferred_story_items(items)
+    non_stub_items = [item for item in label_items if not story_item_is_title_only_stub(item)]
+    if non_stub_items:
+        label_items = non_stub_items
     tokens = Counter(
         token for item in label_items for token in item.tokens if token not in BROAD_MATCH_TOKENS
     )
@@ -2371,6 +2413,9 @@ def representative_cluster_item(items: list[FeedItem]) -> FeedItem:
         return items[0]
 
     candidate_items = preferred_story_items(items)
+    non_stub_candidates = [item for item in candidate_items if not story_item_is_title_only_stub(item)]
+    if non_stub_candidates:
+        candidate_items = non_stub_candidates
     freshest = max(parse_datetime(item.published_at) for item in items)
 
     def representative_score(item: FeedItem) -> tuple[float, float]:
@@ -2384,9 +2429,10 @@ def representative_cluster_item(items: list[FeedItem]) -> FeedItem:
         extraction_bonus = 6 if item.extraction_quality == "article_body" else 2 if item.extraction_quality == "metadata_description" else 0
         event_bonus = max(story_item_event_signal(item), 0) * 1.5
         context_penalty = story_item_context_score(item) * 6.0
+        stub_penalty = 9.0 if story_item_is_title_only_stub(item) else 0.0
         recency_penalty_hours = max(0.0, (freshest - parse_datetime(item.published_at)).total_seconds() / 3600.0)
         return (
-            (content_score * 2.0) + centrality + extraction_bonus + event_bonus - context_penalty - min(recency_penalty_hours, 12.0),
+            (content_score * 2.0) + centrality + extraction_bonus + event_bonus - context_penalty - stub_penalty - min(recency_penalty_hours, 12.0),
             parse_datetime(item.published_at).timestamp(),
         )
 
@@ -2414,6 +2460,7 @@ def build_cluster_payload(
         ordered,
         key=lambda item: (
             0 if not story_item_is_contextual(item) else 1,
+            0 if not story_item_is_title_only_stub(item) else 1,
             -story_item_event_signal(item),
             -summary_quality_score(
                 item.title,

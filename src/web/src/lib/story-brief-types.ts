@@ -9,5 +9,7 @@ export type StoryBrief = {
   supportingPoints: string[]
   substantiveSourceCount: number
   isEarlyBrief: boolean
+  isVisible: boolean
+  hideReason?: string
   revisionTag?: string
 }

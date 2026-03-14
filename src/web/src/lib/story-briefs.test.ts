@@ -52,13 +52,39 @@ test('early briefs still produce a fuller one-source narrative summary', () => {
 
   assert.equal(brief.isEarlyBrief, true)
   assert.ok(brief.paragraphs.length >= 3)
-  assert.match(
-    brief.paragraphs[brief.paragraphs.length - 1] || '',
-    /one-source early brief|fuller working summary/i,
-  )
+  assert.equal(brief.isVisible, true)
+  assert.ok(brief.paragraphs.every((paragraph) => !/^Prism\b/.test(paragraph)))
 })
 
-test('blocked fetches disclose retrieval limits instead of surfacing access boilerplate', () => {
+test('one-source briefs without a distinct grounded followup are hidden', () => {
+  const brief = buildStoryBrief({
+    ...singleSourceCluster,
+    slug: 'thin-single-source-story',
+    title: 'Thin single-source story',
+    dek: 'Lawmakers delayed the vote until next week.',
+    keyFacts: [],
+    articles: [
+      {
+        outlet: 'Reuters',
+        title: 'Lawmakers delay vote until next week',
+        summary: 'Lawmakers delayed the vote until next week.',
+        bodyText: 'Lawmakers delayed the vote until next week.',
+        extractionQuality: 'article_body',
+        accessTier: 'open',
+        published: '20m ago',
+        framing: 'center',
+        image: 'https://example.com/article.jpg',
+        reason: 'baseline read',
+        url: 'https://example.com/thin-story',
+      },
+    ],
+  })
+
+  assert.equal(brief.isVisible, false)
+  assert.equal(brief.hideReason, 'no_distinct_grounded_followup')
+})
+
+test('blocked fetches stay hidden instead of surfacing access boilerplate as a brief', () => {
   const brief = buildStoryBrief({
     ...singleSourceCluster,
     slug: 'blocked-story',
@@ -84,8 +110,8 @@ test('blocked fetches disclose retrieval limits instead of surfacing access boil
     ],
   })
 
-  assert.ok(brief.paragraphs.some((paragraph) => /blocked automated access challenge|blocked automated full-text retrieval/i.test(paragraph)))
-  assert.deepEqual(brief.supportingPoints, [])
+  assert.equal(brief.isVisible, false)
+  assert.equal(brief.hideReason, 'no_distinct_grounded_followup')
 })
 
 test('quoted body sentences stay intact in one-source early briefs', () => {
@@ -117,4 +143,5 @@ test('quoted body sentences stay intact in one-source early briefs', () => {
   assert.match(combined, /But what good does it do\?” Trump told reporters/i)
   assert.ok(!combined.includes('But what good does it do? ”'))
   assert.equal((combined.match(/President Trump said Friday/g) || []).length, 1)
+  assert.equal(brief.isVisible, true)
 })

@@ -101,6 +101,7 @@ export async function StoryPage({ slug }: StoryPageProps) {
   const entryHref = '/'
   const entryLabel = 'Back to homepage'
   const storyBrief = cluster.generatedBrief ?? buildStoryBrief(cluster)
+  const visibleStoryBrief = storyBrief.isVisible ? storyBrief : null
   const perspective = cluster.generatedPerspective ?? buildFallbackPerspective(cluster)
   const perspectiveRevision = perspective.revision
   const linkedArticles = cluster.articles.filter((article) => Boolean(article.url))
@@ -150,16 +151,17 @@ export async function StoryPage({ slug }: StoryPageProps) {
             </div>
           </section>
 
+          {visibleStoryBrief ? (
           <article className="panel content-panel story-summary-panel">
             <div className="section-heading">
                 <div>
-                  <p className="panel-label">{storyBrief.label}</p>
-                  <h2 className="story-section-title">{storyBrief.title}</h2>
+                  <p className="panel-label">{visibleStoryBrief.label}</p>
+                  <h2 className="story-section-title">{visibleStoryBrief.title}</h2>
                 </div>
               </div>
 
             <div className="story-summary-body">
-              {storyBrief.paragraphs.map((paragraph) => (
+              {visibleStoryBrief.paragraphs.map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>
@@ -167,33 +169,34 @@ export async function StoryPage({ slug }: StoryPageProps) {
             <div className="brief-sections">
               <article className="brief-section">
                 <p className="panel-label">Why it matters</p>
-                <p>{storyBrief.whyItMatters}</p>
+                <p>{visibleStoryBrief.whyItMatters}</p>
               </article>
               <article className="brief-section">
                 <p className="panel-label">Where sources agree</p>
-                <p>{storyBrief.whereSourcesAgree}</p>
+                <p>{visibleStoryBrief.whereSourcesAgree}</p>
               </article>
               <article className="brief-section">
                 <p className="panel-label">Where coverage differs</p>
-                <p>{storyBrief.whereCoverageDiffers}</p>
+                <p>{visibleStoryBrief.whereCoverageDiffers}</p>
               </article>
               <article className="brief-section">
                 <p className="panel-label">What to watch</p>
-                <p>{storyBrief.whatToWatch}</p>
+                <p>{visibleStoryBrief.whatToWatch}</p>
               </article>
             </div>
 
-            {storyBrief.supportingPoints.length > 0 ? (
+            {visibleStoryBrief.supportingPoints.length > 0 ? (
               <div className="story-summary-points">
                 <p className="panel-label">What to know</p>
                 <ul className="simple-list">
-                  {storyBrief.supportingPoints.map((fact) => (
+                  {visibleStoryBrief.supportingPoints.map((fact) => (
                     <li key={fact}>{fact}</li>
                   ))}
                 </ul>
               </div>
             ) : null}
           </article>
+          ) : null}
 
           {primaryReads.length > 0 ? (
           <article className="panel content-panel">
