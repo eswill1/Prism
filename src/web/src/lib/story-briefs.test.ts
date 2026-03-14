@@ -87,3 +87,34 @@ test('blocked fetches disclose retrieval limits instead of surfacing access boil
   assert.ok(brief.paragraphs.some((paragraph) => /blocked automated access challenge|blocked automated full-text retrieval/i.test(paragraph)))
   assert.deepEqual(brief.supportingPoints, [])
 })
+
+test('quoted body sentences stay intact in one-source early briefs', () => {
+  const brief = buildStoryBrief({
+    ...singleSourceCluster,
+    slug: 'quoted-story',
+    title: 'Trump says he has own idea on how long Iran war will last',
+    dek: 'President Trump said Friday that he has his “own idea” of how long the conflict in Iran could last.',
+    articles: [
+      {
+        outlet: 'The Hill',
+        title: 'Trump says he has own idea on how long Iran war will last',
+        summary:
+          'President Trump said Friday that he has his “own idea” of how long the conflict in Iran could last.',
+        bodyText:
+          'President Trump said Friday that he has his “own idea” of how long the conflict in Iran could last, adding to a series of shifting messages about the timeline for the joint U.S.-Israeli operation. “I mean, I have my own idea. But what good does it do?” Trump told reporters at Joint Base Andrews when asked about the duration of the war. “It’ll be as long as it’s necessary.” Trump and the Pentagon have offered conflicting signals about when the conflict could come to an end, despite asserting that the U.S. is close to achieving its objectives.',
+        extractionQuality: 'article_body',
+        accessTier: 'open',
+        published: '20m ago',
+        framing: 'center',
+        image: 'https://example.com/article.jpg',
+        reason: 'baseline read',
+        url: 'https://thehill.com/example-story',
+      },
+    ],
+  })
+
+  const combined = brief.paragraphs.join(' ')
+  assert.match(combined, /But what good does it do\?” Trump told reporters/i)
+  assert.ok(!combined.includes('But what good does it do? ”'))
+  assert.equal((combined.match(/President Trump said Friday/g) || []).length, 1)
+})

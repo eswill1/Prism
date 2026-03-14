@@ -115,6 +115,10 @@ function looksClippedText(value: string) {
     return true
   }
 
+  if ((trimmed.match(/“/g) || []).length > (trimmed.match(/”/g) || []).length || (trimmed.match(/"/g) || []).length % 2 === 1) {
+    return true
+  }
+
   if (!/[.!?]$/.test(trimmed)) {
     return true
   }

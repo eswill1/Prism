@@ -138,7 +138,7 @@ def ensure_period(value: str) -> str:
     trimmed = normalize_whitespace(value)
     if not trimmed:
         return ""
-    return trimmed if re.search(r"[.!?]$", trimmed) else f"{trimmed}."
+    return trimmed if re.search(r'[.!?](?:["\u2019\u201d)\]]+)?$', trimmed) else f"{trimmed}."
 
 
 def strip_ending_punctuation(value: str) -> str:
@@ -199,6 +199,29 @@ def alignment_score(reference: str, candidate: str) -> float:
     return len(overlap) / max(1, min(len(reference_tokens), len(candidate_tokens)))
 
 
+def normalize_sentence_closing_punctuation(text: str) -> str:
+    return re.sub(r'([.!?])\s+([)"\]\'\u2019\u201d]+)', r"\1\2", text)
+
+
+def sentence_has_unclosed_quote(text: str) -> bool:
+    normalized = text
+    curly_balance = normalized.count("“") - normalized.count("”")
+    straight_unpaired = normalized.count('"') % 2
+    return curly_balance > 0 or straight_unpaired == 1
+
+
+def sentence_continues_quoted_attribution(previous: str, current: str) -> bool:
+    if not re.search(r'["\u201d\u2019]$', previous.strip()):
+        return False
+    return bool(
+        re.match(
+            r"^(?:(?:[A-Z][A-Za-z'’-]+|[Tt]he|[Hh]e|[Ss]he|[Tt]hey|[Oo]fficials|[Aa]ides|[Rr]eporters)\s+){0,3}"
+            r"(said|says|told|asked|wrote|added|warned|argued|noted|announced|replied|stated|called|posted)\b",
+            current,
+        )
+    )
+
+
 def split_narrative_sentences(text: str) -> list[str]:
     cleaned = normalize_whitespace(text)
     if not cleaned:
@@ -214,21 +237,35 @@ def split_narrative_sentences(text: str) -> list[str]:
 
         protected = re.sub(pattern, repl, protected, flags=re.IGNORECASE)
 
-    matches = re.findall(r"[^.!?]+[.!?]+", protected)
+    matches = re.findall(r'[^.!?]+[.!?]+(?:[)"\]\'\u2019\u201d]+)?', protected)
     if not matches:
         restored = protected
         for token, original in replacements.items():
             restored = restored.replace(token, original)
         return [restored]
 
-    sentences = []
+    sentences: list[str] = []
+    buffer = ""
     for segment in matches:
         restored = segment
         for token, original in replacements.items():
             restored = restored.replace(token, original)
-        restored = normalize_whitespace(restored)
+        restored = normalize_sentence_closing_punctuation(normalize_whitespace(restored))
         if restored:
-            sentences.append(restored)
+            if buffer:
+                buffer = normalize_whitespace(f"{buffer} {restored}")
+            else:
+                buffer = restored
+            if sentence_has_unclosed_quote(buffer):
+                continue
+            if sentences and sentence_continues_quoted_attribution(sentences[-1], buffer):
+                sentences[-1] = normalize_whitespace(f"{sentences[-1]} {buffer}")
+                buffer = ""
+                continue
+            sentences.append(buffer)
+            buffer = ""
+    if buffer:
+        sentences.append(normalize_sentence_closing_punctuation(buffer))
     return sentences
 
 
@@ -644,9 +681,36 @@ def early_brief_opening(cluster: dict[str, Any], central: dict[str, Any] | None)
         return summary
 
     snippet = str(central.get("snippet") or "").strip()
-    if snippet and sentence_similarity(snippet, cluster["summary"]) < 0.72:
+    normalized_summary = normalize_whitespace(summary).lower()
+    normalized_snippet = normalize_whitespace(snippet).lower()
+    summary_anchor = re.sub(r"[.!?]+$", "", normalized_summary)
+    if (
+        snippet
+        and not normalized_snippet.startswith(summary_anchor)
+        and normalized_snippet not in normalized_summary
+        and normalized_summary not in normalized_snippet
+        and sentence_similarity(snippet, cluster["summary"]) < 0.72
+    ):
         return f"{summary} {snippet}".strip()
     return summary
+
+
+def snippet_extension_after_opening(opening: str, snippet: str) -> str:
+    opening_sentences = split_narrative_sentences(opening)
+    snippet_sentences = split_narrative_sentences(snippet)
+    if not opening_sentences or len(snippet_sentences) <= 1:
+        return ""
+
+    normalized_opening = normalize_whitespace(opening_sentences[0]).lower()
+    normalized_snippet_first = normalize_whitespace(snippet_sentences[0]).lower()
+    opening_anchor = re.sub(r"[.!?]+$", "", normalized_opening)
+    if (
+        sentence_similarity(opening_sentences[0], snippet_sentences[0]) < 0.72
+        and not normalized_snippet_first.startswith(opening_anchor)
+    ):
+        return ""
+
+    return " ".join(snippet_sentences[1:]).strip()
 
 
 def early_brief_detail_followup(
@@ -657,11 +721,19 @@ def early_brief_detail_followup(
     if not central:
         return ""
 
+    snippet = ensure_period(str(central.get("snippet") or "").strip())
+    snippet_extension = ensure_period(snippet_extension_after_opening(opening, snippet))
+    if (
+        snippet_extension
+        and normalize_whitespace(snippet_extension).lower() not in normalize_whitespace(opening).lower()
+        and sentence_similarity(snippet_extension, opening) < 0.72
+    ):
+        return snippet_extension
+
     detail = ensure_period(str(central.get("detail") or "").strip())
     if detail and normalize_whitespace(detail).lower() not in normalize_whitespace(opening).lower() and sentence_similarity(detail, opening) < 0.72:
         return detail
 
-    snippet = ensure_period(str(central.get("snippet") or "").strip())
     summary = ensure_period(cluster["summary"])
     if (
         snippet

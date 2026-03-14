@@ -23,10 +23,13 @@ try:
         build_grounded_brief,
         insert_brief_revision_draft,
         promote_revision_current_state as promote_brief_revision_current_state,
+        split_narrative_sentences as split_brief_sentences,
     )
     from tooling.enrich_articles_to_supabase import merge_article_metadata
     from tooling.generate_temporary_live_feed import (
         FeedItem,
+        build_enrichment_from_markup,
+        build_source_api_markup,
         classify_fetch_block,
         choose_story_summary,
         cluster_items,
@@ -36,14 +39,20 @@ try:
     )
     from tooling.local_ingest_runtime import build_launchd_plist, choose_due_job
     from tooling.semantic_story_candidates import build_similarity_lookup
+    from tooling.source_fetch_strategies import (
+        resolve_source_fetch_strategy,
+        should_attempt_browser_fallback,
+        should_attempt_source_api_fallback,
+    )
     from tooling.url_normalization import normalize_canonical_url
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
     from generate_perspective_to_supabase import build_perspective, current_revision_row_id, insert_perspective_revision_draft, promote_revision_current_state as promote_perspective_revision_current_state
-    from generate_story_briefs_to_supabase import build_grounded_brief, insert_brief_revision_draft, promote_revision_current_state as promote_brief_revision_current_state
+    from generate_story_briefs_to_supabase import build_grounded_brief, insert_brief_revision_draft, promote_revision_current_state as promote_brief_revision_current_state, split_narrative_sentences as split_brief_sentences
     from enrich_articles_to_supabase import merge_article_metadata
-    from generate_temporary_live_feed import FeedItem, classify_fetch_block, choose_story_summary, cluster_items, detect_fetch_block, normalize_feed_fetch_url, summary_quality_score
+    from generate_temporary_live_feed import FeedItem, build_enrichment_from_markup, build_source_api_markup, classify_fetch_block, choose_story_summary, cluster_items, detect_fetch_block, normalize_feed_fetch_url, summary_quality_score
     from local_ingest_runtime import build_launchd_plist, choose_due_job
     from semantic_story_candidates import build_similarity_lookup
+    from source_fetch_strategies import resolve_source_fetch_strategy, should_attempt_browser_fallback, should_attempt_source_api_fallback
     from url_normalization import normalize_canonical_url
 
 
@@ -226,6 +235,106 @@ def main() -> int:
     if status_only_block != {"reason": "http_access_denied", "vendor": "generic"}:
         raise SystemExit(f"expected generic HTTP access-denied fetch block, got {status_only_block}")
 
+    the_hill_strategy = resolve_source_fetch_strategy("https://thehill.com/homenews/example")
+    if the_hill_strategy.name != "http_fetch_with_source_api_and_browser_fallback":
+        raise SystemExit(f"expected The Hill API plus browser fallback strategy, got {the_hill_strategy}")
+    if not should_attempt_source_api_fallback(the_hill_strategy, reason="fetch_blocked"):
+        raise SystemExit("expected The Hill strategy to source-retry on fetch blocks")
+    if not should_attempt_source_api_fallback(the_hill_strategy, reason="rss_only"):
+        raise SystemExit("expected The Hill strategy to source-retry on rss_only extraction")
+    if not should_attempt_browser_fallback(the_hill_strategy, reason="fetch_blocked"):
+        raise SystemExit("expected The Hill strategy to browser-retry on fetch blocks")
+    if not should_attempt_browser_fallback(the_hill_strategy, reason="rss_only"):
+        raise SystemExit("expected The Hill strategy to browser-retry on rss_only extraction")
+
+    source_api_markup = build_source_api_markup(
+        title="Trump says he has own idea on how long Iran war will last",
+        article_html="""
+        <p>President Trump said Friday that he had his own idea of how long the conflict in Iran could last.</p>
+        <p>He said the military campaign would continue as long as necessary.</p>
+        <p>Officials have offered shifting messages about the likely timeline.</p>
+        """,
+        description="President Trump said Friday that he had his own idea of how long the conflict in Iran could last.",
+    )
+    source_api_enrichment = build_enrichment_from_markup(
+        source_api_markup,
+        url="https://thehill.com/homenews/administration/5783947-trump-iran-conflict-timeline/",
+        fallback_summary="Fallback summary.",
+        default_payload={
+            "fetch_strategy": "http_fetch_with_source_api_and_browser_fallback",
+            "source_api_attempted": True,
+            "source_api_used": "thehill_wp_json",
+        },
+    )
+    if source_api_enrichment.get("extraction_quality") != "article_body":
+        raise SystemExit(f"expected The Hill source API enrichment to extract article text, got {source_api_enrichment}")
+
+    quoted_sentences = split_brief_sentences(
+        (
+            "President Trump said Friday that he has his own idea of how long the conflict in Iran could last. "
+            "“I mean, I have my own idea. But what good does it do?” Trump told reporters at Joint Base Andrews when asked about the duration of the war. "
+            "“It’ll be as long as it’s necessary.” Trump and the Pentagon have offered conflicting signals about when the conflict could come to an end."
+        )
+    )
+    if len(quoted_sentences) < 3 or "But what good does it do?” Trump told reporters" not in quoted_sentences[1]:
+        raise SystemExit(f"expected quoted narrative sentence to stay intact, got {quoted_sentences}")
+
+    browser_rendered_enrichment = build_enrichment_from_markup(
+        """
+        <html>
+          <head>
+            <meta property="og:description" content="The Hill article body is now available." />
+          </head>
+          <body>
+            <article>
+              <p>President Trump said he had his own idea of how long the Iran conflict would last.</p>
+              <p>The Hill reported that the administration was sending mixed messages about the timeline.</p>
+              <p>Officials said the next phase would depend on how regional responses unfolded.</p>
+            </article>
+          </body>
+        </html>
+        """,
+        url="https://thehill.com/example-story",
+        fallback_summary="Fallback summary.",
+        default_payload={"fetch_strategy": "http_fetch_with_source_api_and_browser_fallback"},
+        browser_rendered=True,
+    )
+    if (
+        browser_rendered_enrichment.get("extraction_quality") != "article_body"
+        or browser_rendered_enrichment.get("browser_rendered") is not True
+    ):
+        raise SystemExit(
+            f"expected browser-rendered enrichment to produce article body extraction, got {browser_rendered_enrichment}"
+        )
+    if browser_rendered_enrichment.get("lede", "").startswith("Decision Desk HQ and The Hill"):
+        raise SystemExit(
+            f"expected The Hill browser-rendered enrichment to skip election-center boilerplate, got {browser_rendered_enrichment}"
+        )
+
+    the_hill_boilerplate_enrichment = build_enrichment_from_markup(
+        """
+        <html>
+          <head>
+            <meta property="og:description" content="Decision Desk HQ and The Hill's ultimate hub for polls, predictions, and election results." />
+          </head>
+          <body>
+            <p>Decision Desk HQ and The Hill's ultimate hub for polls, predictions, and election results.</p>
+            <p>Sponsored content</p>
+            <p>A federal appeals court ruled that Mississippi’s law allowing mail ballots to be received after Election Day is illegal.</p>
+            <p>The opinion sends the RNC challenge back to a lower court to determine whether the statute should be blocked.</p>
+          </body>
+        </html>
+        """,
+        url="https://thehill.com/example-election-center-story",
+        fallback_summary="Fallback summary.",
+        default_payload={"fetch_strategy": "http_fetch_with_source_api_and_browser_fallback"},
+        browser_rendered=True,
+    )
+    if not the_hill_boilerplate_enrichment.get("lede", "").startswith("A federal appeals court ruled"):
+        raise SystemExit(
+            f"expected The Hill boilerplate enrichment to choose the first article sentence, got {the_hill_boilerplate_enrichment}"
+        )
+
     blocked_metadata = merge_article_metadata(
         {"metadata": {"feed_summary": "Fallback summary."}},
         {
@@ -240,6 +349,29 @@ def main() -> int:
     )
     if blocked_metadata.get("fetch_blocked") is not True or blocked_metadata.get("fetch_block_vendor") != "perimeterx":
         raise SystemExit(f"expected fetch block metadata to be retained, got {blocked_metadata}")
+
+    browser_metadata = merge_article_metadata(
+        {"metadata": {"feed_summary": "Fallback summary."}},
+        {
+            "named_entities": [],
+            "extraction_quality": "article_body",
+            "access_signal": "open",
+            "fetch_strategy": "http_fetch_with_source_api_and_browser_fallback",
+            "source_api_attempted": True,
+            "source_api_used": "thehill_wp_json",
+            "source_api_endpoint": "https://thehill.com/wp-json/wp/v2/posts/5783947",
+            "browser_attempted": True,
+            "browser_rendered": True,
+            "browser_executable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        },
+        "2026-03-14T04:15:00Z",
+    )
+    if (
+        browser_metadata.get("browser_rendered") is not True
+        or browser_metadata.get("fetch_strategy") != "http_fetch_with_source_api_and_browser_fallback"
+        or browser_metadata.get("source_api_used") != "thehill_wp_json"
+    ):
+        raise SystemExit(f"expected browser-rendered metadata to be retained, got {browser_metadata}")
 
     single_source_brief = build_grounded_brief(
         {
