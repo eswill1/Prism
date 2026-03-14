@@ -108,6 +108,14 @@ The system goal is maximum automation with narrow human-review points.
 - failure rule: do not roll back the current brief automatically, but treat unsupported sections as a release blocker for generator changes
 - current state: available locally and in staging as `npm run brief:grounding`
 
+#### `evaluate_brief_quality`
+
+- cadence: after `generate_story_briefs` during tuning, and before shipping major brief-generator or source-extraction changes
+- input: active live stories, current `story_brief_revisions`, stored section-support metadata, and current linked article quality signals
+- output: sampled review report that combines readiness, grounding, support concentration, and text-quality warnings, with JSON and markdown output modes
+- failure rule: no automatic rollback, but critical failures should block shipping brief-generator or extraction changes until reviewed
+- current state: available locally and in staging as `npm run brief:quality`
+
 #### `classify_media_rights`
 
 - cadence: immediately after metadata fetch

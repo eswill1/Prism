@@ -6,48 +6,10 @@ import json
 from typing import Any
 
 from sync_story_content import REST_BASE, SUPABASE_SERVICE_ROLE_KEY, SupabaseRestClient
+from generate_story_briefs_to_supabase import cluster_brief_source_metrics, infer_access_tier, is_substantive_article
 
 
 MAX_STORIES = 12
-
-OPEN_OUTLETS = {
-    "ABC News",
-    "Associated Press",
-    "BBC News",
-    "CBS News",
-    "CNN",
-    "Fox News",
-    "MSNBC",
-    "NBC News",
-    "NPR",
-    "PBS NewsHour",
-    "Politico",
-    "Reuters",
-    "The Hill",
-}
-
-LIKELY_PAYWALLED_OUTLETS = {
-    "Bloomberg",
-    "Financial Times",
-    "New York Times",
-    "Wall Street Journal",
-}
-
-
-def is_substantive_article(article: dict[str, Any]) -> bool:
-    metadata = article.get("metadata") or {}
-    extraction_quality = metadata.get("extraction_quality") if isinstance(metadata, dict) else None
-    body_text = article.get("body_text")
-    summary = article.get("summary")
-
-    if extraction_quality == "article_body" and isinstance(body_text, str) and len(body_text.strip()) >= 180:
-        return True
-
-    if isinstance(summary, str) and len(summary.strip()) >= 110:
-        return True
-
-    return False
-
 
 def main() -> int:
     client = SupabaseRestClient(REST_BASE, SUPABASE_SERVICE_ROLE_KEY)
@@ -68,10 +30,10 @@ def main() -> int:
         cluster_articles = row.get("cluster_articles") or []
         article_rows = []
         seen_outlets: set[str] = set()
-        substantive_outlets: set[str] = set()
         open_outlets: set[str] = set()
         paywalled_outlets: set[str] = set()
         brief_revision = brief_by_cluster.get(row.get("id"))
+        source_metrics = cluster_brief_source_metrics(row)
 
         for cluster_article in sorted(cluster_articles, key=lambda item: item.get("rank_in_cluster", 0)):
             article = cluster_article.get("articles") or {}
@@ -80,18 +42,18 @@ def main() -> int:
                 continue
 
             seen_outlets.add(outlet)
-            if outlet in OPEN_OUTLETS:
+            access_tier = infer_access_tier(outlet, ((article.get("metadata") or {}).get("access_signal") if isinstance(article.get("metadata"), dict) else None))
+            if access_tier == "open":
                 open_outlets.add(outlet)
-            if outlet in LIKELY_PAYWALLED_OUTLETS:
+            if access_tier == "likely_paywalled":
                 paywalled_outlets.add(outlet)
-            if is_substantive_article(article):
-                substantive_outlets.add(outlet)
 
             article_rows.append(
                 {
                     "outlet": outlet,
                     "extraction_quality": (article.get("metadata") or {}).get("extraction_quality"),
                     "has_body_text": bool((article.get("body_text") or "").strip()),
+                    "is_substantive": is_substantive_article(article),
                 }
             )
 
@@ -100,11 +62,12 @@ def main() -> int:
                 "slug": row["slug"],
                 "title": row["canonical_headline"],
                 "outlet_count": len(seen_outlets),
-                "substantive_source_count": len(substantive_outlets),
-                "full_brief_ready": len(substantive_outlets) >= 2,
+                "substantive_source_count": source_metrics["substantive_outlet_count"],
+                "article_body_source_count": source_metrics["article_body_outlet_count"],
+                "full_brief_ready": source_metrics["full_brief_ready"],
                 "open_outlet_count": len(open_outlets),
                 "likely_paywalled_outlet_count": len(paywalled_outlets),
-                "open_alternate_ready": len(open_outlets) >= 1 and len(seen_outlets) >= 2,
+                "open_alternate_ready": source_metrics["substantive_outlet_count"] >= 2 and len(open_outlets) >= 1,
                 "stored_brief_current": bool(brief_revision),
                 "stored_brief_status": (brief_revision or {}).get("status"),
                 "stored_brief_revision_tag": (brief_revision or {}).get("revision_tag"),

@@ -10,6 +10,9 @@ from typing import Any
 from urllib import parse
 
 from generate_temporary_live_feed import (
+    BYLINE_FRAGMENT_PATTERN,
+    NOTE_FRAGMENT_PATTERN,
+    SCRIPT_ARTIFACT_PATTERN,
     choose_story_summary,
     clean_summary_snippet,
     fetch_article_enrichment,
@@ -279,6 +282,19 @@ def extraction_mismatch(article: dict[str, Any], enrichment: dict[str, Any]) -> 
         " ".join(filter(None, [enrichment.get("lede"), enrichment.get("body_preview")])),
         2,
     )
+    full_candidate_text = " ".join(
+        filter(
+            None,
+            [
+                str(enrichment.get("lede") or ""),
+                str(enrichment.get("body_preview") or ""),
+            ],
+        )
+    )
+    if candidate_text.strip() and SCRIPT_ARTIFACT_PATTERN.search(candidate_text):
+        return True
+    if full_candidate_text and (BYLINE_FRAGMENT_PATTERN.search(full_candidate_text) or NOTE_FRAGMENT_PATTERN.search(full_candidate_text)):
+        return True
     if not candidate_text.strip():
         return False
     return alignment_score(reference_text, candidate_text) < 0.16
@@ -286,6 +302,23 @@ def extraction_mismatch(article: dict[str, Any], enrichment: dict[str, Any]) -> 
 
 def current_article_mismatch(article: dict[str, Any]) -> bool:
     metadata = article.get("metadata") if isinstance(article.get("metadata"), dict) else {}
+    full_candidate_text = " ".join(
+        filter(
+            None,
+            [
+                str(article.get("body_text") or ""),
+                str(article.get("summary") or ""),
+            ],
+        )
+    )
+    candidate_text = first_narrative_sentences(
+        article.get("body_text") or article.get("summary"),
+        2,
+    )
+    if candidate_text.strip() and SCRIPT_ARTIFACT_PATTERN.search(candidate_text):
+        return True
+    if full_candidate_text and (BYLINE_FRAGMENT_PATTERN.search(full_candidate_text) or NOTE_FRAGMENT_PATTERN.search(full_candidate_text)):
+        return True
     reference_text = " ".join(
         filter(
             None,
@@ -294,10 +327,6 @@ def current_article_mismatch(article: dict[str, Any]) -> bool:
                 metadata.get("feed_summary") if isinstance(metadata, dict) else None,
             ],
         )
-    )
-    candidate_text = first_narrative_sentences(
-        article.get("body_text") or article.get("summary"),
-        2,
     )
     if not reference_text.strip() or not candidate_text.strip():
         return False
