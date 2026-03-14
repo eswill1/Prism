@@ -16,9 +16,7 @@ Prism should not be developed directly on `main`.
 Before opening or merging a pull request, run:
 
 ```bash
-npm run build:web
-python3 -m py_compile tooling/*.py
-python3 tooling/ci_smoke_checks.py
+npm run validate
 ```
 
 If your change touches live ingestion or connected-mode data, also run the relevant connected commands and note what you checked.

@@ -27,6 +27,9 @@
     "cluster:candidates": "python3 tooling/evaluate_cluster_candidates.py",
     "build:api": "npm run build --workspace=src/api",
     "build:web": "npm run build --workspace=src/web",
+    "validate:web": "npm run build:web",
+    "validate:pipeline": "python3 -m py_compile tooling/*.py && python3 tooling/ci_smoke_checks.py",
+    "validate": "npm run validate:web && npm run validate:pipeline",
     "lint": "npm run lint --workspaces --if-present"
   },
   "engines": {
