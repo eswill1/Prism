@@ -12,7 +12,7 @@ Before connecting Vercel:
 - create the new GitHub repository
 - push this repo content into it
 - keep `.env.example` as the documented variable list
-- keep `.github/workflows/web-ci.yml` and `.github/workflows/refresh-live-feed.yml` enabled
+- keep `.github/workflows/web-ci.yml` enabled
 - keep local development aligned with `LOCAL_DEVELOPMENT_MODEL.md`
 
 ---
@@ -57,19 +57,13 @@ For the first Vercel setup, only `staging` needs to exist.
 
 ## 4. GitHub Workflows
 
-Two workflows are already scaffolded:
+One workflow is currently scaffolded for GitHub:
 
 - `web-ci.yml`
   - installs dependencies
   - runs `npm run build:web`
-- `refresh-live-feed.yml`
-  - runs every 4 hours
-  - regenerates the temporary live snapshot
-  - commits changes to:
-    - `data/temporary-live-feed.json`
-    - `src/web/public/data/temporary-live-feed.json`
 
-This is the cheap-content loop for the Vercel preview path.
+The temporary live snapshot remains available as a manual local command via `npm run refresh:live-feed`, but the old scheduled GitHub snapshot refresher has been retired because this repo now prefers the real connected ingest path over direct snapshot commits to `main`.
 
 ---
 

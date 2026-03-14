@@ -1190,6 +1190,7 @@ button {
 }
 
 .perspective-summary-block,
+.perspective-version-block,
 .perspective-meter-block,
 .perspective-presence-block {
   display: grid;
@@ -1211,12 +1212,19 @@ button {
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
 }
 
+.perspective-version-block {
+  margin-top: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035));
+}
+
 .perspective-presence-block {
   margin-top: 16px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
 }
 
+.perspective-version-block .panel-label,
 .perspective-meter-block .panel-label,
 .perspective-presence-block .panel-label {
   margin-bottom: 0;
@@ -1584,6 +1592,88 @@ button {
 
 .perspective-list li + li {
   margin-top: 10px;
+}
+
+.perspective-version-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.perspective-version-tag,
+.perspective-version-stamp {
+  margin: 0;
+}
+
+.perspective-version-tag,
+.perspective-version-code {
+  font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+}
+
+.perspective-version-tag {
+  color: var(--prism-sheet);
+  font-size: 0.94rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.perspective-version-stamp {
+  color: rgba(255, 253, 248, 0.72);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.perspective-version-meta {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.perspective-version-meta div {
+  display: grid;
+  gap: 4px;
+}
+
+.perspective-version-meta dt {
+  color: rgba(255, 253, 248, 0.72);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.perspective-version-meta dd {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  color: rgba(255, 253, 248, 0.95);
+  line-height: 1.55;
+}
+
+.perspective-version-code {
+  color: rgba(255, 253, 248, 0.82);
+  font-size: 0.86rem;
+}
+
+.perspective-version-changes {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.perspective-methodology-link {
+  width: fit-content;
+  color: rgba(255, 253, 248, 0.86);
+}
+
+.perspective-methodology-link:hover {
+  color: var(--prism-sheet);
 }
 
 .perspective-presence-list {

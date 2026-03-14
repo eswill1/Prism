@@ -1,5 +1,6 @@
 import { clusterBySlug, mockClusters, type FramingGroup, type StoryCluster } from './mock-clusters'
 import { loadLiveStoryBySlug } from './live-feed'
+import { buildPerspectiveRevisionInfo, type PerspectiveRevisionSnapshot } from './perspective-versioning'
 import { getNewsSectionKey } from './news-sections'
 import { inferSourceAccessTier } from './source-access'
 import type { StoryBrief } from './story-brief-types'
@@ -256,13 +257,21 @@ type StoryBriefRevisionRow = {
 }
 
 type StoryPerspectiveRevisionRow = {
+  revision_tag: string
   status: string
+  generation_method: string
+  created_at: string
   summary: string
   takeaways: string[] | null
   framing_presence: Array<{ label?: string | null; count?: number | null; note?: string | null }> | null
   source_family_presence: Array<{ label?: string | null; count?: number | null; note?: string | null }> | null
   scope_presence: Array<{ label?: string | null; count?: number | null; note?: string | null }> | null
   methodology_note: string
+  metadata: JsonObject | null
+}
+
+type PerspectiveVersionEventRow = {
+  version_tag: string
 }
 
 function mapStoredBrief(row: StoryBriefRevisionRow | null | undefined): StoryBrief | undefined {
@@ -310,7 +319,9 @@ function mapPresenceItems(
     .filter((row) => row.label.trim().length > 0 && Number.isFinite(row.count) && row.count > 0)
 }
 
-function mapStoredPerspective(row: StoryPerspectiveRevisionRow | null | undefined): StoryPerspective | undefined {
+function toPerspectiveRevisionSnapshot(
+  row: StoryPerspectiveRevisionRow | null | undefined,
+): PerspectiveRevisionSnapshot | undefined {
   if (!row) {
     return undefined
   }
@@ -320,13 +331,40 @@ function mapStoredPerspective(row: StoryPerspectiveRevisionRow | null | undefine
     : []
 
   return {
+    revisionTag: row.revision_tag,
+    createdAt: row.created_at,
+    generationMethod: row.generation_method,
     status: row.status === 'ready' ? 'ready' : 'early',
     summary: row.summary,
     takeaways,
+    metadata: row.metadata || {},
+  }
+}
+
+function mapStoredPerspective(
+  row: StoryPerspectiveRevisionRow | null | undefined,
+  previousRow?: StoryPerspectiveRevisionRow | null,
+): StoryPerspective | undefined {
+  if (!row) {
+    return undefined
+  }
+
+  const currentSnapshot = toPerspectiveRevisionSnapshot(row)
+  if (!currentSnapshot) {
+    return undefined
+  }
+
+  const previousSnapshot = toPerspectiveRevisionSnapshot(previousRow)
+
+  return {
+    status: currentSnapshot.status,
+    summary: row.summary,
+    takeaways: currentSnapshot.takeaways,
     framingPresence: mapPresenceItems(row.framing_presence),
     sourceFamilyPresence: mapPresenceItems(row.source_family_presence),
     scopePresence: mapPresenceItems(row.scope_presence),
     methodologyNote: row.methodology_note,
+    revision: buildPerspectiveRevisionInfo(currentSnapshot, previousSnapshot),
   }
 }
 
@@ -539,6 +577,7 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
       { data: correctionEvents },
       { data: briefRevision },
       { data: perspectiveRevision },
+      { data: perspectiveVersionEvents },
     ] =
       await Promise.all([
         client
@@ -582,12 +621,47 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
         client
           .from('story_perspective_revisions')
           .select(
-            'status, summary, takeaways, framing_presence, source_family_presence, scope_presence, methodology_note',
+            'revision_tag, status, generation_method, created_at, summary, takeaways, framing_presence, source_family_presence, scope_presence, methodology_note, metadata',
           )
           .eq('cluster_id', clusterRow.id)
           .eq('is_current', true)
           .maybeSingle(),
+        client
+          .from('version_registry')
+          .select('version_tag')
+          .eq('scope', 'perspective')
+          .eq('scope_id', clusterRow.id)
+          .order('published_at', { ascending: false })
+          .limit(2),
       ])
+
+    const currentPerspectiveRevision = perspectiveRevision as StoryPerspectiveRevisionRow | null | undefined
+    const perspectiveVersionRows =
+      (perspectiveVersionEvents as PerspectiveVersionEventRow[] | null | undefined) ?? []
+    const previousPublishedTag =
+      currentPerspectiveRevision && perspectiveVersionRows.length > 0
+        ? perspectiveVersionRows.find((row) => row.version_tag !== currentPerspectiveRevision.revision_tag)
+            ?.version_tag
+        : undefined
+
+    let previousPerspectiveRevision: StoryPerspectiveRevisionRow | null = null
+    if (currentPerspectiveRevision && previousPublishedTag) {
+      const { data: previousPerspectiveRow, error: previousPerspectiveError } = await client
+        .from('story_perspective_revisions')
+        .select(
+          'revision_tag, status, generation_method, created_at, summary, takeaways, framing_presence, source_family_presence, scope_presence, methodology_note, metadata',
+        )
+        .eq('cluster_id', clusterRow.id)
+        .eq('revision_tag', previousPublishedTag)
+        .maybeSingle()
+
+      if (previousPerspectiveError) {
+        throw previousPerspectiveError
+      }
+
+      previousPerspectiveRevision =
+        (previousPerspectiveRow as StoryPerspectiveRevisionRow | null | undefined) ?? null
+    }
 
     const normalizedCluster = mapSummaryRow(clusterRow as StoryClusterRow)
     if (!isReaderVisibleStoryOrigin(normalizedCluster.storyOrigin)) {
@@ -769,7 +843,8 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
       contextPacks,
       generatedBrief: mapStoredBrief(briefRevision as StoryBriefRevisionRow | null | undefined),
       generatedPerspective: mapStoredPerspective(
-        perspectiveRevision as StoryPerspectiveRevisionRow | null | undefined,
+        currentPerspectiveRevision,
+        previousPerspectiveRevision,
       ),
     }
   } catch (error) {

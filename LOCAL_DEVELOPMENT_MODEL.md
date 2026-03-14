@@ -105,6 +105,8 @@ Run:
 - remote Supabase data
 - Doppler-backed secrets
 - prefer `npm run dev:web:connected` from the repo root once Doppler is configured
+- this command now also reruns the full real-news ingest pipeline on a local interval while the dev server stays up
+- use `npm run dev:web:connected:web-only` when you need the connected reader without the ingest loop
 
 This is the preferred mode for early real product work.
 
