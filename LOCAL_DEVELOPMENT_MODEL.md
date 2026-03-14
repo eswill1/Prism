@@ -107,6 +107,7 @@ Run:
 - prefer `npm run dev:web:connected` from the repo root once Doppler is configured
 - this command now also reruns the full real-news ingest pipeline on a local interval while the dev server stays up
 - use `npm run dev:web:connected:web-only` when you need the connected reader without the ingest loop
+- for longer-lived local freshness without tying it to an open terminal, use `npm run ingest:local:launchd:install` once, then run `npm run ingest:local:status` to inspect the background scheduler; this is a local bridge, not the long-term hosted worker design
 
 This is the preferred mode for early real product work.
 

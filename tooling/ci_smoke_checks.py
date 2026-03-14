@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+from datetime import UTC, datetime, timedelta
 
 
 os.environ.setdefault("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co")
@@ -14,9 +15,12 @@ os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key")
 try:
     from tooling.generate_perspective_to_supabase import (
         build_perspective,
+        current_revision_row_id,
+        insert_perspective_revision_draft,
         promote_revision_current_state as promote_perspective_revision_current_state,
     )
     from tooling.generate_story_briefs_to_supabase import (
+        insert_brief_revision_draft,
         promote_revision_current_state as promote_brief_revision_current_state,
     )
     from tooling.generate_temporary_live_feed import (
@@ -26,12 +30,14 @@ try:
         normalize_feed_fetch_url,
         summary_quality_score,
     )
+    from tooling.local_ingest_runtime import build_launchd_plist, choose_due_job
     from tooling.semantic_story_candidates import build_similarity_lookup
     from tooling.url_normalization import normalize_canonical_url
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
-    from generate_perspective_to_supabase import build_perspective, promote_revision_current_state as promote_perspective_revision_current_state
-    from generate_story_briefs_to_supabase import promote_revision_current_state as promote_brief_revision_current_state
+    from generate_perspective_to_supabase import build_perspective, current_revision_row_id, insert_perspective_revision_draft, promote_revision_current_state as promote_perspective_revision_current_state
+    from generate_story_briefs_to_supabase import insert_brief_revision_draft, promote_revision_current_state as promote_brief_revision_current_state
     from generate_temporary_live_feed import FeedItem, choose_story_summary, cluster_items, normalize_feed_fetch_url, summary_quality_score
+    from local_ingest_runtime import build_launchd_plist, choose_due_job
     from semantic_story_candidates import build_similarity_lookup
     from url_normalization import normalize_canonical_url
 
@@ -79,6 +85,26 @@ class PromotionClient:
             raise RuntimeError("simulated promotion failure")
 
 
+class ExistingPerspectiveDraftClient:
+    def get(self, path: str) -> list[dict[str, str]]:
+        if "input_signature=eq.signature-123" in path:
+            return [{"id": "existing-perspective-draft"}]
+        return []
+
+    def post(self, path: str, body: list[dict[str, object]], prefer: str | None = None) -> None:  # noqa: ARG002
+        raise AssertionError(f"unexpected draft insert call for {path} with {body}")
+
+
+class ExistingBriefDraftClient:
+    def get(self, path: str) -> list[dict[str, str]]:
+        if "input_signature=eq.brief-signature-123" in path:
+            return [{"id": "existing-brief-draft"}]
+        return []
+
+    def post(self, path: str, body: list[dict[str, object]], prefer: str | None = None) -> None:  # noqa: ARG002
+        raise AssertionError(f"unexpected brief draft insert call for {path} with {body}")
+
+
 def run_web_regression_tests() -> None:
     if not TSX_BIN.exists():
         raise SystemExit(f"expected tsx test runner at {TSX_BIN}")
@@ -100,6 +126,37 @@ def run_web_regression_tests() -> None:
 
 def main() -> int:
     run_web_regression_tests()
+
+    now = datetime.now(UTC)
+    if choose_due_job(
+        now=now,
+        next_raw_due_at=now - timedelta(seconds=30),
+        next_full_due_at=now - timedelta(seconds=5),
+    ) != "full":
+        raise SystemExit("expected full ingest to win when both raw and full are due")
+    if choose_due_job(
+        now=now,
+        next_raw_due_at=now - timedelta(seconds=5),
+        next_full_due_at=now + timedelta(seconds=120),
+    ) != "raw":
+        raise SystemExit("expected raw ingest to run when only the raw cadence is due")
+
+    plist_payload = build_launchd_plist(
+        raw_interval_seconds=300,
+        full_interval_seconds=1800,
+        startup_delay_seconds=30,
+        retry_delay_seconds=60,
+    ).decode("utf-8")
+    if "com.prismwire.local-ingest" not in plist_payload or "tooling/run_local_ingest_scheduler.py" not in plist_payload:
+        raise SystemExit("expected launchd plist to include the local ingest scheduler label and command")
+
+    for command in (
+        ["python3", "tooling/run_local_ingest_job.py", "--help"],
+        ["python3", "tooling/run_local_ingest_scheduler.py", "status", "--json"],
+    ):
+        completed = subprocess.run(command, cwd=REPO_ROOT, check=False, capture_output=True, text=True)
+        if completed.returncode != 0:
+            raise SystemExit(f"expected {' '.join(command)} to succeed, got {completed.returncode}: {completed.stderr}")
 
     oil_one = build_item(
         source="NPR",
@@ -244,6 +301,54 @@ def main() -> int:
         raise SystemExit(f"expected same-outlet perspective to stay early, got {perspective_payload['status']}")
     if "Prism has" in perspective_payload["summary"] or "linked reports" in perspective_payload["summary"]:
         raise SystemExit(f"expected perspective summary to avoid boilerplate focus, got {perspective_payload['summary']}")
+    if current_revision_row_id(None) is not None:
+        raise SystemExit("expected missing perspective current revision to resolve to None")
+    if current_revision_row_id({"id": "current-perspective"}) != "current-perspective":
+        raise SystemExit("expected current perspective revision id helper to return the row id when present")
+    existing_revision_id = insert_perspective_revision_draft(
+        ExistingPerspectiveDraftClient(),
+        "cluster-1",
+        "perspective-20260314020000",
+        {
+            "status": "ready",
+            "input_signature": "signature-123",
+            "source_snapshot": [],
+            "summary": "Stored perspective summary.",
+            "takeaways": [],
+            "framing_presence": [],
+            "source_family_presence": [],
+            "scope_presence": [],
+            "methodology_note": "Method note.",
+            "metadata": {},
+        },
+    )
+    if existing_revision_id != "existing-perspective-draft":
+        raise SystemExit(
+            f"expected perspective draft insert to reuse the existing revision id, got {existing_revision_id}"
+        )
+    existing_brief_revision_id = insert_brief_revision_draft(
+        ExistingBriefDraftClient(),
+        "cluster-1",
+        "brief-20260314020000",
+        {
+            "status": "full",
+            "label": "Prism Brief",
+            "title": "Stored brief title",
+            "input_signature": "brief-signature-123",
+            "source_snapshot": [],
+            "paragraphs": [],
+            "why_it_matters": "Why this matters.",
+            "where_sources_agree": "Agreement",
+            "where_coverage_differs": "Differences",
+            "what_to_watch": "Watch",
+            "supporting_points": [],
+            "metadata": {},
+        },
+    )
+    if existing_brief_revision_id != "existing-brief-draft":
+        raise SystemExit(
+            f"expected brief draft insert to reuse the existing revision id, got {existing_brief_revision_id}"
+        )
 
     for promote_revision in (promote_brief_revision_current_state, promote_perspective_revision_current_state):
         promotion_client = PromotionClient()

@@ -107,6 +107,10 @@ Core commands:
 - `npm run validate`
 - `npm run dev:web:connected`
 - `npm run dev:web:connected:web-only`
+- `npm run ingest:local:scheduler`
+- `npm run ingest:local:status`
+- `npm run ingest:local:launchd:install`
+- `npm run ingest:local:launchd:uninstall`
 - `npm run refresh:live-feed`
 - `npm run sync:stories`
 - `npm run sources:upsert`
@@ -126,12 +130,15 @@ Environment baseline:
 - copy `.env.example` into your local secret system or Doppler project
 - this repo is now scoped locally to Doppler project `prism-wire` config `dev`
 - `npm run validate` is the default pre-PR check: it builds the web app, compiles Python tooling, and runs the smoke suite, including the TypeScript Perspective/ranking regressions
-- `npm run dev:web:connected` is now the preferred local real-news loop: it starts the connected app on `127.0.0.1:3002` and reruns `npm run ingest:feeds` on a fixed interval while the server is alive; tune the cadence with `PRISM_LOCAL_INGEST_INTERVAL_SECONDS` if needed
+- `npm run dev:web:connected` is now the preferred local real-news loop: it starts the connected app on `127.0.0.1:3002` and reruns `npm run ingest:feeds` on a fixed interval while the server is alive; the default attached cadence is conservative for casual development at one full ingest every 12 hours after a 30 minute startup delay, and you can still tune it with `PRISM_LOCAL_INGEST_INTERVAL_SECONDS` if needed
 - `npm run dev:web:connected:web-only` keeps the older server-only behavior when you explicitly do not want the ingest loop
+- `npm run ingest:local:scheduler` is the new always-on local ingest service: it runs raw feed discovery every 6 hours and the full ingest/enrich/brief/Perspective pipeline every 12 hours by default, with a 30 minute startup delay and 1 hour retry delay; a local lock prevents manual runs and background runs from overlapping, and this remains an intentional local-only bridge until Prism moves to a hosted worker/scheduler
+- `npm run ingest:local:status` reads the local scheduler state from `.local/local-ingest/status.json` and shows last raw/full outcomes plus the next due windows
+- `npm run ingest:local:launchd:install` writes and loads a macOS LaunchAgent so the scheduler can keep running in the background even when you are not holding open a terminal session; `npm run ingest:local:launchd:uninstall` removes it
 - `npm run sync:stories` is now for explicit snapshot or manual sync work only; connected Prism should rely on real sourced stories
 - `npm run sources:upsert` activates the current launch feed registry in Supabase
-- `npm run ingest:feeds` is the default operator path: it polls the active RSS and sitemap feeds in Supabase, refreshes the automated live story set, runs the slower article enrichment pass, generates stored grounded brief revisions, and then generates stored Perspective revisions plus Context Packs for active stories
-- `npm run ingest:feeds:raw` runs only the fast discovery and story-sync portion of the pipeline when you explicitly need ingest without enrichment
+- `npm run ingest:feeds` is the default operator path: it now goes through the local ingest lock/status wrapper before running the full pipeline, so manual runs will wait rather than colliding with the attached dev loop or the always-on local scheduler
+- `npm run ingest:feeds:raw` does the same for the fast discovery and story-sync-only pass
 - `npm run enrich:articles` performs the slower article-page extraction pass for recent linked articles, upgrades Prism Brief inputs beyond feed snippets, and refreshes active story summaries after enrichment lands
 - `npm run brief:generate` builds grounded story-brief revisions from enriched article inputs and advances the current brief revision for each active story when the input signature changes
 - `npm run brief:readiness` reports which active live stories are still limited to early briefs, which have enough substantive sourcing for full Prism Briefs, and whether they already have a usable open alternate
