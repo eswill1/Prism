@@ -115,7 +115,30 @@ def ensure_period(value: str | None) -> str:
     cleaned = normalize_whitespace(value)
     if not cleaned:
         return ""
-    return cleaned if re.search(r"[.!?]$", cleaned) else f"{cleaned}."
+    return cleaned if re.search(r'[.!?](?:["\u2019\u201d)\]]+)?$', cleaned) else f"{cleaned}."
+
+
+def normalize_sentence_closing_punctuation(text: str) -> str:
+    return re.sub(r'([.!?])\s+([)"\]\'\u2019\u201d]+)', r"\1\2", text)
+
+
+def sentence_has_unclosed_quote(text: str) -> bool:
+    normalized = text
+    curly_balance = normalized.count("“") - normalized.count("”")
+    straight_unpaired = normalized.count('"') % 2
+    return curly_balance > 0 or straight_unpaired == 1
+
+
+def sentence_continues_quoted_attribution(previous: str, current: str) -> bool:
+    if not re.search(r'["\u201d\u2019]$', previous.strip()):
+        return False
+    return bool(
+        re.match(
+            r"^(?:(?:[A-Z][A-Za-z'’-]+|[Tt]he|[Hh]e|[Ss]he|[Tt]hey|[Oo]fficials|[Aa]ides|[Rr]eporters)\s+){0,3}"
+            r"(said|says|told|asked|wrote|added|warned|argued|noted|announced|replied|stated|called|posted)\b",
+            current,
+        )
+    )
 
 
 def split_narrative_sentences(value: str | None) -> list[str]:
@@ -133,21 +156,35 @@ def split_narrative_sentences(value: str | None) -> list[str]:
 
         protected = re.sub(pattern, repl, protected, flags=re.IGNORECASE)
 
-    matches = re.findall(r"[^.!?]+[.!?]+", protected)
+    matches = re.findall(r'[^.!?]+[.!?]+(?:[)"\]\'\u2019\u201d]+)?', protected)
     if not matches:
         restored = protected
         for token, original in replacements.items():
             restored = restored.replace(token, original)
         return [restored]
 
-    sentences = []
+    sentences: list[str] = []
+    buffer = ""
     for segment in matches:
         restored = segment
         for token, original in replacements.items():
             restored = restored.replace(token, original)
-        restored = normalize_whitespace(restored)
+        restored = normalize_sentence_closing_punctuation(normalize_whitespace(restored))
         if restored:
-            sentences.append(restored)
+            if buffer:
+                buffer = normalize_whitespace(f"{buffer} {restored}")
+            else:
+                buffer = restored
+            if sentence_has_unclosed_quote(buffer):
+                continue
+            if sentences and sentence_continues_quoted_attribution(sentences[-1], buffer):
+                sentences[-1] = normalize_whitespace(f"{sentences[-1]} {buffer}")
+                buffer = ""
+                continue
+            sentences.append(buffer)
+            buffer = ""
+    if buffer:
+        sentences.append(normalize_sentence_closing_punctuation(buffer))
     return sentences
 
 

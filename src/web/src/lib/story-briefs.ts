@@ -71,13 +71,33 @@ const ABBREVIATION_PATTERNS = [
   /\bSt\./g,
 ]
 
+function normalizeSentenceClosingPunctuation(value: string) {
+  return value.replace(/([.!?])\s+([)"\]'’”]+)/g, '$1$2')
+}
+
+function sentenceHasUnclosedQuote(value: string) {
+  const curlyBalance = (value.match(/“/g) || []).length - (value.match(/”/g) || []).length
+  const straightUnpaired = (value.match(/"/g) || []).length % 2
+  return curlyBalance > 0 || straightUnpaired === 1
+}
+
+function sentenceContinuesQuotedAttribution(previous: string, current: string) {
+  if (!/["”’]$/.test(previous.trim())) {
+    return false
+  }
+
+  return /^(?:(?:[A-Z][A-Za-z'’-]+|[Tt]he|[Hh]e|[Ss]he|[Tt]hey|[Oo]fficials|[Aa]ides|[Rr]eporters)\s+){0,3}(said|says|told|asked|wrote|added|warned|argued|noted|announced|replied|stated|called|posted)\b/.test(
+    current,
+  )
+}
+
 function ensurePeriod(value: string) {
   const trimmed = value.trim()
   if (!trimmed) {
     return trimmed
   }
 
-  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`
+  return /[.!?](?:["’”)\]]+)?$/.test(trimmed) ? trimmed : `${trimmed}.`
 }
 
 function normalizeWhitespace(value: string) {
@@ -168,7 +188,7 @@ function splitNarrativeSentences(text: string) {
     })
   })
 
-  const matches = protectedText.match(/[^.!?]+[.!?]+/g)
+  const matches = protectedText.match(/[^.!?]+[.!?]+(?:[)"\]'’”]+)?/g)
   if (!matches || matches.length === 0) {
     let restored = protectedText
     for (const [token, original] of replacements.entries()) {
@@ -177,15 +197,38 @@ function splitNarrativeSentences(text: string) {
     return [normalizeWhitespace(restored)].filter(Boolean)
   }
 
-  return matches
-    .map((sentence) => {
-      let restored = sentence
+  const sentences: string[] = []
+  let buffer = ''
+
+  for (const sentence of matches) {
+    let restored = sentence
       for (const [token, original] of replacements.entries()) {
         restored = restored.replaceAll(token, original)
       }
-      return normalizeWhitespace(restored)
-    })
-    .filter(Boolean)
+    restored = normalizeSentenceClosingPunctuation(normalizeWhitespace(restored))
+    if (!restored) {
+      continue
+    }
+    buffer = buffer ? normalizeWhitespace(`${buffer} ${restored}`) : restored
+    if (sentenceHasUnclosedQuote(buffer)) {
+      continue
+    }
+    if (sentences.length > 0 && sentenceContinuesQuotedAttribution(sentences[sentences.length - 1] || '', buffer)) {
+      sentences[sentences.length - 1] = normalizeWhitespace(
+        `${sentences[sentences.length - 1]} ${buffer}`,
+      )
+      buffer = ''
+      continue
+    }
+    sentences.push(buffer)
+    buffer = ''
+  }
+
+  if (buffer) {
+    sentences.push(normalizeSentenceClosingPunctuation(buffer))
+  }
+
+  return sentences.filter(Boolean)
 }
 
 function firstNarrativeSentences(text: string, sentenceCount: number) {
@@ -488,10 +531,39 @@ function earlyBriefOpening(cluster: StoryCluster, central: ReturnType<typeof cen
   }
 
   const snippet = central.snippet.trim()
-  if (snippet && sentenceSimilarity(snippet, cluster.dek) < 0.72) {
+  const normalizedSummary = normalizeWhitespace(summary).toLowerCase()
+  const normalizedSnippet = normalizeWhitespace(snippet).toLowerCase()
+  const summaryAnchor = stripEndingPunctuation(normalizedSummary)
+  if (
+    snippet &&
+    !normalizedSnippet.startsWith(summaryAnchor) &&
+    !normalizedSummary.includes(normalizedSnippet) &&
+    !normalizedSnippet.includes(normalizedSummary) &&
+    sentenceSimilarity(snippet, cluster.dek) < 0.72
+  ) {
     return `${summary} ${snippet}`.trim()
   }
   return summary
+}
+
+function snippetExtensionAfterOpening(opening: string, snippet: string) {
+  const openingSentences = splitNarrativeSentences(opening)
+  const snippetSentences = splitNarrativeSentences(snippet)
+  if (openingSentences.length === 0 || snippetSentences.length <= 1) {
+    return ''
+  }
+
+  const normalizedOpening = normalizeWhitespace(openingSentences[0] || '').toLowerCase()
+  const normalizedSnippetFirst = normalizeWhitespace(snippetSentences[0] || '').toLowerCase()
+  const openingAnchor = stripEndingPunctuation(normalizedOpening)
+  if (
+    sentenceSimilarity(openingSentences[0] || '', snippetSentences[0] || '') < 0.72 &&
+    !normalizedSnippetFirst.startsWith(openingAnchor)
+  ) {
+    return ''
+  }
+
+  return snippetSentences.slice(1).join(' ').trim()
 }
 
 function earlyBriefDetailFollowup(
@@ -503,12 +575,21 @@ function earlyBriefDetailFollowup(
     return ''
   }
 
+  const snippet = ensurePeriod(central.snippet.trim())
+  const snippetExtension = ensurePeriod(snippetExtensionAfterOpening(opening, snippet))
+  if (
+    snippetExtension &&
+    !normalizeWhitespace(opening).toLowerCase().includes(normalizeWhitespace(snippetExtension).toLowerCase()) &&
+    sentenceSimilarity(snippetExtension, opening) < 0.72
+  ) {
+    return snippetExtension
+  }
+
   const detail = ensurePeriod(central.detail.trim())
   if (detail && !normalizeWhitespace(opening).toLowerCase().includes(normalizeWhitespace(detail).toLowerCase()) && sentenceSimilarity(detail, opening) < 0.72) {
     return detail
   }
 
-  const snippet = ensurePeriod(central.snippet.trim())
   const summary = ensurePeriod(cluster.dek)
   if (
     snippet &&

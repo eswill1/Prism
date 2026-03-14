@@ -5,6 +5,7 @@ import html
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from collections import Counter
@@ -20,9 +21,21 @@ from xml.etree import ElementTree as ET
 
 try:
     from tooling.semantic_story_candidates import build_similarity_lookup
+    from tooling.source_fetch_strategies import (
+        SourceFetchStrategy,
+        resolve_source_fetch_strategy,
+        should_attempt_browser_fallback,
+        should_attempt_source_api_fallback,
+    )
     from tooling.url_normalization import normalize_canonical_url
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
     from semantic_story_candidates import build_similarity_lookup
+    from source_fetch_strategies import (
+        SourceFetchStrategy,
+        resolve_source_fetch_strategy,
+        should_attempt_browser_fallback,
+        should_attempt_source_api_fallback,
+    )
     from url_normalization import normalize_canonical_url
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +43,7 @@ OUTPUT_PATHS = [
     ROOT / "data" / "temporary-live-feed.json",
     ROOT / "src" / "web" / "public" / "data" / "temporary-live-feed.json",
 ]
+BROWSER_FETCH_SCRIPT_PATH = ROOT / "tooling" / "browser_fetch_article.mjs"
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -37,6 +51,7 @@ USER_AGENT = (
 )
 ARTICLE_ENRICHMENT_LIMIT_PER_FEED = 2
 ARTICLE_ENRICHMENT_TIMEOUT_SECONDS = 6
+BROWSER_FETCH_TIMEOUT_SECONDS = 15
 PAYWALL_HINT_PATTERNS = (
     r"subscribe to continue",
     r"subscription required",
@@ -281,6 +296,35 @@ def fetch_text(url: str, timeout: int = 20) -> str:
     raise RuntimeError(f"Unable to fetch {url}")
 
 
+def fetch_json(url: str, timeout: int = 20) -> object:
+    header_profiles = (
+        {
+            "User-Agent": USER_AGENT,
+            "Accept": "application/json, text/plain;q=0.9, */*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Cache-Control": "no-cache",
+        },
+        {
+            "User-Agent": "PrismWirePrototype/0.1 (+local preview)",
+            "Accept": "application/json, text/plain;q=0.9, */*;q=0.8",
+        },
+    )
+
+    last_error: Exception | None = None
+    for headers in header_profiles:
+        request = Request(url, headers=headers)
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                return json.loads(response.read().decode("utf-8", errors="replace"))
+        except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+            last_error = exc
+            continue
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError(f"Unable to fetch JSON from {url}")
+
+
 def strip_html(raw: str | None) -> str:
     if not raw:
         return ""
@@ -294,6 +338,8 @@ def looks_clipped(text: str) -> bool:
     if len(trimmed) < 80:
         return False
     if trimmed.endswith("...") or trimmed.endswith("…"):
+        return True
+    if trimmed.count("“") > trimmed.count("”") or trimmed.count('"') % 2 == 1:
         return True
     if not re.search(r"[.!?]$", trimmed):
         return True
@@ -580,6 +626,27 @@ def extract_article_paragraphs(markup: str) -> list[str]:
     return paragraphs
 
 
+def source_text_looks_boilerplate(text: str, *, url: str) -> bool:
+    normalized = normalize_whitespace(text).lower()
+    if not normalized:
+        return False
+
+    domain = infer_source_domain(url)
+    if domain == "thehill.com" or domain.endswith(".thehill.com"):
+        if re.search(r"ultimate hub for polls,\s*predictions,\s*and election results", normalized):
+            return True
+        if normalized == "sponsored content":
+            return True
+        if normalized.startswith("results forecasting polls projects sponsored content"):
+            return True
+
+    return False
+
+
+def filter_source_boilerplate_texts(texts: list[str], *, url: str) -> list[str]:
+    return [text for text in texts if not source_text_looks_boilerplate(text, url=url)]
+
+
 def extract_source_specific_paragraphs(markup: str, url: str) -> list[str]:
     domain = infer_source_domain(url)
     marker_map: dict[str, tuple[str, ...]] = {
@@ -671,7 +738,7 @@ def extract_named_entities(text: str) -> list[str]:
     return entities
 
 
-def default_enrichment(summary: str = "", url: str = "") -> dict[str, object]:
+def default_enrichment(summary: str = "", url: str = "", *, fetch_strategy: str = "http_fetch") -> dict[str, object]:
     return {
         "image": None,
         "lede": clean_summary_snippet(summary, 320),
@@ -680,6 +747,9 @@ def default_enrichment(summary: str = "", url: str = "") -> dict[str, object]:
         "extraction_quality": "rss_only",
         "access_signal": infer_access_signal_from_url(url),
         "fetch_blocked": False,
+        "fetch_strategy": fetch_strategy,
+        "browser_attempted": False,
+        "browser_rendered": False,
     }
 
 
@@ -764,6 +834,29 @@ ABBREVIATION_PATTERNS = (
 )
 
 
+def normalize_sentence_closing_punctuation(text: str) -> str:
+    return re.sub(r'([.!?])\s+([)"\]\'\u2019\u201d]+)', r"\1\2", text)
+
+
+def sentence_has_unclosed_quote(text: str) -> bool:
+    normalized = text
+    curly_balance = normalized.count("“") - normalized.count("”")
+    straight_unpaired = normalized.count('"') % 2
+    return curly_balance > 0 or straight_unpaired == 1
+
+
+def sentence_continues_quoted_attribution(previous: str, current: str) -> bool:
+    if not re.search(r'["\u201d\u2019]$', previous.strip()):
+        return False
+    return bool(
+        re.match(
+            r"^(?:(?:[A-Z][A-Za-z'’-]+|[Tt]he|[Hh]e|[Ss]he|[Tt]hey|[Oo]fficials|[Aa]ides|[Rr]eporters)\s+){0,3}"
+            r"(said|says|told|asked|wrote|added|warned|argued|noted|announced|replied|stated|called|posted)\b",
+            current,
+        )
+    )
+
+
 def split_narrative_sentences(text: str) -> list[str]:
     cleaned = normalize_whitespace(text)
     if not cleaned:
@@ -779,21 +872,35 @@ def split_narrative_sentences(text: str) -> list[str]:
 
         protected = re.sub(pattern, repl, protected, flags=re.IGNORECASE)
 
-    matches = re.findall(r"[^.!?]+[.!?]+", protected)
+    matches = re.findall(r'[^.!?]+[.!?]+(?:[)"\]\'\u2019\u201d]+)?', protected)
     if not matches:
         restored = protected
         for token, original in replacements.items():
             restored = restored.replace(token, original)
         return [restored]
 
-    sentences = []
+    sentences: list[str] = []
+    buffer = ""
     for segment in matches:
         restored = segment
         for token, original in replacements.items():
             restored = restored.replace(token, original)
-        restored = normalize_whitespace(restored)
+        restored = normalize_sentence_closing_punctuation(normalize_whitespace(restored))
         if restored:
-            sentences.append(restored)
+            if buffer:
+                buffer = normalize_whitespace(f"{buffer} {restored}")
+            else:
+                buffer = restored
+            if sentence_has_unclosed_quote(buffer):
+                continue
+            if sentences and sentence_continues_quoted_attribution(sentences[-1], buffer):
+                sentences[-1] = normalize_whitespace(f"{sentences[-1]} {buffer}")
+                buffer = ""
+                continue
+            sentences.append(buffer)
+            buffer = ""
+    if buffer:
+        sentences.append(normalize_sentence_closing_punctuation(buffer))
     return sentences
 
 
@@ -973,53 +1080,23 @@ def choose_story_summary(
     return fallback, max(best_score, 0), len(substantive_sources)
 
 
-def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, object]:
-    cached = ARTICLE_FETCH_CACHE.get(url)
-    if cached is not None:
-        return cached
-
-    default_payload: dict[str, object] = {
-        "image": None,
-        "lede": clean_summary_snippet(fallback_summary, 320),
-        "body_preview": "",
-        "named_entities": [],
-        "extraction_quality": "rss_only",
-        "access_signal": infer_access_signal_from_url(url),
-        "fetch_blocked": False,
-    }
-
-    status_code: int | None = None
-    try:
-        markup = fetch_text(url, timeout=ARTICLE_ENRICHMENT_TIMEOUT_SECONDS)
-    except HTTPError as exc:
-        status_code = exc.code
-        markup = exc.read().decode("utf-8", errors="replace")
-        fetch_block = classify_fetch_block(markup, status_code=status_code)
-        if fetch_block:
-            payload = {
-                **default_payload,
-                "fetch_blocked": True,
-                "fetch_block_reason": fetch_block["reason"],
-                "fetch_block_vendor": fetch_block["vendor"],
-            }
-            ARTICLE_FETCH_CACHE[url] = payload
-            return payload
-        ARTICLE_FETCH_CACHE[url] = default_payload
-        return default_payload
-    except (URLError, TimeoutError, ValueError):
-        ARTICLE_FETCH_CACHE[url] = default_payload
-        return default_payload
-
-    fetch_block = classify_fetch_block(markup, status_code=status_code)
+def build_enrichment_from_markup(
+    markup: str,
+    *,
+    url: str,
+    fallback_summary: str,
+    default_payload: dict[str, object],
+    browser_rendered: bool = False,
+) -> dict[str, object]:
+    fetch_block = classify_fetch_block(markup)
     if fetch_block:
-        payload = {
+        return {
             **default_payload,
             "fetch_blocked": True,
             "fetch_block_reason": fetch_block["reason"],
             "fetch_block_vendor": fetch_block["vendor"],
+            "browser_rendered": browser_rendered,
         }
-        ARTICLE_FETCH_CACHE[url] = payload
-        return payload
 
     match = re.search(
         r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
@@ -1030,10 +1107,12 @@ def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, 
     image = image or find_meta_content(markup, ("twitter:image",))
 
     meta_description = find_meta_content(markup, ("og:description", "description", "twitter:description"))
+    if source_text_looks_boilerplate(meta_description, url=url):
+        meta_description = ""
     json_ld_text = extract_json_ld_text(markup)
     embedded_json_text = extract_embedded_json_text(markup)
-    paragraphs = extract_article_paragraphs(markup)
-    source_specific_paragraphs = extract_source_specific_paragraphs(markup, url)
+    paragraphs = filter_source_boilerplate_texts(extract_article_paragraphs(markup), url=url)
+    source_specific_paragraphs = filter_source_boilerplate_texts(extract_source_specific_paragraphs(markup, url), url=url)
     if source_specific_paragraphs and len(" ".join(source_specific_paragraphs)) > len(" ".join(paragraphs)):
         paragraphs = source_specific_paragraphs
 
@@ -1064,7 +1143,8 @@ def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, 
     elif meta_description or embedded_json_text or json_ld_text:
         extraction_quality = "metadata_description"
 
-    payload = {
+    return {
+        **default_payload,
         "image": image,
         "lede": lede,
         "body_preview": body_preview,
@@ -1072,7 +1152,276 @@ def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, 
         "extraction_quality": extraction_quality,
         "access_signal": detect_access_signal(markup, url),
         "fetch_blocked": False,
+        "browser_rendered": browser_rendered,
     }
+
+
+def build_source_api_markup(
+    *,
+    title: str,
+    article_html: str,
+    description: str = "",
+    image_url: str = "",
+) -> str:
+    head_parts = [f"<title>{html.escape(strip_html(title))}</title>"] if title else []
+    if description:
+        escaped_description = html.escape(strip_html(description), quote=True)
+        head_parts.append(f'<meta property="og:description" content="{escaped_description}" />')
+        head_parts.append(f'<meta name="description" content="{escaped_description}" />')
+    if image_url:
+        escaped_image_url = html.escape(image_url, quote=True)
+        head_parts.append(f'<meta property="og:image" content="{escaped_image_url}" />')
+
+    return f"<html><head>{''.join(head_parts)}</head><body><article>{article_html}</article></body></html>"
+
+
+def infer_thehill_post_id(url: str) -> str:
+    path = urlparse(url).path.strip("/")
+    if not path:
+        return ""
+    segment = path.split("/")[-1]
+    match = re.match(r"(?P<post_id>\d+)(?:-|$)", segment)
+    return match.group("post_id") if match else ""
+
+
+def fetch_thehill_wp_json_markup(url: str) -> dict[str, str] | None:
+    post_id = infer_thehill_post_id(url)
+    if not post_id:
+        return None
+
+    endpoint = f"https://thehill.com/wp-json/wp/v2/posts/{post_id}"
+    try:
+        payload = fetch_json(endpoint, timeout=ARTICLE_ENRICHMENT_TIMEOUT_SECONDS)
+    except (HTTPError, URLError, TimeoutError, ValueError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    content = payload.get("content")
+    title = payload.get("title")
+    excerpt = payload.get("excerpt")
+    article_html = content.get("rendered") if isinstance(content, dict) else ""
+    title_text = title.get("rendered") if isinstance(title, dict) else ""
+    description = excerpt.get("rendered") if isinstance(excerpt, dict) else ""
+    image_url = ""
+
+    if not isinstance(article_html, str) or not article_html.strip():
+        return None
+
+    return {
+        "html": build_source_api_markup(
+            title=title_text if isinstance(title_text, str) else "",
+            article_html=article_html,
+            description=description if isinstance(description, str) else "",
+            image_url=image_url,
+        ),
+        "source_api": "thehill_wp_json",
+        "source_api_endpoint": endpoint,
+    }
+
+
+def fetch_source_api_markup(url: str, strategy: SourceFetchStrategy) -> dict[str, str] | None:
+    if strategy.source_api_fallback == "thehill_wp_json":
+        return fetch_thehill_wp_json_markup(url)
+    return None
+
+
+def fetch_browser_rendered_markup(url: str) -> dict[str, object] | None:
+    if not BROWSER_FETCH_SCRIPT_PATH.exists():
+        return None
+
+    try:
+        completed = subprocess.run(
+            ["node", str(BROWSER_FETCH_SCRIPT_PATH), url],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            timeout=BROWSER_FETCH_TIMEOUT_SECONDS + 5,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+
+    if completed.returncode != 0:
+        return None
+
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    if not isinstance(payload.get("html"), str) or not payload["html"].strip():
+        return None
+    return payload
+
+
+def fetch_article_enrichment(url: str, fallback_summary: str = "") -> dict[str, object]:
+    cached = ARTICLE_FETCH_CACHE.get(url)
+    if cached is not None:
+        return cached
+
+    fetch_strategy = resolve_source_fetch_strategy(url)
+    default_payload = default_enrichment(
+        fallback_summary,
+        url,
+        fetch_strategy=fetch_strategy.name,
+    )
+
+    def fallback_succeeded(payload: dict[str, object] | None) -> bool:
+        return bool(
+            payload
+            and payload.get("fetch_blocked") is not True
+            and payload.get("extraction_quality") != "rss_only"
+        )
+
+    def try_source_api_fallback(reason: str) -> dict[str, object] | None:
+        if not should_attempt_source_api_fallback(fetch_strategy, reason=reason):
+            return None
+
+        source_markup = fetch_source_api_markup(url, fetch_strategy)
+        if not source_markup:
+            return {
+                **default_payload,
+                "source_api_attempted": True,
+                "source_api_fallback_error": "source_api_fetch_unavailable",
+            }
+
+        source_payload = build_enrichment_from_markup(
+            str(source_markup.get("html") or ""),
+            url=url,
+            fallback_summary=fallback_summary,
+            default_payload={
+                **default_payload,
+                "source_api_attempted": True,
+            },
+        )
+        if source_markup.get("source_api"):
+            source_payload["source_api_used"] = source_markup["source_api"]
+        if source_markup.get("source_api_endpoint"):
+            source_payload["source_api_endpoint"] = source_markup["source_api_endpoint"]
+        return source_payload
+
+    def try_browser_fallback(reason: str) -> dict[str, object] | None:
+        if not should_attempt_browser_fallback(fetch_strategy, reason=reason):
+            return None
+
+        browser_markup = fetch_browser_rendered_markup(url)
+        if not browser_markup:
+            return {
+                **default_payload,
+                "browser_attempted": True,
+                "browser_fallback_error": "browser_fetch_unavailable",
+            }
+
+        browser_payload = build_enrichment_from_markup(
+            str(browser_markup.get("html") or ""),
+            url=url,
+            fallback_summary=fallback_summary,
+            default_payload={
+                **default_payload,
+                "browser_attempted": True,
+            },
+            browser_rendered=True,
+        )
+        if browser_markup.get("executablePath"):
+            browser_payload["browser_executable"] = browser_markup["executablePath"]
+        if browser_markup.get("finalUrl"):
+            browser_payload["browser_final_url"] = browser_markup["finalUrl"]
+        return browser_payload
+
+    status_code: int | None = None
+    try:
+        markup = fetch_text(url, timeout=ARTICLE_ENRICHMENT_TIMEOUT_SECONDS)
+    except HTTPError as exc:
+        status_code = exc.code
+        markup = exc.read().decode("utf-8", errors="replace")
+        fetch_block = classify_fetch_block(markup, status_code=status_code)
+        if fetch_block:
+            source_retry = try_source_api_fallback("fetch_blocked")
+            if fallback_succeeded(source_retry):
+                ARTICLE_FETCH_CACHE[url] = source_retry
+                return source_retry
+
+            browser_retry = try_browser_fallback("fetch_blocked")
+            if fallback_succeeded(browser_retry):
+                ARTICLE_FETCH_CACHE[url] = browser_retry
+                return browser_retry
+
+            payload = {
+                **default_payload,
+                "fetch_blocked": True,
+                "fetch_block_reason": fetch_block["reason"],
+                "fetch_block_vendor": fetch_block["vendor"],
+            }
+            if source_retry:
+                payload["source_api_attempted"] = source_retry.get("source_api_attempted", False)
+                if source_retry.get("source_api_fallback_error"):
+                    payload["source_api_fallback_error"] = source_retry["source_api_fallback_error"]
+            if browser_retry:
+                payload["browser_attempted"] = browser_retry.get("browser_attempted", False)
+                if browser_retry.get("browser_fallback_error"):
+                    payload["browser_fallback_error"] = browser_retry["browser_fallback_error"]
+                if browser_retry.get("browser_rendered") is True:
+                    payload["browser_rendered"] = True
+            ARTICLE_FETCH_CACHE[url] = payload
+            return payload
+        ARTICLE_FETCH_CACHE[url] = default_payload
+        return default_payload
+    except (URLError, TimeoutError, ValueError):
+        ARTICLE_FETCH_CACHE[url] = default_payload
+        return default_payload
+
+    payload = build_enrichment_from_markup(
+        markup,
+        url=url,
+        fallback_summary=fallback_summary,
+        default_payload=default_payload,
+    )
+    if payload.get("fetch_blocked"):
+        source_retry = try_source_api_fallback("fetch_blocked")
+        if fallback_succeeded(source_retry):
+            ARTICLE_FETCH_CACHE[url] = source_retry
+            return source_retry
+
+        browser_retry = try_browser_fallback("fetch_blocked")
+        if fallback_succeeded(browser_retry):
+            ARTICLE_FETCH_CACHE[url] = browser_retry
+            return browser_retry
+        if source_retry:
+            payload["source_api_attempted"] = source_retry.get("source_api_attempted", False)
+            if source_retry.get("source_api_fallback_error"):
+                payload["source_api_fallback_error"] = source_retry["source_api_fallback_error"]
+        if browser_retry:
+            payload["browser_attempted"] = browser_retry.get("browser_attempted", False)
+            if browser_retry.get("browser_fallback_error"):
+                payload["browser_fallback_error"] = browser_retry["browser_fallback_error"]
+            if browser_retry.get("browser_rendered") is True:
+                payload["browser_rendered"] = True
+        ARTICLE_FETCH_CACHE[url] = payload
+        return payload
+
+    if payload.get("extraction_quality") == "rss_only":
+        source_retry = try_source_api_fallback("rss_only")
+        if fallback_succeeded(source_retry):
+            ARTICLE_FETCH_CACHE[url] = source_retry
+            return source_retry
+
+        browser_retry = try_browser_fallback("rss_only")
+        if fallback_succeeded(browser_retry):
+            ARTICLE_FETCH_CACHE[url] = browser_retry
+            return browser_retry
+        if source_retry:
+            payload["source_api_attempted"] = source_retry.get("source_api_attempted", False)
+            if source_retry.get("source_api_fallback_error"):
+                payload["source_api_fallback_error"] = source_retry["source_api_fallback_error"]
+        if browser_retry:
+            payload["browser_attempted"] = browser_retry.get("browser_attempted", False)
+            if browser_retry.get("browser_fallback_error"):
+                payload["browser_fallback_error"] = browser_retry["browser_fallback_error"]
+
     ARTICLE_FETCH_CACHE[url] = payload
     return payload
 

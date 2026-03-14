@@ -501,6 +501,41 @@ def merge_article_metadata(article: dict[str, Any], enrichment: dict[str, Any], 
         metadata.pop("fetch_block_reason", None)
         metadata.pop("fetch_block_vendor", None)
         metadata.pop("fetch_blocked_at", None)
+    if enrichment.get("fetch_strategy"):
+        metadata["fetch_strategy"] = enrichment["fetch_strategy"]
+    if enrichment.get("source_api_attempted") is True:
+        metadata["source_api_attempted"] = True
+    else:
+        metadata.pop("source_api_attempted", None)
+    if enrichment.get("source_api_used"):
+        metadata["source_api_used"] = enrichment["source_api_used"]
+        if enrichment.get("source_api_endpoint"):
+            metadata["source_api_endpoint"] = enrichment["source_api_endpoint"]
+    else:
+        metadata.pop("source_api_used", None)
+        metadata.pop("source_api_endpoint", None)
+    if enrichment.get("source_api_fallback_error"):
+        metadata["source_api_fallback_error"] = enrichment["source_api_fallback_error"]
+    else:
+        metadata.pop("source_api_fallback_error", None)
+    if enrichment.get("browser_attempted") is True:
+        metadata["browser_attempted"] = True
+    else:
+        metadata.pop("browser_attempted", None)
+    if enrichment.get("browser_rendered") is True:
+        metadata["browser_rendered"] = True
+        if enrichment.get("browser_executable"):
+            metadata["browser_executable"] = enrichment["browser_executable"]
+        if enrichment.get("browser_final_url"):
+            metadata["browser_final_url"] = enrichment["browser_final_url"]
+    else:
+        metadata.pop("browser_rendered", None)
+        metadata.pop("browser_executable", None)
+        metadata.pop("browser_final_url", None)
+    if enrichment.get("browser_fallback_error"):
+        metadata["browser_fallback_error"] = enrichment["browser_fallback_error"]
+    else:
+        metadata.pop("browser_fallback_error", None)
     return metadata
 
 

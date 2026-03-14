@@ -73,6 +73,11 @@ def article_fetch_blocked(article: dict[str, Any]) -> bool:
     return bool(isinstance(metadata, dict) and metadata.get("fetch_blocked") is True)
 
 
+def article_browser_rendered(article: dict[str, Any]) -> bool:
+    metadata = article.get("metadata") or {}
+    return bool(isinstance(metadata, dict) and metadata.get("browser_rendered") is True)
+
+
 def main() -> int:
     client = SupabaseRestClient(REST_BASE, SUPABASE_SERVICE_ROLE_KEY)
     cutoff = datetime.now(timezone.utc) - timedelta(hours=LOOKBACK_HOURS)
@@ -120,6 +125,7 @@ def main() -> int:
         open_articles = [article for article in articles if article_access_signal(article) == "open"]
         paywalled_articles = [article for article in articles if article_access_signal(article) == "likely_paywalled"]
         blocked_articles = [article for article in articles if article_fetch_blocked(article)]
+        browser_rendered_articles = [article for article in articles if article_browser_rendered(article)]
         thin_paywalled_articles = [
             article
             for article in articles
@@ -168,6 +174,7 @@ def main() -> int:
                 "substantive_articles_48h": len(substantive_articles),
                 "substantive_rate_48h": substantive_rate,
                 "blocked_articles_48h": len(blocked_articles),
+                "browser_rendered_48h": len(browser_rendered_articles),
                 "open_articles_48h": len(open_articles),
                 "likely_paywalled_articles_48h": len(paywalled_articles),
                 "thin_paywalled_articles_48h": len(thin_paywalled_articles),
