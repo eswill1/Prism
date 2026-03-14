@@ -11,6 +11,7 @@ type BriefSource = {
   snippet: string
   focus: string
   detail: string
+  followup: string
 }
 
 const PLACEHOLDER_KEY_FACT = /^Prism has |^Prism only has |^The latest linked reporting came from |^The comparison set /i
@@ -205,6 +206,10 @@ function laterNarrativeSentences(text: string, skipCount: number, sentenceCount:
   return cleaned.slice(skipCount, skipCount + sentenceCount).join(' ')
 }
 
+function followupNarrativeSentences(text: string) {
+  return laterNarrativeSentences(text, 4, 2)
+}
+
 function topicFamilyForStory(topic: string): TopicFamily {
   const normalized = topic.toLowerCase()
 
@@ -319,6 +324,7 @@ function buildBriefSources(cluster: StoryCluster) {
       snippet: ensurePeriod(snippet),
       focus: articleFocus(article),
       detail: ensurePeriod(laterNarrativeSentences(article.bodyText || '', 2, 2)),
+      followup: ensurePeriod(followupNarrativeSentences(article.bodyText || '')),
     })
   }
 
@@ -475,10 +481,6 @@ function earlyBriefOpening(cluster: StoryCluster, central: ReturnType<typeof cen
   }
 
   const snippet = central.snippet.trim()
-  const detail = central.detail.trim()
-  if (detail && sentenceSimilarity(detail, cluster.dek) < 0.72) {
-    return `${summary} ${detail}`.trim()
-  }
   if (snippet && sentenceSimilarity(snippet, cluster.dek) < 0.72) {
     return `${summary} ${snippet}`.trim()
   }
@@ -513,9 +515,30 @@ function earlyBriefDetailFollowup(
   return ''
 }
 
+function distinctEarlyParagraph(candidates: string[], existing: string[]) {
+  for (const candidate of candidates) {
+    const cleaned = ensurePeriod(candidate.trim())
+    if (!cleaned) {
+      continue
+    }
+
+    const duplicate = existing.some(
+      (value) =>
+        normalizeWhitespace(value).toLowerCase().includes(normalizeWhitespace(cleaned).toLowerCase()) ||
+        sentenceSimilarity(value, cleaned) >= 0.72,
+    )
+    if (!duplicate) {
+      return cleaned
+    }
+  }
+
+  return ''
+}
+
 export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
   const family = topicFamilyForStory(cluster.topic)
   const sources = buildBriefSources(cluster)
+  const visibleFacts = visibleKeyFacts(cluster)
   const central = centralSource(sources)
   const divergent = divergentSource(sources, central)
   const fullBrief = sources.length >= 2 && distinctOutletCount(cluster) >= 2
@@ -525,6 +548,24 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
   const corroboratingOutlets = outletListText(secondarySources.map((source) => source.outlet))
   const earlyOpening = earlyBriefOpening(cluster, sources[0])
   const earlyDetailFollowup = earlyBriefDetailFollowup(cluster, sources[0], earlyOpening)
+  const earlyGroundedFollowup = distinctEarlyParagraph(
+    [
+      sources[0]?.followup || '',
+      visibleFacts[0] || '',
+      sources[0]
+        ? `${sources[0].outlet}'s reporting spends more time on ${cleanFocusPhrase(
+            sources[0].focus,
+            family,
+          )}, which is the clearest grounded line of reporting Prism can verify so far.`
+        : '',
+    ],
+    [earlyOpening, earlyDetailFollowup],
+  )
+  const earlyProvisionalParagraph = sources[1]
+    ? `Prism has linked another read from ${sources[1].outlet}, but the source mix is still too concentrated to treat differences in emphasis as a meaningful split in coverage yet. This early brief is meant to give a fuller working summary before that wider comparison arrives.`
+    : sources[0]
+      ? `Prism is still treating this as a one-source early brief grounded primarily in ${sources[0].outlet}'s reporting. It should already give you the core story and immediate stakes, but Prism still needs another independent detailed report before coverage differences become useful to compare.`
+      : `Prism is still working with a thin source set here. This early brief is meant to give readers a usable first summary now, then widen into a fuller comparison once another detailed report arrives.`
 
   const paragraphs = fullBrief
     ? [
@@ -546,11 +587,8 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
     : [
         earlyOpening,
         earlyDetailFollowup,
-        sources[1]
-          ? `Prism has also linked another read from ${sources[1].outlet}, but the source mix is still too thin to treat differences in emphasis as a meaningful split in coverage.`
-          : sources[0]
-            ? `Right now Prism has one detailed source on this story, from ${sources[0].outlet}. That gives readers a useful first account, but not yet enough reporting to show where coverage really starts to diverge.`
-            : `Prism is still working with a thin source set here. This is a useful first read, but it will become more complete once another detailed report arrives.`,
+        earlyGroundedFollowup,
+        earlyProvisionalParagraph,
       ]
 
   const whereSourcesAgree = fullBrief
@@ -576,7 +614,7 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
     whereSourcesAgree,
     whereCoverageDiffers,
     whatToWatch: watchNextCopy(cluster, family),
-    supportingPoints: visibleKeyFacts(cluster),
+    supportingPoints: visibleFacts,
     substantiveSourceCount: sources.length,
     isEarlyBrief: !fullBrief,
   }

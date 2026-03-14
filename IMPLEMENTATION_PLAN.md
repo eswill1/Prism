@@ -198,9 +198,9 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Perspective panel v1 backed by real outlet data
 - [x] Methodology page shell
 - [x] Browser-local saved/followed story prototype
-- [ ] Saved stories
-- [ ] Follow story updates
-- [ ] Reader account scaffolding
+- [x] Saved stories
+- [x] Follow story updates
+- [x] Reader account scaffolding
 - [x] Subscriber pricing and subscription shell
 - [ ] Core-loop user testing with a small serious-reader cohort
 
@@ -246,7 +246,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [ ] Media-rights policy enforcement in the ingestion pipeline
 - [ ] Scheduled connected ingest jobs beyond the local development loop
 - [x] Source-health reporting for active discovery inputs
-- [ ] Saved/followed story state backed by real persistence
+- [x] Saved/followed story state backed by real persistence
 - [x] Editorial seed stories removed from connected reader surfaces instead of shipping fake source-link affordances
 
 #### Success metrics:

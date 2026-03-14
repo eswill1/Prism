@@ -20,6 +20,7 @@ try:
         promote_revision_current_state as promote_perspective_revision_current_state,
     )
     from tooling.generate_story_briefs_to_supabase import (
+        build_grounded_brief,
         insert_brief_revision_draft,
         promote_revision_current_state as promote_brief_revision_current_state,
     )
@@ -35,7 +36,7 @@ try:
     from tooling.url_normalization import normalize_canonical_url
 except ModuleNotFoundError:  # pragma: no cover - direct script execution fallback
     from generate_perspective_to_supabase import build_perspective, current_revision_row_id, insert_perspective_revision_draft, promote_revision_current_state as promote_perspective_revision_current_state
-    from generate_story_briefs_to_supabase import insert_brief_revision_draft, promote_revision_current_state as promote_brief_revision_current_state
+    from generate_story_briefs_to_supabase import build_grounded_brief, insert_brief_revision_draft, promote_revision_current_state as promote_brief_revision_current_state
     from generate_temporary_live_feed import FeedItem, choose_story_summary, cluster_items, normalize_feed_fetch_url, summary_quality_score
     from local_ingest_runtime import build_launchd_plist, choose_due_job
     from semantic_story_candidates import build_similarity_lookup
@@ -116,6 +117,8 @@ def run_web_regression_tests() -> None:
                 "--test",
                 "src/web/src/lib/perspective-versioning.test.ts",
                 "src/web/src/lib/cluster-ranking.test.ts",
+                "src/web/src/lib/reader-persistence.test.ts",
+                "src/web/src/lib/story-briefs.test.ts",
             ],
             cwd=REPO_ROOT,
             check=True,
@@ -198,6 +201,55 @@ def main() -> int:
     normalized = normalize_canonical_url("https://example.com/story?utm_source=test&id=42#top")
     if normalized != "https://example.com/story?id=42":
         raise SystemExit(f"unexpected canonical URL normalization result: {normalized}")
+
+    single_source_brief = build_grounded_brief(
+        {
+            "canonical_headline": "Cuba confirms talks with Trump administration amid fuel shortages",
+            "summary": "Cuba confirmed talks with the Trump administration after fuel shortages deepened the country’s economic crisis.",
+            "topic_label": "World",
+            "outlet_count": 1,
+            "cluster_key_facts": [
+                {"fact_text": "Officials said the talks are aimed at easing immediate fuel shortages.", "sort_order": 0},
+                {"fact_text": "Power generation and freight movement have already been disrupted.", "sort_order": 1},
+                {"fact_text": "State media described the contacts as practical crisis management.", "sort_order": 2},
+            ],
+            "correction_events": [],
+            "cluster_articles": [
+                {
+                    "rank_in_cluster": 1,
+                    "framing_group": "center",
+                    "articles": {
+                        "id": "article-1",
+                        "headline": "Cuba confirms talks with Trump administration amid fuel shortages",
+                        "summary": "Cuba said the talks were focused on fuel shortages, transport disruption and a broader economic crunch after Venezuelan oil shipments were cut.",
+                        "body_text": (
+                            "Cuba said the talks were focused on fuel shortages, transport disruption and a broader economic crunch after Venezuelan oil shipments were cut. "
+                            "Officials said the immediate goal was to stabilize domestic supply and keep freight lines moving. "
+                            "The government described the contacts as practical rather than a diplomatic reset. "
+                            "Power generation has already been reduced in several provinces because fuel stocks are low. "
+                            "Freight delays have started to disrupt deliveries and factory schedules across the island. "
+                            "State media said any agreement would be judged by whether it eases shortages quickly for households and businesses."
+                        ),
+                        "metadata": {
+                            "feed_summary": "Cuba confirmed talks as fuel shortages worsened.",
+                            "extraction_quality": "article_body",
+                        },
+                        "original_url": "https://example.com/cuba-talks",
+                        "canonical_url": "https://example.com/cuba-talks",
+                        "outlets": {
+                            "canonical_name": "Reuters",
+                        },
+                    },
+                }
+            ],
+        }
+    )
+    if single_source_brief["status"] != "early":
+        raise SystemExit(f"expected one-source brief to stay early, got {single_source_brief['status']}")
+    if len(single_source_brief["paragraphs"]) < 3:
+        raise SystemExit(
+            f"expected richer one-source early brief paragraphs, got {len(single_source_brief['paragraphs'])}: {single_source_brief['paragraphs']}"
+        )
 
     sitemap_fetch_url = normalize_feed_fetch_url(
         "https://www.reuters.com/arc/outboundfeeds/news-sitemap/?outputType=xml&from=100"

@@ -48,6 +48,7 @@ export type StoryChangeItem = {
 }
 
 export type StoryCluster = {
+  clusterId?: string
   slug: string
   topic: string
   title: string

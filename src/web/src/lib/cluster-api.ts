@@ -16,6 +16,7 @@ export type ClusterSummary = ClusterSummaryRankInput
 
 function toClusterSummary(cluster: StoryCluster): ClusterSummary {
   return {
+    clusterId: cluster.clusterId,
     slug: cluster.slug,
     topic: cluster.topic,
     title: cluster.title,
@@ -232,6 +233,7 @@ type StoryClusterRow = {
 }
 
 type StoryBriefRevisionRow = {
+  revision_tag: string
   label: string
   title: string
   status: string
@@ -276,6 +278,7 @@ function mapStoredBrief(row: StoryBriefRevisionRow | null | undefined): StoryBri
     : []
 
   return {
+    revisionTag: row.revision_tag,
     label: row.label,
     title: row.title,
     paragraphs,
@@ -374,6 +377,7 @@ function mapSummaryRow(row: StoryClusterRow): ClusterSummary {
       : 'No summary available yet.'
 
   return {
+    clusterId: row.id,
     slug: row.slug,
     topic: row.topic_label,
     title: row.canonical_headline,
@@ -534,7 +538,7 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
         client
           .from('story_brief_revisions')
           .select(
-            'label, title, status, paragraphs, why_it_matters, where_sources_agree, where_coverage_differs, what_to_watch, supporting_points, metadata',
+            'revision_tag, label, title, status, paragraphs, why_it_matters, where_sources_agree, where_coverage_differs, what_to_watch, supporting_points, metadata',
           )
           .eq('cluster_id', clusterRow.id)
           .eq('is_current', true)
@@ -731,6 +735,7 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
     }))
 
     return {
+      clusterId: normalizedCluster.clusterId,
       slug: normalizedCluster.slug,
       topic: normalizedCluster.topic,
       title: normalizedCluster.title,
