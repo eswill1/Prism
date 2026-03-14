@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import subprocess
 
 
 os.environ.setdefault("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co")
@@ -36,6 +37,8 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution fallba
 
 
 FIXTURES_PATH = Path(__file__).with_name("clustering_regression_fixtures.json")
+REPO_ROOT = Path(__file__).resolve().parent.parent
+TSX_BIN = REPO_ROOT / "node_modules" / ".bin" / "tsx"
 
 
 def build_item(
@@ -76,7 +79,28 @@ class PromotionClient:
             raise RuntimeError("simulated promotion failure")
 
 
+def run_web_regression_tests() -> None:
+    if not TSX_BIN.exists():
+        raise SystemExit(f"expected tsx test runner at {TSX_BIN}")
+
+    try:
+        subprocess.run(
+            [
+                str(TSX_BIN),
+                "--test",
+                "src/web/src/lib/perspective-versioning.test.ts",
+                "src/web/src/lib/cluster-ranking.test.ts",
+            ],
+            cwd=REPO_ROOT,
+            check=True,
+        )
+    except subprocess.CalledProcessError as error:
+        raise SystemExit(f"web regression tests failed with exit code {error.returncode}") from error
+
+
 def main() -> int:
+    run_web_regression_tests()
+
     oil_one = build_item(
         source="NPR",
         title="US to release emergency oil reserves as prices rise",
