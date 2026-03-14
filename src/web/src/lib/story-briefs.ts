@@ -12,9 +12,11 @@ type BriefSource = {
   focus: string
   detail: string
   followup: string
+  fetchBlocked?: boolean
 }
 
-const PLACEHOLDER_KEY_FACT = /^Prism has |^Prism only has |^The latest linked reporting came from |^The comparison set /i
+const PLACEHOLDER_KEY_FACT =
+  /^Prism has |^Prism only has |^The latest linked reporting came from |^The comparison set |^The strongest available source read is already open\.?$|^Prism found an open alternate read from |^Some linked reporting may be gated/i
 const GENERIC_FOCUS_TOKENS = new Set([
   'another',
   'around',
@@ -325,10 +327,15 @@ function buildBriefSources(cluster: StoryCluster) {
       focus: articleFocus(article),
       detail: ensurePeriod(laterNarrativeSentences(article.bodyText || '', 2, 2)),
       followup: ensurePeriod(followupNarrativeSentences(article.bodyText || '')),
+      fetchBlocked: article.fetchBlocked === true,
     })
   }
 
   return sources
+}
+
+function blockedArticle(cluster: StoryCluster) {
+  return cluster.articles.find((article) => article.fetchBlocked === true)
 }
 
 function distinctOutletCount(cluster: StoryCluster) {
@@ -542,6 +549,7 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
   const central = centralSource(sources)
   const divergent = divergentSource(sources, central)
   const fullBrief = sources.length >= 2 && distinctOutletCount(cluster) >= 2
+  const blockedFetchArticle = blockedArticle(cluster)
   const secondarySources = sources
     .filter((source) => source.outlet !== central?.outlet)
     .slice(0, 3)
@@ -552,6 +560,11 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
     [
       sources[0]?.followup || '',
       visibleFacts[0] || '',
+      sources[0]?.fetchBlocked
+        ? `Prism could not retrieve the full article text from ${sources[0].outlet} because the site served an automated access challenge to the enrichment worker. This early brief is limited to feed-level material until Prism can verify the full body text or another independent report arrives.`
+        : blockedFetchArticle
+          ? `Prism could not retrieve the full article text from ${blockedFetchArticle.outlet} because the site served an automated access challenge to the enrichment worker. This early brief is limited to feed-level material until Prism can verify the full body text or another independent report arrives.`
+        : '',
       sources[0]
         ? `${sources[0].outlet}'s reporting spends more time on ${cleanFocusPhrase(
             sources[0].focus,
@@ -563,7 +576,11 @@ export function buildStoryBrief(cluster: StoryCluster): StoryBrief {
   )
   const earlyProvisionalParagraph = sources[1]
     ? `Prism has linked another read from ${sources[1].outlet}, but the source mix is still too concentrated to treat differences in emphasis as a meaningful split in coverage yet. This early brief is meant to give a fuller working summary before that wider comparison arrives.`
-    : sources[0]
+    : sources[0]?.fetchBlocked
+      ? `Prism is still treating this as a one-source early brief grounded primarily in ${sources[0].outlet}'s feed-level reporting because the site blocked automated full-text retrieval. Prism still needs either verified body text or another independent detailed report before coverage differences become useful to compare.`
+      : blockedFetchArticle
+        ? `Prism is still treating this as a one-source early brief grounded primarily in ${blockedFetchArticle.outlet}'s feed-level reporting because the site blocked automated full-text retrieval. Prism still needs either verified body text or another independent detailed report before coverage differences become useful to compare.`
+      : sources[0]
       ? `Prism is still treating this as a one-source early brief grounded primarily in ${sources[0].outlet}'s reporting. It should already give you the core story and immediate stakes, but Prism still needs another independent detailed report before coverage differences become useful to compare.`
       : `Prism is still working with a thin source set here. This early brief is meant to give readers a usable first summary now, then widen into a fuller comparison once another detailed report arrives.`
 

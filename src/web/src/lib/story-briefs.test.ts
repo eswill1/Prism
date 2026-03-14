@@ -57,3 +57,33 @@ test('early briefs still produce a fuller one-source narrative summary', () => {
     /one-source early brief|fuller working summary/i,
   )
 })
+
+test('blocked fetches disclose retrieval limits instead of surfacing access boilerplate', () => {
+  const brief = buildStoryBrief({
+    ...singleSourceCluster,
+    slug: 'blocked-story',
+    title: 'Blocked story',
+    dek: 'President Trump said Friday that he has his own idea of how long the conflict in Iran could last.',
+    keyFacts: ['The strongest available source read is already open.'],
+    articles: [
+      {
+        outlet: 'The Hill',
+        title: 'Trump says he has own idea on how long Iran war will last',
+        summary: 'President Trump said Friday that he has his own idea of how long the conflict in Iran could last.',
+        feedSummary: 'President Trump said Friday that he has his own idea of how long the conflict in Iran could last.',
+        extractionQuality: 'rss_only',
+        accessTier: 'open',
+        fetchBlocked: true,
+        fetchBlockReason: 'anti_bot_challenge',
+        published: '20m ago',
+        framing: 'center',
+        image: 'https://example.com/article.jpg',
+        reason: 'baseline read',
+        url: 'https://thehill.com/example-story',
+      },
+    ],
+  })
+
+  assert.ok(brief.paragraphs.some((paragraph) => /blocked automated access challenge|blocked automated full-text retrieval/i.test(paragraph)))
+  assert.deepEqual(brief.supportingPoints, [])
+})

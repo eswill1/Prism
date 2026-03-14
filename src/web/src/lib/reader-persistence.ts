@@ -1,11 +1,15 @@
 import type { User } from '@supabase/supabase-js'
 
 import type { ReaderTrackingMutation, ReaderTrackingState, RemoteTrackedStory } from './reader-tracking-types'
+import type { PerspectiveRevisionSnapshot } from './perspective-versioning'
+import type { StoryBriefRevisionSnapshot } from './story-brief-versioning'
 import {
   getSupabaseServiceRoleClient,
   hasSupabaseServiceRoleConfig,
+  type JsonObject,
   type SupabaseServerClient,
 } from './supabase/server'
+import { buildTrackedStoryHistory } from './tracked-story-history'
 
 type ReaderProfileRow = {
   id: string
@@ -51,6 +55,34 @@ type TrackedStoryRow = {
 type CorrectionEventRow = {
   cluster_id: string
   display_summary: string
+}
+
+type StoryBriefRevisionRow = {
+  cluster_id: string
+  revision_tag: string
+  status: string
+  is_current: boolean
+  created_at: string
+  title: string
+  paragraphs: string[] | null
+  why_it_matters: string
+  where_sources_agree: string
+  where_coverage_differs: string
+  what_to_watch: string
+  supporting_points: string[] | null
+  metadata: JsonObject | null
+}
+
+type StoryPerspectiveRevisionRow = {
+  cluster_id: string
+  revision_tag: string
+  status: string
+  is_current: boolean
+  created_at: string
+  generation_method: string
+  summary: string
+  takeaways: string[] | null
+  metadata: JsonObject | null
 }
 
 export type AuthenticatedReader = {
@@ -144,6 +176,83 @@ function formatUpdatedAt(value: string | null | undefined) {
   return `Updated ${diffDays}d ago`
 }
 
+function readStringArray(values: string[] | null | undefined) {
+  return Array.isArray(values)
+    ? values.filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    : []
+}
+
+function toBriefRevisionSnapshot(
+  row: StoryBriefRevisionRow | undefined,
+): StoryBriefRevisionSnapshot | undefined {
+  if (!row) {
+    return undefined
+  }
+
+  return {
+    revisionTag: row.revision_tag,
+    createdAt: row.created_at,
+    status: row.status === 'full' ? 'full' : 'early',
+    title: row.title,
+    paragraphs: readStringArray(row.paragraphs),
+    whyItMatters: row.why_it_matters,
+    whereSourcesAgree: row.where_sources_agree,
+    whereCoverageDiffers: row.where_coverage_differs,
+    whatToWatch: row.what_to_watch,
+    supportingPoints: readStringArray(row.supporting_points),
+    metadata: row.metadata || {},
+  }
+}
+
+function toPerspectiveRevisionSnapshot(
+  row: StoryPerspectiveRevisionRow | undefined,
+): PerspectiveRevisionSnapshot | undefined {
+  if (!row) {
+    return undefined
+  }
+
+  return {
+    revisionTag: row.revision_tag,
+    createdAt: row.created_at,
+    generationMethod: row.generation_method,
+    status: row.status === 'ready' ? 'ready' : 'early',
+    summary: row.summary,
+    takeaways: readStringArray(row.takeaways),
+    metadata: row.metadata || {},
+  }
+}
+
+function groupRowsByCluster<T extends { cluster_id: string }>(rows: T[]) {
+  const grouped = new Map<string, T[]>()
+
+  for (const row of rows) {
+    grouped.set(row.cluster_id, [...(grouped.get(row.cluster_id) ?? []), row])
+  }
+
+  return grouped
+}
+
+function currentRevisionRow<T extends { is_current: boolean }>(rows: T[]) {
+  return rows.find((row) => row.is_current) ?? rows[0]
+}
+
+function previousRevisionRow<T extends { revision_tag: string; is_current: boolean }>(rows: T[]) {
+  const current = currentRevisionRow(rows)
+  if (!current) {
+    return undefined
+  }
+
+  return rows.find((row) => row.revision_tag !== current.revision_tag)
+}
+
+function revisionRowByTag<T extends { revision_tag: string }>(rows: T[], revisionTag?: string) {
+  if (!revisionTag) {
+    return undefined
+  }
+
+  return rows.find((row) => row.revision_tag === revisionTag)
+}
+
 function ensureServiceClient() {
   const client = getSupabaseServiceRoleClient()
   if (!client || !hasSupabaseServiceRoleConfig()) {
@@ -151,6 +260,10 @@ function ensureServiceClient() {
   }
 
   return client
+}
+
+export function requireReaderServiceClient() {
+  return ensureServiceClient()
 }
 
 function parseBearerToken(request: Request) {
@@ -276,6 +389,28 @@ async function loadClusterContext(
 
   return Object.fromEntries(
     ((data as ClusterSlugRow[] | null) ?? []).map((row) => [row.id, row]),
+  )
+}
+
+async function loadClusterContextBySlug(
+  client: SupabaseServerClient,
+  slugs: string[],
+): Promise<Record<string, ClusterSlugRow>> {
+  if (slugs.length === 0) {
+    return {}
+  }
+
+  const { data, error } = await client
+    .from('story_clusters')
+    .select('id, slug, topic_label, canonical_headline')
+    .in('slug', slugs)
+
+  if (error) {
+    throw new ReaderAuthError(`Unable to load tracked stories: ${error.message}`, 500)
+  }
+
+  return Object.fromEntries(
+    ((data as ClusterSlugRow[] | null) ?? []).map((row) => [row.slug, row]),
   )
 }
 
@@ -659,6 +794,196 @@ export async function importReaderTrackingRecords(
   }
 }
 
+async function resolvePreviewTrackingState(
+  client: SupabaseServerClient,
+  records: ReaderTrackingState[],
+) {
+  const filteredRecords = records.filter(
+    (record) => record.slug && (record.saved || record.followed || record.lastViewedAt),
+  )
+  if (filteredRecords.length === 0) {
+    return {} as Record<string, ReaderTrackingState>
+  }
+
+  const [clusterContextById, clusterContextBySlug] = await Promise.all([
+    loadClusterContext(
+      client,
+      Array.from(
+        new Set(filteredRecords.map((record) => record.clusterId).filter((value): value is string => Boolean(value))),
+      ),
+    ),
+    loadClusterContextBySlug(
+      client,
+      Array.from(
+        new Set(
+          filteredRecords
+            .filter((record) => !record.clusterId)
+            .map((record) => record.slug)
+            .filter(Boolean),
+        ),
+      ),
+    ),
+  ])
+
+  const trackingState: Record<string, ReaderTrackingState> = {}
+
+  for (const record of filteredRecords) {
+    const cluster =
+      (record.clusterId ? clusterContextById[record.clusterId] : undefined) ||
+      clusterContextBySlug[record.slug]
+    if (!cluster) {
+      continue
+    }
+
+    trackingState[cluster.id] = {
+      clusterId: cluster.id,
+      slug: cluster.slug,
+      title: record.title || cluster.canonical_headline || undefined,
+      topic: record.topic || cluster.topic_label || undefined,
+      saved: record.saved,
+      followed: record.followed,
+      savedAt: record.savedAt,
+      followedAt: record.followedAt,
+      lastViewedAt: record.lastViewedAt,
+      lastSeenBriefRevisionTag: record.lastSeenBriefRevisionTag,
+      lastSeenPerspectiveRevisionTag: record.lastSeenPerspectiveRevisionTag,
+    }
+  }
+
+  return trackingState
+}
+
+async function buildTrackedStoriesFromState(
+  client: SupabaseServerClient,
+  trackingState: Record<string, ReaderTrackingState>,
+) {
+  const clusterIds = Array.from(
+    new Set(
+      Object.entries(trackingState)
+        .filter(([, state]) => state.saved || state.followed)
+        .map(([clusterId]) => clusterId)
+        .filter(Boolean),
+    ),
+  )
+
+  if (clusterIds.length === 0) {
+    return [] as RemoteTrackedStory[]
+  }
+
+  const [
+    { data: stories, error: storiesError },
+    { data: corrections, error: correctionsError },
+    { data: briefRevisions, error: briefRevisionsError },
+    { data: perspectiveRevisions, error: perspectiveRevisionsError },
+  ] = await Promise.all([
+    client
+      .from('story_clusters')
+      .select(
+        'id, slug, topic_label, canonical_headline, summary, latest_event_at, hero_media_url, hero_media_alt',
+      )
+      .in('id', clusterIds),
+    client
+      .from('correction_events')
+      .select('cluster_id, display_summary')
+      .in('cluster_id', clusterIds)
+      .order('created_at', { ascending: false }),
+    client
+      .from('story_brief_revisions')
+      .select(
+        'cluster_id, revision_tag, status, is_current, created_at, title, paragraphs, why_it_matters, where_sources_agree, where_coverage_differs, what_to_watch, supporting_points, metadata',
+      )
+      .in('cluster_id', clusterIds)
+      .order('created_at', { ascending: false }),
+    client
+      .from('story_perspective_revisions')
+      .select(
+        'cluster_id, revision_tag, status, is_current, created_at, generation_method, summary, takeaways, metadata',
+      )
+      .in('cluster_id', clusterIds)
+      .order('created_at', { ascending: false }),
+  ])
+
+  if (storiesError) {
+    throw new ReaderAuthError(`Unable to load tracked story details: ${storiesError.message}`, 500)
+  }
+  if (correctionsError) {
+    throw new ReaderAuthError(`Unable to load tracked story change history: ${correctionsError.message}`, 500)
+  }
+  if (briefRevisionsError) {
+    throw new ReaderAuthError(`Unable to load tracked story briefs: ${briefRevisionsError.message}`, 500)
+  }
+  if (perspectiveRevisionsError) {
+    throw new ReaderAuthError(`Unable to load tracked story Perspective history: ${perspectiveRevisionsError.message}`, 500)
+  }
+
+  const correctionMap = groupRowsByCluster((corrections as CorrectionEventRow[] | null) ?? [])
+  const briefRevisionMap = groupRowsByCluster(
+    (briefRevisions as StoryBriefRevisionRow[] | null) ?? [],
+  )
+  const perspectiveRevisionMap = groupRowsByCluster(
+    (perspectiveRevisions as StoryPerspectiveRevisionRow[] | null) ?? [],
+  )
+
+  return ((stories as TrackedStoryRow[] | null) ?? [])
+    .flatMap((story) => {
+      const storyTracking = trackingState[story.id]
+      if (!storyTracking || (!storyTracking.saved && !storyTracking.followed)) {
+        return []
+      }
+
+      const storyCorrections = correctionMap.get(story.id) ?? []
+      const storyBriefRows = briefRevisionMap.get(story.id) ?? []
+      const storyPerspectiveRows = perspectiveRevisionMap.get(story.id) ?? []
+      const currentBriefRow = currentRevisionRow(storyBriefRows)
+      const currentPerspectiveRow = currentRevisionRow(storyPerspectiveRows)
+      const history = buildTrackedStoryHistory({
+        currentBrief: toBriefRevisionSnapshot(currentBriefRow),
+        seenBrief: toBriefRevisionSnapshot(
+          revisionRowByTag(storyBriefRows, storyTracking.lastSeenBriefRevisionTag),
+        ),
+        previousBrief: toBriefRevisionSnapshot(previousRevisionRow(storyBriefRows)),
+        lastSeenBriefRevisionTag: storyTracking.lastSeenBriefRevisionTag,
+        currentPerspective: toPerspectiveRevisionSnapshot(currentPerspectiveRow),
+        seenPerspective: toPerspectiveRevisionSnapshot(
+          revisionRowByTag(
+            storyPerspectiveRows,
+            storyTracking.lastSeenPerspectiveRevisionTag,
+          ),
+        ),
+        previousPerspective: toPerspectiveRevisionSnapshot(
+          previousRevisionRow(storyPerspectiveRows),
+        ),
+        lastSeenPerspectiveRevisionTag: storyTracking.lastSeenPerspectiveRevisionTag,
+      })
+
+      return [
+        {
+          clusterId: story.id,
+          slug: story.slug,
+          topic: story.topic_label,
+          title: story.canonical_headline,
+          dek: story.summary || 'No summary available yet.',
+          updatedAt: formatUpdatedAt(story.latest_event_at),
+          heroImage: story.hero_media_url || fallbackClusterImage(story.slug),
+          heroAlt:
+            story.hero_media_alt || `Editorial image for the ${story.canonical_headline} story.`,
+          latestChange: storyCorrections[0]?.display_summary,
+          changeCount: storyCorrections.length,
+          tracking: storyTracking,
+          history,
+        } satisfies RemoteTrackedStory,
+      ]
+    })
+    .sort((left, right) => {
+      const leftTimestamp =
+        left.tracking.followedAt || left.tracking.savedAt || left.tracking.lastViewedAt || ''
+      const rightTimestamp =
+        right.tracking.followedAt || right.tracking.savedAt || right.tracking.lastViewedAt || ''
+
+      return rightTimestamp.localeCompare(leftTimestamp)
+    })
+}
+
 export async function listTrackedStories(client: SupabaseServerClient, profileId: string) {
   const { data: savedRows, error: savedError } = await client
     .from('saved_clusters')
@@ -692,67 +1017,13 @@ export async function listTrackedStories(client: SupabaseServerClient, profileId
   }
 
   const trackingState = await loadReaderTrackingState(client, profileId, clusterIds)
+  return buildTrackedStoriesFromState(client, trackingState)
+}
 
-  const [{ data: stories, error: storiesError }, { data: corrections, error: correctionsError }] =
-    await Promise.all([
-      client
-        .from('story_clusters')
-        .select(
-          'id, slug, topic_label, canonical_headline, summary, latest_event_at, hero_media_url, hero_media_alt',
-        )
-        .in('id', clusterIds),
-      client
-        .from('correction_events')
-        .select('cluster_id, display_summary')
-        .in('cluster_id', clusterIds)
-        .order('created_at', { ascending: false }),
-    ])
-
-  if (storiesError) {
-    throw new ReaderAuthError(`Unable to load tracked story details: ${storiesError.message}`, 500)
-  }
-  if (correctionsError) {
-    throw new ReaderAuthError(`Unable to load tracked story change history: ${correctionsError.message}`, 500)
-  }
-
-  const correctionMap = new Map<string, CorrectionEventRow[]>()
-  for (const row of (corrections as CorrectionEventRow[] | null) ?? []) {
-    correctionMap.set(row.cluster_id, [...(correctionMap.get(row.cluster_id) ?? []), row])
-  }
-
-  const trackedStories = ((stories as TrackedStoryRow[] | null) ?? [])
-    .flatMap((story) => {
-      const storyTracking = trackingState[story.id]
-      if (!storyTracking || (!storyTracking.saved && !storyTracking.followed)) {
-        return []
-      }
-
-      const storyCorrections = correctionMap.get(story.id) ?? []
-      return [
-        {
-          clusterId: story.id,
-          slug: story.slug,
-          topic: story.topic_label,
-          title: story.canonical_headline,
-          dek: story.summary || 'No summary available yet.',
-          updatedAt: formatUpdatedAt(story.latest_event_at),
-          heroImage: story.hero_media_url || fallbackClusterImage(story.slug),
-          heroAlt:
-            story.hero_media_alt || `Editorial image for the ${story.canonical_headline} story.`,
-          latestChange: storyCorrections[0]?.display_summary,
-          changeCount: storyCorrections.length,
-          tracking: storyTracking,
-        } satisfies RemoteTrackedStory,
-      ]
-    })
-    .sort((left, right) => {
-      const leftTimestamp =
-        left.tracking.followedAt || left.tracking.savedAt || left.tracking.lastViewedAt || ''
-      const rightTimestamp =
-        right.tracking.followedAt || right.tracking.savedAt || right.tracking.lastViewedAt || ''
-
-      return rightTimestamp.localeCompare(leftTimestamp)
-    })
-
-  return trackedStories
+export async function listTrackedStoriesPreview(
+  client: SupabaseServerClient,
+  records: ReaderTrackingState[],
+) {
+  const trackingState = await resolvePreviewTrackingState(client, records)
+  return buildTrackedStoriesFromState(client, trackingState)
 }

@@ -2073,6 +2073,58 @@ button {
   color: var(--prism-slate);
 }
 
+.saved-history-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.saved-history-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--prism-deep-line);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.saved-history-card-updated {
+  background: rgba(227, 244, 229, 0.72);
+  border-color: rgba(72, 121, 82, 0.28);
+}
+
+.saved-history-card-pending {
+  background: rgba(246, 239, 221, 0.72);
+  border-color: rgba(143, 120, 73, 0.24);
+}
+
+.saved-history-header,
+.saved-history-compare {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.saved-history-title {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.saved-history-tag {
+  font-size: 0.78rem;
+  color: var(--prism-slate);
+}
+
+.saved-history-compare {
+  color: var(--prism-slate);
+  font-size: 0.78rem;
+}
+
+.saved-history-list {
+  margin: 0;
+}
+
 .narrative-panel,
 .pricing-card,
 .correction-log-card {

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
-import { loadTrackedStories } from '../lib/reader-tracking-client'
+import { loadTrackedStories, previewTrackedStories } from '../lib/reader-tracking-client'
 import type { RemoteTrackedStory } from '../lib/reader-tracking-types'
 import {
   readStoryTrackingStore,
@@ -31,6 +31,7 @@ type SavedStoriesClientProps = {
 
 type RenderTrackedStory = TrackedStoryCandidate & {
   tracking?: StoryTrackingRecord
+  history?: RemoteTrackedStory['history']
 }
 
 function formatTrackedDate(value?: string) {
@@ -82,7 +83,33 @@ function toRenderedRemoteStories(stories: RemoteTrackedStory[]) {
     latestChange: story.latestChange,
     changeCount: story.changeCount,
     tracking: story.tracking,
+    history: story.history,
   }))
+}
+
+function renderHistoryEntry(
+  label: string,
+  entry: RemoteTrackedStory['history']['narrative'],
+) {
+  return (
+    <article className={`saved-history-card saved-history-card-${entry.state}`}>
+      <div className="saved-history-header">
+        <p className="panel-label">{label}</p>
+        {entry.currentRevisionTag ? (
+          <span className="saved-history-tag">{entry.currentRevisionTag}</span>
+        ) : null}
+      </div>
+      <p className="saved-history-title">{entry.title}</p>
+      {entry.comparedToTag ? (
+        <p className="saved-history-compare">Compared with {entry.comparedToTag}</p>
+      ) : null}
+      <ul className="simple-list saved-history-list">
+        {entry.changeSummary.map((item) => (
+          <li key={`${label}-${entry.currentRevisionTag || entry.title}-${item}`}>{item}</li>
+        ))}
+      </ul>
+    </article>
+  )
 }
 
 export function SavedStoriesClient({ stories }: SavedStoriesClientProps) {
@@ -113,9 +140,31 @@ export function SavedStoriesClient({ stories }: SavedStoriesClientProps) {
   useEffect(() => {
     const localStories = toSortedLocalStories(stories, readStoryTrackingStore())
     if (session.status !== 'signed_in' || !session.accessToken) {
+      const localRecords = localStories.flatMap((story) => (story.tracking ? [story.tracking] : []))
       setTrackedStories(localStories)
       setSyncError(null)
-      setIsLoading(false)
+      if (localStories.length === 0) {
+        setIsLoading(false)
+        return
+      }
+
+      setIsLoading(true)
+      previewTrackedStories(localRecords)
+        .then(({ stories: previewStories }) => {
+          if (previewStories.length > 0) {
+            setTrackedStories(toRenderedRemoteStories(previewStories))
+          }
+        })
+        .catch((error) => {
+          setSyncError(
+            error instanceof Error
+              ? error.message
+              : 'Unable to load saved-story history right now.',
+          )
+        })
+        .finally(() => {
+          setIsLoading(false)
+        })
       return
     }
 
@@ -180,7 +229,13 @@ export function SavedStoriesClient({ stories }: SavedStoriesClientProps) {
 
   return (
     <>
-      {isLoading ? <p className="tracking-footnote">Refreshing synced saved stories...</p> : null}
+      {isLoading ? (
+        <p className="tracking-footnote">
+          {session.status === 'signed_in'
+            ? 'Refreshing synced saved stories...'
+            : 'Refreshing saved-story history...'}
+        </p>
+      ) : null}
       {importState.isImporting ? (
         <p className="tracking-footnote">Syncing browser-tracked stories into this account...</p>
       ) : null}
@@ -211,6 +266,12 @@ export function SavedStoriesClient({ stories }: SavedStoriesClientProps) {
                 <strong>{story.changeCount} visible changes</strong>
                 <span>{story.latestChange || 'Return to the story page for the latest change log.'}</span>
               </div>
+              {story.history ? (
+                <div className="saved-history-grid">
+                  {renderHistoryEntry('Narrative delta', story.history.narrative)}
+                  {renderHistoryEntry('Perspective delta', story.history.perspective)}
+                </div>
+              ) : null}
               <div className="saved-story-footer">
                 <span>{story.updatedAt}</span>
                 <span>Last opened {formatTrackedDate(story.tracking?.lastViewedAt)}</span>

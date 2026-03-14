@@ -282,7 +282,7 @@ Institutional plans and saved stories matter early because they align with the b
 - [x] Perspective firewall tests
 - [ ] Morning and evening briefing generation
 - [ ] Follow alerts and topic following
-- [ ] Saved-story history with visible narrative and Perspective deltas over time
+- [x] Saved-story history with visible narrative and Perspective deltas over time
 - [ ] Major-story Live Tracker surface with rolling source updates and a lighter-weight live Perspective treatment
 - [ ] Subscriber-only monitoring and briefing features
 - [ ] Payment and account workflows

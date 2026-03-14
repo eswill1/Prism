@@ -12,6 +12,8 @@ export type ClusterArticle = {
   namedEntities?: string[]
   extractionQuality?: string
   accessTier?: 'open' | 'likely_paywalled' | 'unknown'
+  fetchBlocked?: boolean
+  fetchBlockReason?: string
   published: string
   framing: FramingGroup
   image: string

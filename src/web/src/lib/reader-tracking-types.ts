@@ -24,6 +24,20 @@ export type ReaderTrackingMutation = {
   lastSeenPerspectiveRevisionTag?: string
 }
 
+export type TrackedStoryHistoryEntry = {
+  state: 'updated' | 'current' | 'pending'
+  title: string
+  currentRevisionTag?: string
+  comparedToTag?: string
+  changeSummary: string[]
+}
+
+export type TrackedStoryHistory = {
+  hasUpdates: boolean
+  narrative: TrackedStoryHistoryEntry
+  perspective: TrackedStoryHistoryEntry
+}
+
 export type RemoteTrackedStory = {
   clusterId: string
   slug: string
@@ -36,4 +50,5 @@ export type RemoteTrackedStory = {
   latestChange?: string
   changeCount: number
   tracking: ReaderTrackingState
+  history: TrackedStoryHistory
 }

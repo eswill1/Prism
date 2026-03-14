@@ -490,6 +490,17 @@ def merge_article_metadata(article: dict[str, Any], enrichment: dict[str, Any], 
         metadata["body_mismatch_detected"] = True
     else:
         metadata.pop("body_mismatch_detected", None)
+    if enrichment.get("fetch_blocked"):
+        metadata["fetch_blocked"] = True
+        metadata["fetch_block_reason"] = enrichment.get("fetch_block_reason") or "anti_bot_challenge"
+        if enrichment.get("fetch_block_vendor"):
+            metadata["fetch_block_vendor"] = enrichment["fetch_block_vendor"]
+        metadata["fetch_blocked_at"] = attempted_at
+    else:
+        metadata.pop("fetch_blocked", None)
+        metadata.pop("fetch_block_reason", None)
+        metadata.pop("fetch_block_vendor", None)
+        metadata.pop("fetch_blocked_at", None)
     return metadata
 
 
@@ -500,6 +511,7 @@ def main() -> int:
     enriched = 0
     failed = 0
     skipped = 0
+    blocked = 0
     refreshed_clusters = 0
     touched_story_slugs: set[str] = set()
 
@@ -519,6 +531,7 @@ def main() -> int:
             summary = clean_summary_snippet(str(enrichment.get("lede", "")) or fallback_summary, 320)
             body_preview = str(enrichment.get("body_preview", "") or "").strip()
             extraction_quality = str(enrichment.get("extraction_quality", "rss_only"))
+            fetch_blocked = enrichment.get("fetch_blocked") is True
 
             if mismatch_detected:
                 enrichment["body_mismatch_detected"] = True
@@ -544,13 +557,24 @@ def main() -> int:
                     client,
                     discovery["id"],
                     {
-                        "fetch_status": "fetched" if extraction_quality != "rss_only" else "normalized",
+                        "fetch_status": (
+                            "failed"
+                            if fetch_blocked
+                            else "fetched" if extraction_quality != "rss_only" else "normalized"
+                        ),
                         "last_attempted_at": attempted_at,
-                        "error_message": None,
+                        "error_message": (
+                            f"fetch_blocked:{enrichment.get('fetch_block_reason') or 'anti_bot_challenge'}"
+                            if fetch_blocked
+                            else None
+                        ),
                     },
                 )
 
-            if extraction_quality == "rss_only":
+            if fetch_blocked:
+                blocked += 1
+                skipped += 1
+            elif extraction_quality == "rss_only":
                 skipped += 1
             else:
                 enriched += 1
@@ -579,6 +603,7 @@ def main() -> int:
                 "attempted": attempted,
                 "enriched": enriched,
                 "rss_only_fallbacks": skipped,
+                "fetch_blocked": blocked,
                 "failed": failed,
                 "refreshed_clusters": refreshed_clusters,
             },

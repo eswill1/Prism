@@ -649,6 +649,11 @@ export async function getClusterDetail(slug: string): Promise<StoryCluster | nul
           typeof articleMetadata.extraction_quality === 'string'
             ? articleMetadata.extraction_quality
             : undefined,
+        fetchBlocked: articleMetadata.fetch_blocked === true,
+        fetchBlockReason:
+          typeof articleMetadata.fetch_block_reason === 'string'
+            ? articleMetadata.fetch_block_reason
+            : undefined,
       }
       }) ?? []
 

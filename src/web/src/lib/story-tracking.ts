@@ -105,6 +105,10 @@ export function getStoryTracking(slug: string) {
   return sanitizeRecord(slug, readStoryTrackingStore()[slug])
 }
 
+export function emptyStoryTrackingRecord(slug: string) {
+  return sanitizeRecord(slug, null)
+}
+
 export function toggleSavedStory(
   story: Pick<StoryTrackingRecord, 'clusterId' | 'slug' | 'title' | 'topic'>,
 ) {
@@ -142,7 +146,15 @@ export function toggleFollowedStory(
 }
 
 export function markStoryViewed(
-  story: Pick<StoryTrackingRecord, 'clusterId' | 'slug' | 'title' | 'topic'>,
+  story: Pick<
+    StoryTrackingRecord,
+    | 'clusterId'
+    | 'slug'
+    | 'title'
+    | 'topic'
+    | 'lastSeenBriefRevisionTag'
+    | 'lastSeenPerspectiveRevisionTag'
+  >,
 ) {
   return upsertStoryTracking(story.slug, (existing) => ({
     ...existing,
@@ -150,5 +162,8 @@ export function markStoryViewed(
     title: story.title || existing.title,
     topic: story.topic || existing.topic,
     lastViewedAt: new Date().toISOString(),
+    lastSeenBriefRevisionTag: story.lastSeenBriefRevisionTag || existing.lastSeenBriefRevisionTag,
+    lastSeenPerspectiveRevisionTag:
+      story.lastSeenPerspectiveRevisionTag || existing.lastSeenPerspectiveRevisionTag,
   }))
 }

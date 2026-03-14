@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { syncReaderTrackingMutation } from '../lib/reader-tracking-client'
 import {
-  getStoryTracking,
+  emptyStoryTrackingRecord,
   markStoryViewed,
   toggleFollowedStory,
   toggleSavedStory,
@@ -63,16 +63,18 @@ export function StoryControls({
 }: StoryControlsProps) {
   const session = useReaderSession()
   const storyIdentity = { clusterId, slug, title, topic }
-  const [tracking, setTracking] = useState<StoryTrackingRecord>(() =>
-    getStoryTracking(slug),
-  )
+  const [tracking, setTracking] = useState<StoryTrackingRecord>(() => emptyStoryTrackingRecord(slug))
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const lastViewSyncKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
-    setTracking(markStoryViewed(storyIdentity))
-  }, [clusterId, slug, title, topic])
+    setTracking(markStoryViewed({
+      ...storyIdentity,
+      lastSeenBriefRevisionTag: briefRevisionTag,
+      lastSeenPerspectiveRevisionTag: perspectiveRevisionTag,
+    }))
+  }, [briefRevisionTag, clusterId, perspectiveRevisionTag, slug, title, topic])
 
   useEffect(() => {
     if (session.status !== 'signed_in' || !clusterId || !session.accessToken) {

@@ -93,3 +93,17 @@ export async function loadTrackedStories(accessToken: string | undefined) {
     stories: RemoteTrackedStory[]
   }>(response)
 }
+
+export async function previewTrackedStories(records: ReaderTrackingState[]) {
+  const response = await fetch('/api/reader/tracked-stories/preview', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ records }),
+  })
+
+  return readJsonResponse<{
+    stories: RemoteTrackedStory[]
+  }>(response)
+}
